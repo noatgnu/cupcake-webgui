@@ -1,0 +1,108 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-info-circle me-2"></i>
+    {{ isEdit ? 'Edit' : 'Add' }} Support Information
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  <form>
+    <div class="mb-3">
+      <label for="serialNumber" class="form-label">Serial Number</label>
+      <input
+        type="text"
+        class="form-control"
+        id="serialNumber"
+        [(ngModel)]="serialNumber"
+        name="serialNumber"
+        placeholder="Enter serial number">
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="vendorName" class="form-label">Vendor Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="vendorName"
+          [(ngModel)]="vendorName"
+          name="vendorName"
+          placeholder="Enter vendor name">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="manufacturerName" class="form-label">Manufacturer Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="manufacturerName"
+          [(ngModel)]="manufacturerName"
+          name="manufacturerName"
+          placeholder="Enter manufacturer name">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="location" class="form-label">
+        <i class="bi bi-geo-alt me-1"></i>Location
+      </label>
+      <app-storage-location-typeahead
+        [selectedLocationName]="selectedLocationName"
+        [selectedLocationId]="supportInformation?.location"
+        (locationSelected)="onLocationSelected($event)"
+        placeholder="Search for storage location...">
+      </app-storage-location-typeahead>
+      <small class="form-text text-muted">
+        Type to search for a storage location (min. 2 characters)
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label for="maintenanceFrequencyDays" class="form-label">Maintenance Frequency (Days)</label>
+      <input
+        type="number"
+        class="form-control"
+        id="maintenanceFrequencyDays"
+        [(ngModel)]="maintenanceFrequencyDays"
+        name="maintenanceFrequencyDays"
+        placeholder="Enter maintenance frequency in days"
+        min="1">
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="warrantyStartDate" class="form-label">Warranty Start Date</label>
+        <input
+          type="date"
+          class="form-control"
+          id="warrantyStartDate"
+          [(ngModel)]="warrantyStartDate"
+          name="warrantyStartDate">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="warrantyEndDate" class="form-label">Warranty End Date</label>
+        <input
+          type="date"
+          class="form-control"
+          id="warrantyEndDate"
+          [(ngModel)]="warrantyEndDate"
+          name="warrantyEndDate">
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" (click)="cancel()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    <i class="bi bi-check-circle me-2"></i>
+    {{ isEdit ? 'Update' : 'Create' }}
+  </button>
+</div>

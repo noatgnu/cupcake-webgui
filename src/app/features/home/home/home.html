@@ -1,0 +1,125 @@
+<app-home-navbar (sectionChange)="showSection($event)" [activeSection]="activeSection" />
+
+<div class="content-wrapper">
+  @if (activeSection === 'dashboard') {
+    <div class="container-fluid p-4">
+      <div class="row g-4">
+    <!-- Welcome Card -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h3 class="card-title">Welcome to Cupcake</h3>
+          <p class="card-text text-muted">
+            Your laboratory information management system for protocols, instruments, and storage management.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="col-md-3 col-sm-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-journal-text fs-1 text-primary"></i>
+            <div>
+              <div class="text-muted small">Protocols</div>
+              <div class="h4 mb-0">24</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-calendar3 fs-1 text-success"></i>
+            <div>
+              <div class="text-muted small">Bookings</div>
+              <div class="h4 mb-0">8</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-box-seam fs-1 text-info"></i>
+            <div>
+              <div class="text-muted small">Reagents</div>
+              <div class="h4 mb-0">156</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-warning">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
+            <div>
+              <div class="text-muted small">Low Stock</div>
+              <div class="h4 mb-0">3</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Recent Activity</h5>
+        </div>
+        <div class="card-body">
+          <div class="empty-state">
+            <i class="bi bi-clock-history"></i>
+            <h3>No Recent Activity</h3>
+            <p>Your recent actions will appear here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Access -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Quick Access</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-grid gap-2">
+            <button class="btn btn-outline-primary btn-sm text-start">
+              <i class="bi bi-journal-plus me-2"></i>
+              New Protocol
+            </button>
+            <button class="btn btn-outline-success btn-sm text-start">
+              <i class="bi bi-calendar-plus me-2"></i>
+              Book Instrument
+            </button>
+            <button class="btn btn-outline-info btn-sm text-start">
+              <i class="bi bi-box-arrow-in-down me-2"></i>
+              Add Reagent
+            </button>
+            <button class="btn btn-outline-secondary btn-sm text-start">
+              <i class="bi bi-search me-2"></i>
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  } @else {
+    <router-outlet />
+  }
+</div>

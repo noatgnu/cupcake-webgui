@@ -1,0 +1,81 @@
+<div class="notification-dropdown">
+  <button
+    #toggleButton
+    [class]="getButtonClass()"
+    (click)="toggleDropdown()"
+    type="button">
+    <i class="bi bi-bell fs-5"></i>
+    @if (unreadCount() > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+        {{ unreadCount() > 99 ? '99+' : unreadCount() }}
+      </span>
+    }
+  </button>
+
+  @if (isOpen()) {
+    <div
+      class="dropdown-menu show"
+      [style.bottom.px]="dropdownPosition().bottom"
+      [style.left.px]="dropdownPosition().left"
+      style="width: 380px; max-height: 500px;">
+      <div class="dropdown-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Notifications</h6>
+        <button type="button" class="btn-close btn-sm" (click)="isOpen.set(false)"></button>
+      </div>
+
+      @if (loading()) {
+        <div class="text-center p-4">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      } @else if (notifications().length === 0) {
+        <div class="text-center p-4 text-muted">
+          <i class="bi bi-bell-slash fs-1 mb-2 d-block"></i>
+          <p class="mb-0">No new notifications</p>
+        </div>
+      } @else {
+        <div class="notifications-list" style="max-height: 400px; overflow-y: auto;">
+          @for (notification of notifications(); track notification.id) {
+            <div
+              class="dropdown-item notification-item"
+              [class.unread]="!notification.isRead"
+              [class.has-link]="hasReagentLink(notification)"
+              (click)="markAsRead(notification)">
+              <div class="d-flex gap-2">
+                <div class="flex-shrink-0">
+                  <i [class]="getPriorityIcon(notification.priority) + ' ' + getPriorityClass(notification.priority)"></i>
+                </div>
+                <div class="flex-grow-1 overflow-hidden">
+                  <div class="fw-semibold text-truncate">{{ notification.title }}</div>
+                  <div class="small text-muted text-truncate">{{ notification.message }}</div>
+                  @if (hasReagentLink(notification)) {
+                    <button
+                      class="btn btn-link btn-sm p-0 text-decoration-none"
+                      (click)="navigateToReagent(notification, $event)">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>
+                      <small>View reagent</small>
+                    </button>
+                  }
+                  <div class="small text-muted">{{ getTimeAgo(notification.createdAt) }}</div>
+                </div>
+                @if (!notification.isRead) {
+                  <div class="flex-shrink-0">
+                    <span class="badge bg-primary rounded-circle" style="width: 8px; height: 8px;"></span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item text-center">
+        <button class="btn btn-link text-decoration-none" (click)="viewAll()">
+          View All Notifications
+        </button>
+      </div>
+    </div>
+  }
+</div>

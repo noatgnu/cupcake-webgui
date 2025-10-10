@@ -1,0 +1,60 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-box me-2"></i>
+    Edit Storage Object
+  </h5>
+  <button type="button" class="btn-close" aria-label="Close" (click)="close()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" class="d-flex flex-column gap-3">
+    <div class="form-floating">
+      <input
+        type="text"
+        class="form-control"
+        [class.is-invalid]="form.controls.objectName.invalid && form.controls.objectName.touched"
+        id="objectName"
+        formControlName="objectName"
+        placeholder="Object Name">
+      <label for="objectName">Object Name *</label>
+      @if (form.controls.objectName.invalid && form.controls.objectName.touched) {
+        <div class="invalid-feedback">
+          Storage object name is required
+        </div>
+      }
+    </div>
+
+    <div class="form-floating">
+      <textarea
+        id="objectDescription"
+        class="form-control"
+        formControlName="objectDescription"
+        placeholder="Object Description"
+        style="min-height: 120px"></textarea>
+      <label for="objectDescription">Object Description</label>
+    </div>
+
+    <div>
+      <app-image-upload
+        label="Storage Object Image"
+        [maxWidth]="800"
+        [maxHeight]="800"
+        [initialImage]="initialImage"
+        (imageChange)="onImageChange($event)"
+        (imageCleared)="onImageCleared()">
+      </app-image-upload>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <div class="d-flex justify-content-end w-100">
+    <button class="btn btn-outline-secondary me-2" (click)="close()">Cancel</button>
+    <button
+      class="btn btn-primary"
+      [disabled]="form.invalid"
+      (click)="submit()">
+      <i class="bi bi-save me-1"></i> Save
+    </button>
+  </div>
+</div>

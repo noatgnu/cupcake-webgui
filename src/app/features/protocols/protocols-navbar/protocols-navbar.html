@@ -1,0 +1,36 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <button
+      class="btn btn-link nav-link me-2"
+      (click)="onToggleSidebar()"
+      aria-label="Toggle sidebar"
+      style="border: none; background: none; color: inherit;">
+      <i class="bi bi-list fs-4"></i>
+    </button>
+
+    <span class="navbar-brand mb-0 me-4">Protocols</span>
+
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/protocols" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+            <i class="bi bi-journal-medical me-1"></i>
+            Protocols
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/protocols/sessions" routerLinkActive="active">
+            <i class="bi bi-play-circle me-1"></i>
+            Sessions
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/protocols/timers" routerLinkActive="active">
+            <i class="bi bi-stopwatch me-1"></i>
+            Timers
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>

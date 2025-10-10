@@ -1,0 +1,712 @@
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute } from '@angular/router';
+import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
+import {
+  InstrumentJobService,
+  JobType,
+  Status,
+  SampleType,
+  InstrumentJob,
+  InstrumentJobCreateRequest
+} from '@noatgnu/cupcake-macaron';
+import { ProjectService, Project, ProjectCreateRequest } from '@noatgnu/cupcake-red-velvet';
+import { ToastService } from '@noatgnu/cupcake-core';
+import { JobSubmissionStateService } from './services/job-submission-state';
+import { StepOneJobProjectComponent } from './steps/step-one-job-project/step-one-job-project';
+import { StepTwoLabGroupStaffComponent } from './steps/step-two-lab-group-staff/step-two-lab-group-staff';
+import { StepThreeSamplesComponent } from './steps/step-three-samples/step-three-samples';
+import { StepFourTemplateComponent } from './steps/step-four-template/step-four-template';
+import { StepFiveReviewSubmitComponent } from './steps/step-five-review-submit/step-five-review-submit';
+import { StepSixStaffReviewComponent } from './steps/step-six-staff-review/step-six-staff-review';
+
+@Component({
+  selector: 'app-job-submission',
+  imports: [
+    CommonModule,
+    FormsModule,
+    NgbPaginationModule,
+    StepOneJobProjectComponent,
+    StepTwoLabGroupStaffComponent,
+    StepThreeSamplesComponent,
+    StepFourTemplateComponent,
+    StepFiveReviewSubmitComponent,
+    StepSixStaffReviewComponent
+  ],
+  providers: [JobSubmissionStateService],
+  templateUrl: './job-submission.html',
+  styleUrl: './job-submission.scss'
+})
+export class JobSubmission implements OnInit {
+  private instrumentJobService = inject(InstrumentJobService);
+  private projectService = inject(ProjectService);
+  private toastService = inject(ToastService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  state = inject(JobSubmissionStateService);
+
+  currentStep = signal(1);
+  totalSteps = 6;
+
+  private originalJobData: any = {};
+  private stepDirtyFlags = new Map<number, boolean>();
+
+  JobType = JobType;
+  Status = Status;
+  SampleType = SampleType;
+  Math = Math;
+
+  canGoNext = computed(() => {
+    switch (this.currentStep()) {
+      case 1:
+        const hasJobTitle = this.state.jobTitle().trim().length > 0;
+        const hasProject = this.state.selectedProjectId() !== null ||
+                          (this.state.projectTitle().trim().length > 0 && this.state.projectDescription().trim().length > 0);
+        return hasJobTitle && hasProject && this.state.jobId() !== null;
+      case 2:
+        return this.state.selectedLabGroupId() !== null;
+      case 3:
+        return this.state.sampleNumber() > 0;
+      case 4:
+        return this.state.selectedTemplateId() !== null;
+      case 5:
+        return this.state.metadataTableCreated();
+      case 6:
+        return true;
+      default:
+        return false;
+    }
+  });
+
+  ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const stepParam = params['step'];
+      const targetStep = stepParam ? parseInt(stepParam, 10) : 1;
+
+      const jobIdParam = params['jobId'];
+      if (jobIdParam) {
+        const id = parseInt(jobIdParam, 10);
+        if (!isNaN(id)) {
+          this.state.jobId.set(id);
+          this.loadExistingJob(id, targetStep);
+        }
+      }
+
+      const projectIdParam = params['projectId'];
+      if (projectIdParam && !jobIdParam) {
+        const projectId = parseInt(projectIdParam, 10);
+        if (!isNaN(projectId)) {
+          this.loadProjectById(projectId);
+        }
+      }
+    });
+  }
+
+  loadProjectById(projectId: number): void {
+    this.projectService.getProject(projectId).subscribe({
+      next: (project) => {
+        this.state.selectProject(project);
+      },
+      error: (err) => {
+        console.error('Error loading project:', err);
+        this.toastService.error('Failed to load project');
+      }
+    });
+  }
+
+  storeOriginalJobData(job: InstrumentJob): void {
+    this.originalJobData = {
+      jobName: job.jobName || '',
+      project: job.project || null,
+      labGroup: job.labGroup || null,
+      staff: [...(job.staff || [])],
+      funder: job.funder || '',
+      costCenter: job.costCenter || '',
+      sampleNumber: job.sampleNumber || 1,
+      metadataTableTemplate: job.metadataTableTemplate || null
+    };
+    this.stepDirtyFlags.clear();
+  }
+
+  isStepDirty(step: number): boolean {
+    switch (step) {
+      case 1:
+        return this.state.jobTitle() !== this.originalJobData.jobName ||
+               this.state.selectedProjectId() !== this.originalJobData.project;
+      case 2:
+        return this.state.selectedLabGroupId() !== this.originalJobData.labGroup ||
+               JSON.stringify(this.state.selectedStaffIds()) !== JSON.stringify(this.originalJobData.staff) ||
+               this.state.funder() !== this.originalJobData.funder ||
+               this.state.costCenter() !== this.originalJobData.costCenter;
+      case 3:
+        return this.state.sampleNumber() !== this.originalJobData.sampleNumber;
+      case 4:
+        return this.state.selectedTemplateId() !== this.originalJobData.metadataTableTemplate;
+      default:
+        return false;
+    }
+  }
+
+  loadExistingJob(id: number, targetStep: number = 1): void {
+    this.state.loading.set(true);
+    this.instrumentJobService.getInstrumentJob(id).subscribe({
+      next: (job) => {
+        this.state.existingJob.set(job);
+        this.state.jobTitle.set(job.jobName || '');
+        this.state.selectedProjectId.set(job.project || null);
+        this.state.projectTitle.set(job.projectName || '');
+        this.state.funder.set(job.funder || '');
+        this.state.funderSearchTerm.set(job.funder || '');
+        this.state.costCenter.set(job.costCenter || '');
+        this.state.costCenterSearchTerm.set(job.costCenter || '');
+        this.state.selectedLabGroupId.set(job.labGroup || null);
+        this.state.selectedStaffIds.set(job.staff || []);
+        this.state.sampleNumber.set(job.sampleNumber || 1);
+
+        if (job.metadataTable) {
+          this.state.metadataTableId.set(job.metadataTable);
+          this.state.metadataTableCreated.set(true);
+        }
+
+        if (job.metadataTableTemplate) {
+          this.state.selectedTemplateId.set(job.metadataTableTemplate);
+        }
+
+        if (job.project) {
+          this.loadProjectById(job.project);
+        }
+
+        if (job.labGroup) {
+          this.state.labGroupSearchTerm.set(job.labGroupName || '');
+          this.state.loadLabGroupMembers(job.labGroup);
+          this.state.loadLabGroupTemplates(job.labGroup);
+        }
+
+        this.loadAutocompleteFields();
+
+        this.storeOriginalJobData(job);
+
+        if (targetStep >= 1 && targetStep <= this.totalSteps) {
+          this.currentStep.set(targetStep);
+        } else {
+          this.currentStep.set(1);
+        }
+
+        this.state.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading job:', err);
+        this.toastService.error('Failed to load draft job');
+        this.state.loading.set(false);
+        this.router.navigate(['/jobs/submit']);
+      }
+    });
+  }
+
+  createDraftJob(): void {
+    this.state.submitting.set(true);
+
+    const projectId = this.state.selectedProjectId();
+
+    if (projectId) {
+      this.createJobWithProject(projectId);
+    } else {
+      const projectData: ProjectCreateRequest = {
+        projectName: this.state.projectTitle(),
+        projectDescription: this.state.projectDescription() || undefined
+      };
+
+      this.projectService.createProject(projectData).subscribe({
+        next: (project) => {
+          this.state.selectProject(project);
+          this.toastService.success('Project created');
+          this.createJobWithProject(project.id);
+        },
+        error: (err) => {
+          console.error('Error creating project:', err);
+          this.toastService.error('Failed to create project');
+          this.state.submitting.set(false);
+        }
+      });
+    }
+  }
+
+  createJobWithProject(projectId: number): void {
+    const jobData: InstrumentJobCreateRequest = {
+      jobType: JobType.ANALYSIS,
+      jobName: this.state.jobTitle(),
+      project: projectId
+    };
+
+    this.instrumentJobService.createInstrumentJob(jobData).subscribe({
+      next: (job) => {
+        this.jobId.set(job.id);
+        this.existingJob.set(job);
+        this.toastService.success('Draft job created');
+        const nextStep = this.currentStep() + 1;
+        this.currentStep.set(nextStep);
+        this.submitting.set(false);
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { jobId: job.id, step: nextStep },
+          queryParamsHandling: 'merge'
+        });
+      },
+      error: (err) => {
+        console.error('Error creating draft job:', err);
+        this.toastService.error('Failed to create draft job');
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  saveAndContinue(step: number): void {
+    const jobIdValue = this.jobId();
+    if (!jobIdValue) {
+      this.toastService.error('No draft job found');
+      return;
+    }
+
+    if (!this.isStepDirty(step)) {
+      this.continueToNextStep(step);
+      return;
+    }
+
+    this.submitting.set(true);
+    const updateData: any = {};
+
+    switch (step) {
+      case 1:
+        updateData.jobName = this.jobTitle().trim().length > 0 ? this.jobTitle() : undefined;
+        if (this.selectedProjectId()) {
+          updateData.project = this.selectedProjectId();
+        } else if (this.projectTitle().trim().length > 0) {
+          const projectData = {
+            projectName: this.projectTitle(),
+            projectDescription: this.projectDescription() || undefined
+          };
+          this.projectService.createProject(projectData).subscribe({
+            next: (project) => {
+              this.selectedProjectId.set(project.id);
+              this.toastService.success('Project created');
+              updateData.project = project.id;
+              this.updateJob(jobIdValue, updateData, step);
+            },
+            error: (err) => {
+              console.error('Error creating project:', err);
+              this.toastService.error('Failed to create project');
+              this.submitting.set(false);
+            }
+          });
+          return;
+        }
+        break;
+      case 2:
+        updateData.labGroup = this.selectedLabGroupId() || undefined;
+        updateData.staff = this.selectedStaffIds().length > 0 ? this.selectedStaffIds() : undefined;
+        updateData.funder = this.funder().trim().length > 0 ? this.funder() : undefined;
+        updateData.costCenter = this.costCenter().trim().length > 0 ? this.costCenter() : undefined;
+        break;
+      case 3:
+        updateData.sampleNumber = this.sampleNumber();
+        break;
+      case 4:
+        updateData.metadataTableTemplate = this.selectedTemplateId() || undefined;
+        break;
+      case 5:
+        break;
+    }
+
+    this.updateJob(jobIdValue, updateData, step);
+  }
+
+  updateJob(jobId: number, updateData: any, step: number): void {
+    if (Object.keys(updateData).length > 0) {
+      this.instrumentJobService.patchInstrumentJob(jobId, updateData).subscribe({
+        next: (job) => {
+          this.existingJob.set(job);
+          this.storeOriginalJobData(job);
+          this.toastService.success('Changes saved');
+          this.continueToNextStep(step);
+          this.submitting.set(false);
+        },
+        error: (err) => {
+          console.error('Error saving draft:', err);
+          this.toastService.error('Failed to save draft');
+          this.submitting.set(false);
+        }
+      });
+    } else {
+      this.continueToNextStep(step);
+      this.submitting.set(false);
+    }
+  }
+
+  continueToNextStep(currentStepNum: number): void {
+    if (currentStepNum === 1) {
+      this.loadLabGroups();
+      this.loadAutocompleteFields();
+    }
+
+    if (this.currentStep() < this.totalSteps) {
+      const nextStep = this.currentStep() + 1;
+      this.currentStep.set(nextStep);
+      this.updateStepQueryParam(nextStep);
+    }
+  }
+
+  loadAutocompleteFields(): void {
+    this.instrumentJobService.getAutocompleteFields().subscribe({
+      next: (response) => {
+        this.allFunders.set(response.funders);
+        this.allCostCenters.set(response.cost_centers);
+        this.updateFunderSuggestions();
+        this.updateCostCenterSuggestions();
+      },
+      error: (err) => {
+        console.error('Error loading autocomplete fields:', err);
+      }
+    });
+  }
+
+  updateFunderSuggestions(): void {
+    const allFunders = this.allFunders();
+    if (!allFunders) {
+      this.funderSuggestions.set([]);
+      return;
+    }
+    const searchTerm = this.funderSearchTerm().toLowerCase().trim();
+    const filtered = searchTerm.length > 0
+      ? allFunders.filter(f => f.toLowerCase().includes(searchTerm))
+      : allFunders;
+    this.funderSuggestions.set(filtered);
+  }
+
+  updateCostCenterSuggestions(): void {
+    const allCostCenters = this.allCostCenters();
+    if (!allCostCenters) {
+      this.costCenterSuggestions.set([]);
+      return;
+    }
+    const searchTerm = this.costCenterSearchTerm().toLowerCase().trim();
+    const filtered = searchTerm.length > 0
+      ? allCostCenters.filter(c => c.toLowerCase().includes(searchTerm))
+      : allCostCenters;
+    this.costCenterSuggestions.set(filtered);
+  }
+
+  onFunderSearchInput(value: string): void {
+    this.funderSearchTerm.set(value);
+    this.funder.set(value);
+    this.updateFunderSuggestions();
+    this.funderCurrentPage.set(1);
+  }
+
+  selectFunder(funder: string): void {
+    this.funder.set(funder);
+    this.funderSearchTerm.set(funder);
+    this.showFunderSuggestions.set(false);
+  }
+
+  clearFunderSelection(): void {
+    this.funder.set('');
+    this.funderSearchTerm.set('');
+    this.showFunderSuggestions.set(false);
+    this.updateFunderSuggestions();
+  }
+
+  hideFunderSuggestions(): void {
+    setTimeout(() => this.showFunderSuggestions.set(false), 200);
+  }
+
+  getPaginatedFunders(): string[] {
+    const suggestions = this.funderSuggestions();
+    if (!suggestions) return [];
+    const start = (this.funderCurrentPage() - 1) * this.funderPageSize;
+    const end = start + this.funderPageSize;
+    return suggestions.slice(start, end);
+  }
+
+  onFunderPageChange(page: number): void {
+    this.funderCurrentPage.set(page);
+  }
+
+  onCostCenterSearchInput(value: string): void {
+    this.costCenterSearchTerm.set(value);
+    this.costCenter.set(value);
+    this.updateCostCenterSuggestions();
+    this.costCenterCurrentPage.set(1);
+  }
+
+  selectCostCenter(costCenter: string): void {
+    this.costCenter.set(costCenter);
+    this.costCenterSearchTerm.set(costCenter);
+    this.showCostCenterSuggestions.set(false);
+  }
+
+  clearCostCenterSelection(): void {
+    this.costCenter.set('');
+    this.costCenterSearchTerm.set('');
+    this.showCostCenterSuggestions.set(false);
+    this.updateCostCenterSuggestions();
+  }
+
+  hideCostCenterSuggestions(): void {
+    setTimeout(() => this.showCostCenterSuggestions.set(false), 200);
+  }
+
+  getPaginatedCostCenters(): string[] {
+    const suggestions = this.costCenterSuggestions();
+    if (!suggestions) return [];
+    const start = (this.costCenterCurrentPage() - 1) * this.costCenterPageSize;
+    const end = start + this.costCenterPageSize;
+    return suggestions.slice(start, end);
+  }
+
+  onCostCenterPageChange(page: number): void {
+    this.costCenterCurrentPage.set(page);
+  }
+
+  previousStep(): void {
+    if (this.currentStep() > 1) {
+      const prevStep = this.currentStep() - 1;
+      this.currentStep.set(prevStep);
+      this.updateStepQueryParam(prevStep);
+    }
+  }
+
+  updateStepQueryParam(step: number): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { step },
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  loadProjects(): void {
+    this.loading.set(true);
+    this.projectService.getProjects({ limit: 10 }).subscribe({
+      next: (response) => {
+        this.projects.set(response.results);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading projects:', err);
+        this.toastService.error('Failed to load projects');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  loadLabGroups(page: number = 1): void {
+    this.loading.set(true);
+    const searchTerm = this.labGroupSearchTerm().trim();
+    const params: any = {
+      limit: this.labGroupPageSize,
+      offset: (page - 1) * this.labGroupPageSize
+    };
+
+    if (searchTerm.length > 0) {
+      params.search = searchTerm;
+    }
+
+    this.labGroupService.getMyLabGroups(params).subscribe({
+      next: (response) => {
+        const filteredGroups = response.results.filter(g => g.canProcessJobs);
+        this.labGroups.set(filteredGroups);
+        this.labGroupTotalCount.set(response.count);
+        this.labGroupCurrentPage.set(page);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading lab groups:', err);
+        this.toastService.error('Failed to load lab groups');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  onLabGroupPageChange(page: number): void {
+    this.loadLabGroups(page);
+  }
+
+  onLabGroupSearchInput(value: string): void {
+    this.labGroupSearchTerm.set(value);
+    this.labGroupSearchSubject.next(value);
+    this.loadLabGroups(1);
+  }
+
+  selectLabGroup(labGroup: LabGroup): void {
+    this.selectedLabGroupId.set(labGroup.id);
+    this.labGroupSearchTerm.set(labGroup.name);
+    this.showLabGroupSuggestions.set(false);
+    this.selectedStaffIds.set([]);
+    this.loadLabGroupMembers(labGroup.id);
+    this.loadLabGroupTemplates(labGroup.id);
+  }
+
+  clearLabGroupSelection(): void {
+    this.selectedLabGroupId.set(null);
+    this.labGroupSearchTerm.set('');
+    this.selectedStaffIds.set([]);
+    this.showLabGroupSuggestions.set(false);
+    this.labGroupMembers.set([]);
+  }
+
+  clearLabGroupAndStaff(): void {
+    this.selectedLabGroupId.set(null);
+    this.labGroupSearchTerm.set('');
+    this.selectedStaffIds.set([]);
+    this.showLabGroupSuggestions.set(false);
+    this.labGroupMembers.set([]);
+  }
+
+  hideLabGroupSuggestions(): void {
+    setTimeout(() => this.showLabGroupSuggestions.set(false), 200);
+  }
+
+  onLabGroupSelect(labGroupId: number): void {
+    this.selectedLabGroupId.set(labGroupId);
+    this.selectedStaffIds.set([]);
+    this.loadLabGroupMembers(labGroupId);
+    this.loadLabGroupTemplates(labGroupId);
+  }
+
+  loadLabGroupMembers(labGroupId: number): void {
+    this.labGroupService.getLabGroupMembers(labGroupId, { directOnly: true, limit: 10 }).subscribe({
+      next: (response) => {
+        const members = response.results as unknown as User[];
+        this.labGroupMembers.set(members);
+
+        const memberIds = new Set(members.map(m => m.id));
+        const currentStaffIds = this.selectedStaffIds();
+        const validStaffIds = currentStaffIds.filter(id => memberIds.has(id));
+
+        if (validStaffIds.length !== currentStaffIds.length) {
+          const removedCount = currentStaffIds.length - validStaffIds.length;
+          this.selectedStaffIds.set(validStaffIds);
+          this.toastService.warning(`Removed ${removedCount} staff member(s) who are not direct members of this lab group`);
+        }
+      },
+      error: (err) => {
+        console.error('Error loading lab group members:', err);
+        this.toastService.error('Failed to load lab group members');
+      }
+    });
+  }
+
+  loadLabGroupTemplates(labGroupId: number): void {
+    this.metadataTableTemplateService.getMetadataTableTemplates({
+      labGroupId: labGroupId,
+      limit: 10
+    }).subscribe({
+      next: (response) => {
+        this.templates.set(response.results);
+      },
+      error: (err) => {
+        console.error('Error loading templates:', err);
+        this.toastService.error('Failed to load templates');
+      }
+    });
+  }
+
+  loadUserTemplates(): void {
+    this.metadataTableTemplateService.getMetadataTableTemplates({
+      limit: 10
+    }).subscribe({
+      next: (response) => {
+        this.templates.set(response.results);
+      },
+      error: (err) => {
+        console.error('Error loading templates:', err);
+        this.toastService.error('Failed to load templates');
+      }
+    });
+  }
+
+  toggleStaffSelection(userId: number): void {
+    const current = this.selectedStaffIds();
+    if (current.includes(userId)) {
+      this.selectedStaffIds.set(current.filter(id => id !== userId));
+    } else {
+      this.selectedStaffIds.set([...current, userId]);
+    }
+  }
+
+  isStaffSelected(userId: number): boolean {
+    return this.selectedStaffIds().includes(userId);
+  }
+
+  onTemplateSourceChange(source: 'user' | 'labgroup'): void {
+    this.selectedTemplateId.set(null);
+    this.templates.set([]);
+    if (source === 'user') {
+      this.loadUserTemplates();
+    } else if (this.selectedLabGroupId()) {
+      this.loadLabGroupTemplates(this.selectedLabGroupId()!);
+    }
+  }
+
+  createMetadataTable(): void {
+    const jobIdValue = this.jobId();
+    const templateId = this.selectedTemplateId();
+
+    if (!jobIdValue || !templateId) {
+      this.toastService.error('Please complete all required fields');
+      return;
+    }
+
+    this.submitting.set(true);
+
+    this.instrumentJobService.createMetadataFromTemplate(jobIdValue, {
+      templateId: templateId,
+      sampleCount: this.sampleNumber()
+    }).subscribe({
+      next: (response) => {
+        this.metadataTableId.set(response.metadataTable.id);
+        this.metadataTableCreated.set(true);
+        this.toastService.success('Metadata table created successfully');
+        this.submitting.set(false);
+      },
+      error: (err) => {
+        console.error('Error creating metadata table:', err);
+        this.toastService.error('Failed to create metadata table');
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  submitJob(): void {
+    const jobIdValue = this.jobId();
+
+    if (!jobIdValue) {
+      this.toastService.error('No job found');
+      return;
+    }
+
+    if (!this.metadataTableCreated()) {
+      this.toastService.error('Please create metadata table first');
+      return;
+    }
+
+    this.submitting.set(true);
+
+    this.instrumentJobService.submitJob(jobIdValue).subscribe({
+      next: (response) => {
+        this.toastService.success('Job submitted successfully');
+        this.router.navigate(['/jobs', jobIdValue]);
+      },
+      error: (err) => {
+        console.error('Error submitting job:', err);
+        this.toastService.error('Failed to submit job');
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  cancel(): void {
+    this.router.navigate(['/jobs']);
+  }
+}

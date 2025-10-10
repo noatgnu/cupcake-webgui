@@ -1,0 +1,14 @@
+.notifications-view {
+  .notification-card {
+    transition: all 0.2s;
+
+    &:hover {
+      box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
+    }
+
+    &.unread {
+      border-left: 4px solid var(--bs-primary);
+      background-color: var(--bs-primary-bg-subtle);
+    }
+  }
+}

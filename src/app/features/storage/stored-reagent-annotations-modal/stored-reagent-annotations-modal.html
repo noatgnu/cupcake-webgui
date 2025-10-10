@@ -1,0 +1,224 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-folder2-open me-2"></i>
+    {{ canManage ? 'Manage' : 'View' }} Documents
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="uploading()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <p class="text-muted mb-0">Documents for:</p>
+    <p class="fw-bold">{{ storedReagent.reagentName || 'Unknown Reagent' }}</p>
+  </div>
+
+  @if (loadingAnnotations() || loading()) {
+    <div class="text-center p-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="text-muted mt-2 mb-0">Loading documents...</p>
+    </div>
+  } @else {
+    @if (availableFolders().length > 0) {
+      <ul ngbNav #nav="ngbNav" [activeId]="activeTabId()" (activeIdChange)="activeTabId.set($event)" class="nav-tabs mb-3">
+        @for (folder of availableFolders(); track folder.id; let i = $index) {
+          <li [ngbNavItem]="folder.id">
+            <button ngbNavLink>
+              <i class="bi bi-folder2 me-2"></i>
+              {{ folder.folderName }}
+              @if (annotationsByFolder()[i]) {
+                <span class="badge bg-secondary ms-2">{{ annotationsByFolder()[i].annotations.length }}</span>
+              }
+            </button>
+            <ng-template ngbNavContent>
+              @if (currentTabAnnotations().length > 0) {
+                <div class="list-group">
+                  @for (item of currentTabAnnotations(); track item.junctionId) {
+                    <div class="list-group-item">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                          <div class="d-flex align-items-center mb-1">
+                            <i class="bi {{ getAnnotationTypeIcon(item.annotation.annotationType) }} me-2"></i>
+                            <strong>{{ item.annotation.annotation || 'Untitled' }}</strong>
+                          </div>
+                          @if (item.annotation.file) {
+                            <div class="small text-muted">
+                              <i class="bi bi-paperclip me-1"></i>
+                              {{ item.annotation.fileSize ? formatFileSize(item.annotation.fileSize) : '' }}
+                              @if (item.storedReagentAnnotation.createdAt) {
+                                <span class="ms-2">
+                                  <i class="bi bi-calendar me-1"></i>
+                                  {{ item.storedReagentAnnotation.createdAt | date:'short' }}
+                                </span>
+                              }
+                            </div>
+                          }
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                          @if (item.storedReagentAnnotation.fileUrl) {
+                            <a
+                              [href]="item.storedReagentAnnotation.fileUrl"
+                              target="_blank"
+                              class="btn btn-outline-primary"
+                              title="Download">
+                              <i class="bi bi-download"></i>
+                            </a>
+                          }
+                          @if (canManage) {
+                            <button
+                              class="btn btn-outline-danger"
+                              title="Delete"
+                              (click)="deleteAnnotation(item.junctionId, item.annotation.annotation)">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="text-center text-muted py-5">
+                  <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                  <p class="mb-0">No documents in this folder</p>
+                </div>
+              }
+            </ng-template>
+          </li>
+        }
+      </ul>
+      <div [ngbNavOutlet]="nav"></div>
+    }
+
+    @if (availableFolders().length === 0) {
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        No annotation folders available. Please contact an administrator to create the required folders (MSDS, Certificates, Manuals).
+      </div>
+    }
+
+    @if (canManage) {
+      <div class="border-top pt-3 mt-3">
+        @if (!showUploadForm()) {
+          <button
+            class="btn btn-primary w-100"
+            (click)="showUploadForm.set(true)"
+            [disabled]="availableFolders().length === 0">
+            <i class="bi bi-plus-circle me-2"></i>
+            Upload New Document
+          </button>
+        } @else {
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">Upload New Document</h6>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Folder</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="bi bi-folder2"></i>
+                </span>
+                <input
+                  type="text"
+                  class="form-control"
+                  [value]="activeFolder().folderName || 'No folder selected'"
+                  readonly>
+              </div>
+              <div class="form-text">
+                Document will be uploaded to the currently selected tab folder
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="annotationFile" class="form-label">Select File <span class="text-danger">*</span></label>
+              <input
+                type="file"
+                class="form-control"
+                id="annotationFile"
+                (change)="onFileSelected($event)"
+                [disabled]="uploading()">
+              @if (selectedFile()) {
+                <div class="mt-2 small text-muted">
+                  <i class="bi bi-file-earmark me-1"></i>
+                  {{ selectedFile()!.name }} ({{ (selectedFile()!.size / 1024 / 1024).toFixed(2) }} MB)
+                </div>
+              }
+            </div>
+
+            <div class="mb-3">
+              <label for="annotationType" class="form-label">Document Type</label>
+              <select
+                class="form-select"
+                id="annotationType"
+                [(ngModel)]="selectedAnnotationType"
+                [disabled]="uploading()">
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio</option>
+                <option value="file">File</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="annotationText" class="form-label">Description</label>
+              <textarea
+                class="form-control"
+                id="annotationText"
+                rows="2"
+                [(ngModel)]="newAnnotationText"
+                [disabled]="uploading()"
+                placeholder="Add a description for this document"></textarea>
+            </div>
+
+            @if (uploading()) {
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-2">
+                  <span class="small text-muted">Upload progress</span>
+                  <span class="small text-muted">{{ uploadProgress() }}%</span>
+                </div>
+                <div class="progress">
+                  <div
+                    class="progress-bar progress-bar-striped progress-bar-animated"
+                    role="progressbar"
+                    [style.width.%]="uploadProgress()"></div>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="card-footer">
+            <div class="d-flex gap-2">
+              <button
+                type="button"
+                class="btn btn-primary flex-grow-1"
+                (click)="uploadAnnotation()"
+                [disabled]="!selectedFile() || uploading()">
+                <i class="bi bi-cloud-upload me-2"></i>
+                Upload
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                (click)="cancelUpload()"
+                [disabled]="uploading()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        }
+      </div>
+    }
+  }
+</div>
+
+<div class="modal-footer">
+  <button
+    type="button"
+    class="btn btn-secondary"
+    (click)="cancel()"
+    [disabled]="uploading()">
+    Close
+  </button>
+</div>

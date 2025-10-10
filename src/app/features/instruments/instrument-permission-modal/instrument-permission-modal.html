@@ -1,0 +1,144 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-shield-lock me-2"></i>
+    Manage Permissions - {{ instrument.instrumentName }}
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="input-group">
+      <span class="input-group-text">
+        <i class="bi bi-search"></i>
+      </span>
+      <input
+        type="text"
+        class="form-control"
+        placeholder="Search users by name, username, or email..."
+        [(ngModel)]="$any(searchTerm)"
+        (ngModelChange)="onSearchChange()"
+        [disabled]="loading() || saving()">
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center p-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else if (users().length === 0) {
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      No users found
+    </div>
+  } @else {
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th class="text-center">View</th>
+            <th class="text-center">Book</th>
+            <th class="text-center">Manage</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (userWithPermission of users(); track userWithPermission.user.id) {
+            <tr>
+              <td>
+                <div>
+                  <div class="fw-semibold">
+                    @if (userWithPermission.user.firstName || userWithPermission.user.lastName) {
+                      {{ userWithPermission.user.firstName }} {{ userWithPermission.user.lastName }}
+                    } @else {
+                      {{ userWithPermission.user.username }}
+                    }
+                  </div>
+                  @if (userWithPermission.user.email) {
+                    <small class="text-muted">{{ userWithPermission.user.email }}</small>
+                  }
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="form-check d-inline-block">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    [(ngModel)]="userWithPermission.canView"
+                    [disabled]="saving()">
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="form-check d-inline-block">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    [(ngModel)]="userWithPermission.canBook"
+                    [disabled]="saving()">
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="form-check d-inline-block">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    [(ngModel)]="userWithPermission.canManage"
+                    [disabled]="saving()">
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalUsers() > pageSize) {
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="text-muted small">
+          Showing {{ (currentPage() - 1) * pageSize + 1 }} to {{ Math.min(currentPage() * pageSize, totalUsers()) }} of {{ totalUsers() }}
+        </div>
+        <div class="btn-group btn-group-sm">
+          <button
+            class="btn btn-outline-secondary"
+            (click)="previousPage()"
+            [disabled]="currentPage() === 1 || loading() || saving()">
+            <i class="bi bi-chevron-left"></i>
+            Previous
+          </button>
+          <button
+            class="btn btn-outline-secondary"
+            (click)="nextPage()"
+            [disabled]="currentPage() >= Math.ceil(totalUsers() / pageSize) || loading() || saving()">
+            Next
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    }
+
+    <div class="alert alert-info mb-0 mt-3">
+      <small>
+        <strong>Permission levels:</strong>
+        <ul class="mb-0">
+          <li><strong>View:</strong> Can view instrument details and information</li>
+          <li><strong>Book:</strong> Can create bookings for this instrument</li>
+          <li><strong>Manage:</strong> Can modify instrument settings, maintenance logs, and manage permissions</li>
+        </ul>
+      </small>
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="loading() || saving()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    }
+    Save Permissions
+  </button>
+</div>

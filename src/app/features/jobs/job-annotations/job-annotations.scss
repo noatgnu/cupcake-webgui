@@ -1,0 +1,29 @@
+.job-annotations-container {
+  .annotation-item {
+    transition: box-shadow 0.2s;
+
+    &:hover {
+      box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+  }
+
+  .annotation-content {
+    p {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  }
+
+  .annotations-list {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  .empty-state {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+}

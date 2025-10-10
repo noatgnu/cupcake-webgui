@@ -1,0 +1,17 @@
+<div class="app-container">
+  <!-- Desktop Sidebar -->
+  <aside class="app-sidebar d-none d-md-block" [class.collapsed]="sidebarCollapsed()">
+    <app-sidebar />
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="app-main" [class.sidebar-collapsed]="sidebarCollapsed()">
+    <!-- Section Content -->
+    <router-outlet />
+  </main>
+</div>
+
+<!-- Mobile Offcanvas Sidebar Template -->
+<ng-template #sidebarContent>
+  <app-sidebar />
+</ng-template>

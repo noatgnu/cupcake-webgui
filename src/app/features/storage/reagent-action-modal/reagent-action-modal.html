@@ -1,0 +1,67 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i [class]="'bi ' + getIcon() + ' me-2'"></i>
+    {{ getTitle() }}
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="alert alert-info">
+      <div><strong>Reagent:</strong> {{ storedReagent.reagentName }}</div>
+      <div><strong>Current Quantity:</strong> {{ storedReagent.currentQuantity }}{{ storedReagent.reagentUnit ? ' ' + storedReagent.reagentUnit : '' }}</div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="quantity" class="form-label">
+      Quantity <span class="text-danger">*</span>
+    </label>
+    <div class="input-group">
+      <input
+        type="number"
+        class="form-control"
+        id="quantity"
+        [(ngModel)]="quantity"
+        [min]="0"
+        step="0.01"
+        required>
+      @if (storedReagent.reagentUnit) {
+        <span class="input-group-text">{{ storedReagent.reagentUnit }}</span>
+      }
+    </div>
+    <div class="form-text">
+      @if (actionType === ActionType.ADD) {
+        Enter the quantity to add to the current stock
+      } @else {
+        Enter the quantity to reserve from the current stock
+      }
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="notes" class="form-label">Notes</label>
+    <textarea
+      class="form-control"
+      id="notes"
+      rows="3"
+      [(ngModel)]="notes"
+      placeholder="Optional notes about this action..."></textarea>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+    <i class="bi bi-x-circle me-1"></i>
+    Cancel
+  </button>
+  <button type="button" [class]="'btn ' + getButtonClass()" (click)="save()" [disabled]="saving() || quantity <= 0">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+    } @else {
+      <i [class]="'bi ' + getIcon() + ' me-1'"></i>
+    }
+    {{ getTitle() }}
+  </button>
+</div>

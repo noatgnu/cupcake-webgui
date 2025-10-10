@@ -1,0 +1,101 @@
+<div class="detail-content">
+  <div class="mb-3">
+    <h5>{{ project.projectName }}</h5>
+    @if (project.projectDescription) {
+      <p class="text-muted">{{ project.projectDescription }}</p>
+    }
+  </div>
+
+  <div class="border-top pt-3 mt-3">
+    <h6 class="text-muted mb-2">Project Information</h6>
+    <div class="row">
+      <div class="col-6 mb-2">
+        <small class="text-muted">ID</small>
+        <div>#{{ project.id }}</div>
+      </div>
+      <div class="col-6 mb-2">
+        <small class="text-muted">Created</small>
+        <div>{{ project.createdAt | date: 'short' }}</div>
+      </div>
+      <div class="col-6 mb-2">
+        <small class="text-muted">Last Updated</small>
+        <div>{{ project.updatedAt | date: 'short' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-top pt-3 mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="text-muted mb-0">
+        <i class="bi bi-briefcase me-2"></i>Instrument Jobs ({{ jobs().length }})
+      </h6>
+      <button class="btn btn-sm btn-outline-primary" (click)="createJob()">
+        <i class="bi bi-plus me-1"></i>Create Job
+      </button>
+    </div>
+    @if (loadingJobs()) {
+      <div class="text-center p-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+      </div>
+    } @else if (jobs().length === 0) {
+      <div class="text-center text-muted p-3">
+        <small>No jobs found for this project</small>
+      </div>
+    } @else {
+      <div class="list-group">
+        @for (job of jobs(); track job.id) {
+          <button
+            type="button"
+            class="list-group-item list-group-item-action"
+            (click)="viewJob(job)">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold">{{ job.jobName || 'Untitled Job' }}</div>
+                <small class="text-muted">{{ job.createdAt | date: 'short' }}</small>
+              </div>
+              <span class="badge"
+                [class.bg-secondary]="job.status === 'draft'"
+                [class.bg-primary]="job.status === 'submitted'"
+                [class.bg-warning]="job.status === 'pending' || job.status === 'in_progress'"
+                [class.bg-success]="job.status === 'completed'"
+                [class.bg-danger]="job.status === 'cancelled'">
+                {{ job.statusDisplay || job.status }}
+              </span>
+            </div>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="border-top pt-3 mt-3">
+    <h6 class="text-muted mb-2">
+      <i class="bi bi-clock-history me-2"></i>Sessions ({{ sessions().length }})
+    </h6>
+    @if (loadingSessions()) {
+      <div class="text-center p-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+      </div>
+    } @else if (sessions().length === 0) {
+      <div class="text-center text-muted p-3">
+        <small>No sessions found for this project</small>
+      </div>
+    } @else {
+      <div class="list-group">
+        @for (session of sessions(); track session.id) {
+          <button
+            type="button"
+            class="list-group-item list-group-item-action"
+            (click)="viewSession(session)">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold">{{ session.name }}</div>
+                <small class="text-muted">{{ session.startedAt | date: 'short' }}</small>
+              </div>
+            </div>
+          </button>
+        }
+      </div>
+    }
+  </div>
+</div>

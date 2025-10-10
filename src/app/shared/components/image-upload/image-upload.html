@@ -1,0 +1,62 @@
+<div class="image-upload-container">
+  <label class="form-label">{{ label }}</label>
+
+  @if (error()) {
+    <div class="alert alert-danger alert-sm">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Preview Area -->
+  @if (imagePreview() && !isCameraActive()) {
+    <div class="image-preview mb-3">
+      <img [src]="imagePreview()" alt="Preview" class="img-thumbnail">
+      <button type="button" class="btn btn-sm btn-danger mt-2" (click)="clearImage()">
+        <i class="bi bi-trash me-1"></i>
+        Remove Image
+      </button>
+    </div>
+  }
+
+  <!-- Camera View -->
+  @if (isCameraActive()) {
+    <div class="camera-view mb-3">
+      <video #videoElement autoplay playsinline class="video-preview"></video>
+      <canvas #canvasElement style="display: none;"></canvas>
+      <div class="camera-controls mt-2">
+        <button type="button" class="btn btn-sm btn-primary me-2" (click)="captureFromCamera()">
+          <i class="bi bi-camera me-1"></i>
+          Capture
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" (click)="stopCamera()">
+          <i class="bi bi-x-lg me-1"></i>
+          Cancel
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Upload Controls -->
+  @if (!imagePreview() && !isCameraActive()) {
+    <div class="upload-controls">
+      <input
+        #fileInput
+        type="file"
+        accept="image/*"
+        (change)="onFileSelected($event)"
+        style="display: none;">
+
+      <div class="btn-group">
+        <button type="button" class="btn btn-outline-primary btn-sm" (click)="triggerFileInput()">
+          <i class="bi bi-upload me-1"></i>
+          Upload Image
+        </button>
+        <button type="button" class="btn btn-outline-primary btn-sm" (click)="startCamera()">
+          <i class="bi bi-camera me-1"></i>
+          Capture from Camera
+        </button>
+      </div>
+    </div>
+  }
+</div>

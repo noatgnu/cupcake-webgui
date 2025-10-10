@@ -1,0 +1,366 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-secondary btn-sm" (click)="backToList()">
+            <i class="bi bi-arrow-left me-1"></i>
+            Back
+          </button>
+          <h4 class="navbar-brand m-0 fw-bold">
+            <i class="bi bi-journal-medical me-2"></i>
+            {{ protocol()?.protocolTitle || 'Protocol Editor' }}
+          </h4>
+        </div>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-primary btn-sm"
+            (click)="initiateSession()"
+            [disabled]="!protocol()">
+            <i class="bi bi-play-circle me-1"></i>
+            Start Session
+          </button>
+          <button
+            class="btn btn-success btn-sm"
+            (click)="saveProtocol()"
+            [disabled]="saving() || !protocolForm.valid">
+            @if (saving()) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            <i class="bi bi-save me-1"></i>
+            Save Protocol
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="protocol-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="protocol-layout d-flex gap-3 h-100">
+        <div class="protocol-panel-left d-flex flex-column gap-3">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">Protocol Settings</h6>
+            </div>
+            <div class="card-body">
+              <form [formGroup]="protocolForm">
+                <div class="mb-3">
+                  <label for="protocolTitle" class="form-label">Title <span class="text-danger">*</span></label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="protocolTitle"
+                    formControlName="protocolTitle"
+                    placeholder="Protocol title">
+                </div>
+
+                <div class="mb-3">
+                  <label for="protocolDescription" class="form-label">Description</label>
+                  <textarea
+                    class="form-control"
+                    id="protocolDescription"
+                    formControlName="protocolDescription"
+                    rows="3"
+                    placeholder="Protocol description"></textarea>
+                </div>
+
+                <div class="form-check mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="enabled"
+                    formControlName="enabled">
+                  <label class="form-check-label" for="enabled">
+                    Enable for public view
+                  </label>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card flex-grow-1 d-flex flex-column" style="min-height: 0;">
+            <div class="card-header flex-shrink-0">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Sections</h6>
+                <button
+                  class="btn btn-sm btn-primary"
+                  (click)="createSection()"
+                  title="Add Section">
+                  <i class="bi bi-plus-lg"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body flex-grow-1 p-0" style="overflow-y: auto; min-height: 0;">
+              @if (sections().length > 0) {
+                <div class="list-group list-group-flush">
+                  @for (section of sections(); track section.id; let i = $index) {
+                    <button
+                      type="button"
+                      class="list-group-item list-group-item-action text-start"
+                      [class.active]="selectedSectionIndex() === i"
+                      (click)="selectSection(i)">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <div class="fw-semibold">{{ section.sectionDescription || 'Untitled Section' }}</div>
+                          @if (section.sectionDuration) {
+                            <small class="text-muted">
+                              <i class="bi bi-clock me-1"></i>{{ section.sectionDuration | durationFormat }}
+                            </small>
+                          }
+                        </div>
+                        <span class="badge bg-secondary">{{ i + 1 }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              } @else {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-folder-plus fs-2 mb-2 d-block"></i>
+                  <small>No sections yet</small>
+                </div>
+              }
+            </div>
+
+            @if (selectedSection()) {
+              <div class="card-footer flex-shrink-0">
+                <form [formGroup]="sectionForm">
+                  <div class="mb-2">
+                    <label for="sectionDescription" class="form-label small">Section Title</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      id="sectionDescription"
+                      formControlName="sectionDescription"
+                      placeholder="Section title">
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label small">Duration</label>
+                    <app-duration-input formControlName="sectionDuration"></app-duration-input>
+                  </div>
+
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-success flex-grow-1" (click)="saveSection()">
+                      <i class="bi bi-save me-1"></i>Save
+                    </button>
+                    <button class="btn btn-sm btn-danger" (click)="deleteSection()">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="protocol-panel-right">
+          <div class="card h-100 d-flex flex-column">
+            <div class="card-header flex-shrink-0">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  @if (selectedSection()) {
+                    <i class="bi bi-list-check me-2"></i>
+                    Steps: {{ selectedSection()!.sectionDescription || 'Untitled Section' }}
+                  } @else {
+                    <span class="text-muted">No Section Selected</span>
+                  }
+                </h6>
+                @if (selectedSection()) {
+                  <button class="btn btn-sm btn-primary" (click)="addStep()">
+                    <i class="bi bi-plus-lg me-1"></i>
+                    Add Step
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="card-body flex-grow-1" style="overflow-y: auto; min-height: 0;">
+              @if (!selectedSection()) {
+                <div class="empty-state text-center text-muted p-5">
+                  <i class="bi bi-arrow-left fs-1 mb-3 d-block"></i>
+                  <h5>No Section Selected</h5>
+                  <p>Select a section from the left panel to view and edit its steps</p>
+                </div>
+              } @else if (selectedSectionSteps().length === 0) {
+                <div class="empty-state text-center text-muted p-5">
+                  <i class="bi bi-list-check fs-1 mb-3 d-block"></i>
+                  <h5>No Steps</h5>
+                  <p class="mb-3">Add your first step to get started</p>
+                  <button class="btn btn-primary" (click)="addStep()">
+                    <i class="bi bi-plus-lg me-1"></i>
+                    Add Step
+                  </button>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (step of selectedSectionSteps(); track step.id; let i = $index) {
+                    <div class="list-group-item">
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0">
+                          Step {{ i + 1 }} of {{ selectedSectionSteps().length }}
+                        </h6>
+                        <div class="btn-group btn-group-sm">
+                          <button
+                            class="btn btn-outline-secondary"
+                            (click)="moveStepUp(step, i)"
+                            [disabled]="i === 0"
+                            title="Move Up">
+                            <i class="bi bi-arrow-up"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-secondary"
+                            (click)="moveStepDown(step, i)"
+                            [disabled]="i === selectedSectionSteps().length - 1"
+                            title="Move Down">
+                            <i class="bi bi-arrow-down"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-primary"
+                            (click)="editStep(step)"
+                            title="Edit Step">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            class="btn btn-outline-danger"
+                            (click)="deleteStep(step.id)"
+                            title="Delete Step">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mb-2">
+                        <label class="form-label small">Description</label>
+                        <div class="border rounded p-2 step-description-content" [innerHTML]="(step.stepDescription | stepTemplate:getStepReagents(step.id)) || '<em class=text-muted>No description</em>'">
+                        </div>
+                      </div>
+
+                      @if (step.stepDuration) {
+                        <div class="small text-muted">
+                          <i class="bi bi-clock me-1"></i>
+                          Duration: {{ step.stepDuration | durationFormat }}
+                        </div>
+                      }
+
+                      <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <label class="form-label small mb-0">
+                            <i class="bi bi-flask me-1"></i>
+                            Reagents
+                          </label>
+                          <button
+                            class="btn btn-sm btn-outline-primary"
+                            (click)="addStepReagent(step)"
+                            title="Add Reagent">
+                            <i class="bi bi-plus-lg"></i>
+                          </button>
+                        </div>
+
+                        @if (getStepReagents(step.id).length === 0) {
+                          <div class="text-muted small text-center p-2 border rounded empty-reagent-state">
+                            No reagents added
+                          </div>
+                        } @else {
+                          <div class="list-group list-group-flush">
+                            @for (reagent of getStepReagents(step.id); track reagent.id) {
+                              <div class="list-group-item p-2 d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                  <div class="fw-semibold small">{{ reagent.reagentName || 'Unknown' }}</div>
+                                  <div class="text-muted small">
+                                    Quantity: {{ reagent.quantity }}
+                                    @if (reagent.reagentUnit) {
+                                      {{ reagent.reagentUnit }}
+                                    }
+                                  </div>
+                                  @if (reagent.scalable) {
+                                    <div class="text-muted small">
+                                      <i class="bi bi-arrows-angle-expand me-1"></i>
+                                      Scalable (factor: {{ reagent.scalableFactor }})
+                                    </div>
+                                  }
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                  <div class="btn-group btn-group-sm" ngbDropdown placement="bottom-end">
+                                    <button
+                                      type="button"
+                                      class="btn btn-outline-success btn-sm"
+                                      ngbDropdownToggle
+                                      title="Insert Template">
+                                      <i class="bi bi-code-square"></i>
+                                    </button>
+                                    <div class="dropdown-menu" ngbDropdownMenu>
+                                      <h6 class="dropdown-header">Insert Template</h6>
+                                      <button
+                                        type="button"
+                                        class="dropdown-item"
+                                        (click)="copyTemplateToClipboard(reagent.id, 'quantity')">
+                                        <i class="bi bi-123 me-2"></i>
+                                        Quantity: <code class="small">%{{reagent.id}}.quantity%</code>
+                                      </button>
+                                      @if (reagent.scalable) {
+                                        <button
+                                          type="button"
+                                          class="dropdown-item"
+                                          (click)="copyTemplateToClipboard(reagent.id, 'scaled_quantity')">
+                                          <i class="bi bi-calculator me-2"></i>
+                                          Scaled: <code class="small">%{{reagent.id}}.scaled_quantity%</code>
+                                        </button>
+                                      }
+                                      <button
+                                        type="button"
+                                        class="dropdown-item"
+                                        (click)="copyTemplateToClipboard(reagent.id, 'unit')">
+                                        <i class="bi bi-rulers me-2"></i>
+                                        Unit: <code class="small">%{{reagent.id}}.unit%</code>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        class="dropdown-item"
+                                        (click)="copyTemplateToClipboard(reagent.id, 'name')">
+                                        <i class="bi bi-tag me-2"></i>
+                                        Name: <code class="small">%{{reagent.id}}.name%</code>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    (click)="editStepReagent(step.id, reagent)"
+                                    title="Edit Reagent">
+                                    <i class="bi bi-pencil"></i>
+                                  </button>
+                                  <button
+                                    class="btn btn-outline-danger btn-sm"
+                                    (click)="deleteStepReagent(step.id, reagent.id)"
+                                    title="Remove Reagent">
+                                    <i class="bi bi-trash"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+
+                      <div class="mt-2 text-muted small">
+                        Last updated: {{ step.updatedAt | date: 'short' }}
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

@@ -1,0 +1,947 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-secondary btn-sm" (click)="backToList()">
+            <i class="bi bi-arrow-left me-1"></i>
+            Back
+          </button>
+          <h4 class="navbar-brand m-0 fw-bold">
+            <i class="bi bi-play-circle me-2"></i>
+            {{ session()?.name || 'Session' }}
+          </h4>
+          @if (session()?.startedAt) {
+            <span class="badge bg-success">
+              <i class="bi bi-calendar-event me-1"></i>
+              {{ session()!.startedAt | date: 'short' }}
+            </span>
+          }
+          @if (session()?.endedAt) {
+            <span class="badge bg-primary">
+              <i class="bi bi-calendar-check me-1"></i>
+              {{ session()!.endedAt | date: 'short' }}
+            </span>
+          }
+          @if (session()?.startedAt && session()?.endedAt) {
+            <span class="badge bg-success">
+              <i class="bi bi-check-circle me-1"></i>
+              Completed
+            </span>
+          }
+        </div>
+        @if (selectedProtocol()) {
+          <div class="d-flex align-items-center gap-3">
+            <div class="text-muted">
+              <small>Current Protocol:</small>
+              <div class="fw-semibold">{{ selectedProtocol()!.protocolTitle || 'Untitled Protocol' }}</div>
+            </div>
+            @if (protocols().length > 1) {
+              <div class="btn-group">
+                @for (protocol of protocols(); track protocol.id; let i = $index) {
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    [class.btn-primary]="selectedProtocolIndex() === i"
+                    [class.btn-outline-primary]="selectedProtocolIndex() !== i"
+                    (click)="selectProtocol(i)"
+                    [title]="protocol.protocolTitle || 'Untitled'">
+                    Protocol {{ i + 1 }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </nav>
+
+  <div class="session-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="session-layout d-flex gap-3 h-100">
+        <div class="session-panel-left d-flex flex-column gap-3">
+          <div class="card flex-grow-1 d-flex flex-column" style="min-height: 0;">
+            <div class="card-header flex-shrink-0">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ol me-2"></i>
+                Protocol Sections
+              </h6>
+            </div>
+            <div class="card-body flex-grow-1 p-0" style="overflow-y: auto; min-height: 0;">
+              @if (loadingSections()) {
+                <div class="text-center p-4">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              } @else if (sections().length === 0) {
+                <div class="empty-state text-center text-muted p-4">
+                  <i class="bi bi-folder-x fs-1 mb-2 d-block"></i>
+                  <small>No sections available</small>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (section of sections(); track section.id; let i = $index) {
+                    <div
+                      class="list-group-item list-group-item-action"
+                      [class.active]="selectedSectionIndex() === i"
+                      (click)="selectSection(i)"
+                      role="button">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold mb-1">
+                            {{ i + 1 }}. {{ section.sectionDescription || 'Untitled Section' }}
+                          </div>
+                          @if (section.sectionDuration) {
+                            <small class="text-muted">
+                              <i class="bi bi-clock me-1"></i>{{ section.sectionDuration | durationFormat }}
+                            </small>
+                          }
+                        </div>
+                        @if ((steps().get(section.id) || []).length > 0) {
+                          <span class="badge bg-secondary">
+                            {{ (steps().get(section.id) || []).length }} steps
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="session-panel-right">
+          <div class="card h-100 d-flex flex-column">
+            <div class="card-header flex-shrink-0">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  @if (currentStep()) {
+                    <i class="bi bi-clipboard-check me-2"></i>
+                    Step {{ currentStepIndexInSection() + 1 }} of {{ currentSectionSteps().length }}
+                  } @else {
+                    <span class="text-muted">No Steps</span>
+                  }
+                </h6>
+                @if (currentStep()) {
+                  <div class="step-navigation btn-group btn-group-sm">
+                    <button
+                      class="btn btn-outline-secondary"
+                      (click)="previousStep()"
+                      [disabled]="currentStepIndex() === 0"
+                      title="Previous Step">
+                      <i class="bi bi-chevron-left"></i>
+                      Previous
+                    </button>
+                    <button
+                      class="btn btn-outline-secondary"
+                      (click)="nextStep()"
+                      [disabled]="currentStepIndex() === allSteps().length - 1"
+                      title="Next Step">
+                      Next
+                      <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="card-body flex-grow-1" style="overflow-y: auto; min-height: 0;">
+              @if (loadingSteps()) {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              } @else if (!currentStep()) {
+                <div class="empty-state text-center text-muted p-5">
+                  <i class="bi bi-clipboard-x fs-1 mb-3 d-block"></i>
+                  <h5>No Steps</h5>
+                  <p>This protocol has no steps defined</p>
+                </div>
+              } @else {
+                <div class="step-content">
+                  <div class="step-header mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <h4 class="mb-0">Step {{ currentStepIndexInSection() + 1 }}</h4>
+                        <span class="badge bg-primary">
+                          Section: {{ selectedSection()?.sectionDescription || 'Unknown' }}
+                        </span>
+                        @if (timer.timeKeeper[currentStep()!.id.toString()]) {
+                          <div class="d-flex align-items-center gap-2">
+                            <span class="fs-6 fw-semibold">
+                              <i class="bi bi-clock me-1"></i>
+                              {{ timer.convertTime(timer.timeKeeper[currentStep()!.id.toString()].current) }}
+                            </span>
+                            <div class="btn-group btn-group-sm" role="group">
+                              @if (timer.timeKeeper[currentStep()!.id.toString()].started) {
+                                <button class="btn btn-warning btn-sm" (click)="pauseTimer(currentStep()!.id)" title="Pause Timer">
+                                  <i class="bi bi-pause-fill"></i>
+                                </button>
+                              } @else {
+                                <button class="btn btn-success btn-sm" (click)="startTimer(currentStep()!.id)" title="Start Timer">
+                                  <i class="bi bi-play-fill"></i>
+                                </button>
+                              }
+                              <button class="btn btn-outline-secondary btn-sm" (click)="resetTimer(currentStep()!.id)" title="Reset Timer">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                    @if (currentStep()!.stepDuration && !timer.timeKeeper[currentStep()!.id.toString()]) {
+                      <div class="text-muted mb-2">
+                        <i class="bi bi-clock me-1"></i>
+                        Duration: {{ currentStep()!.stepDuration | durationFormat }}
+                      </div>
+                    }
+                    @if (timer.timeKeeper[currentStep()!.id.toString()]) {
+                      <div class="progress mb-2" style="height: 4px;">
+                        <div
+                          class="progress-bar"
+                          [class.bg-info]="timer.getProgressType(currentStep()!.id) === 'info'"
+                          [class.bg-primary]="timer.getProgressType(currentStep()!.id) === 'primary'"
+                          [class.bg-warning]="timer.getProgressType(currentStep()!.id) === 'warning'"
+                          [class.bg-danger]="timer.getProgressType(currentStep()!.id) === 'danger'"
+                          [style.width.%]="timer.getProgressPercentage(currentStep()!.id)">
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="step-description mb-4">
+                    <h5 class="text-muted mb-3">Instructions</h5>
+                    <div class="step-description-content border rounded p-3" [innerHTML]="(currentStep()!.stepDescription | stepTemplate:currentStepReagents()) || '<em class=text-muted>No instructions provided</em>'">
+                    </div>
+                  </div>
+
+                  @if (currentStepReagents().length > 0) {
+                    <div class="step-reagents mb-4">
+                      <h5 class="text-muted mb-3">
+                        <i class="bi bi-flask me-2"></i>
+                        Reagents Required
+                      </h5>
+                      <div class="list-group">
+                        @for (reagent of currentStepReagents(); track reagent.id) {
+                          <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                              <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ reagent.reagentName || 'Unknown' }}</h6>
+                                <div class="text-muted small">
+                                  Quantity: <strong>{{ reagent.quantity }}</strong>
+                                  @if (reagent.reagentUnit) {
+                                    {{ reagent.reagentUnit }}
+                                  }
+                                </div>
+                                @if (reagent.scalable) {
+                                  <div class="text-primary small mt-1">
+                                    <i class="bi bi-arrows-angle-expand me-1"></i>
+                                    Scalable (factor: {{ reagent.scalableFactor }})
+                                    @if (reagent.scaledQuantity !== undefined) {
+                                      - Scaled: <strong>{{ reagent.scaledQuantity }}</strong>
+                                      @if (reagent.reagentUnit) {
+                                        {{ reagent.reagentUnit }}
+                                      }
+                                    }
+                                  </div>
+                                }
+                              </div>
+                              <button
+                                type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                (click)="openReagentBookingModal(reagent)"
+                                title="Book this reagent">
+                                <i class="bi bi-bookmark-plus me-1"></i>Book
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (currentStepReagentActions().length > 0) {
+                    <div class="step-reagent-actions mb-4">
+                      <h5 class="text-muted mb-3">
+                        <i class="bi bi-bookmark-check me-2"></i>
+                        Reagent Bookings
+                      </h5>
+                      <div class="list-group">
+                        @for (action of currentStepReagentActions(); track action.id) {
+                          <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                              <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-1">
+                                  <h6 class="mb-0 me-2">{{ action.reagentName || 'Unknown' }}</h6>
+                                  <span class="badge bg-info">{{ action.actionTypeDisplay || action.actionType }}</span>
+                                  @if (action.isWithinDeletionWindow) {
+                                    <span class="badge bg-warning text-dark ms-1" title="Can be deleted within the configured time window">
+                                      <i class="bi bi-clock-history me-1"></i>Deletion Window
+                                    </span>
+                                  }
+                                </div>
+                                <div class="text-muted small">
+                                  Quantity: <strong>{{ action.quantity }}</strong>
+                                </div>
+                                @if (action.notes) {
+                                  <div class="small mt-1">
+                                    <i class="bi bi-journal-text me-1"></i>
+                                    {{ action.notes }}
+                                  </div>
+                                }
+                                @if (action.userUsername) {
+                                  <div class="small text-muted mt-1">
+                                    <i class="bi bi-person me-1"></i>
+                                    {{ action.userUsername }}
+                                  </div>
+                                }
+                                <div class="small text-muted">
+                                  <i class="bi bi-clock me-1"></i>
+                                  {{ action.createdAt | date: 'short' }}
+                                </div>
+                              </div>
+                              <div class="d-flex flex-column gap-1">
+                                @if (action.isDeletable) {
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    (click)="deleteReagentAction(action)"
+                                    title="Delete booking (within deletion window)">
+                                    <i class="bi bi-trash"></i>
+                                  </button>
+                                } @else {
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    disabled
+                                    title="Cannot delete (outside deletion window)">
+                                    <i class="bi bi-lock"></i>
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <div class="step-metadata small text-muted">
+                    <div>Last updated: {{ currentStep()!.updatedAt | date: 'medium' }}</div>
+                  </div>
+
+                  @if (loadingAnnotations()) {
+                    <div class="step-annotations mt-4">
+                      <h5 class="text-muted mb-3">
+                        <i class="bi bi-paperclip me-2"></i>
+                        Annotations
+                      </h5>
+                      <div class="text-center p-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                          <span class="visually-hidden">Loading annotations...</span>
+                        </div>
+                      </div>
+                    </div>
+                  } @else if (currentStepAnnotations().length > 0) {
+                    <div class="step-annotations mt-4">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center gap-3">
+                          <h5 class="text-muted mb-0">
+                            <i class="bi bi-paperclip me-2"></i>
+                            Annotations
+                            <span class="badge bg-secondary ms-2">{{ annotationsTotal() }}</span>
+                          </h5>
+                          <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="hideScratched" [checked]="hideScratched()" (change)="toggleHideScratched()">
+                            <label class="form-check-label text-muted small" for="hideScratched">
+                              Hide scratched
+                            </label>
+                          </div>
+                          <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn" [class.btn-primary]="annotationDisplayMode() === 'single'" [class.btn-outline-secondary]="annotationDisplayMode() !== 'single'" (click)="toggleAnnotationDisplayMode()" title="Single view">
+                              <i class="bi bi-square"></i>
+                            </button>
+                            <button type="button" class="btn" [class.btn-primary]="annotationDisplayMode() === 'list'" [class.btn-outline-secondary]="annotationDisplayMode() !== 'list'" (click)="toggleAnnotationDisplayMode()" title="List view">
+                              <i class="bi bi-list"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading()">
+                          <i class="bi bi-plus-circle me-1"></i>
+                          Add
+                        </button>
+                      </div>
+
+                      @if (uploading()) {
+                        <div class="alert alert-info mb-3">
+                          <div class="d-flex justify-content-between mb-2">
+                            <span class="small">Uploading annotation...</span>
+                            <span class="small">{{ uploadProgress() }}%</span>
+                          </div>
+                          <div class="progress">
+                            <div
+                              class="progress-bar progress-bar-striped progress-bar-animated"
+                              role="progressbar"
+                              [style.width.%]="uploadProgress()"></div>
+                          </div>
+                        </div>
+                      }
+
+                      @if (annotationDisplayMode() === 'single') {
+                        @if (currentAnnotation(); as annotation) {
+                          <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-muted small">
+                              {{ annotationsOffset() + 1 }} of {{ annotationsTotal() }}
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                              <button
+                                class="btn btn-outline-secondary"
+                                (click)="previousAnnotation()"
+                                [disabled]="annotationsOffset() === 0">
+                                <i class="bi bi-chevron-left"></i>
+                                Previous
+                              </button>
+                              <button
+                                class="btn btn-outline-secondary"
+                                (click)="nextAnnotation()"
+                                [disabled]="annotationsOffset() + 1 >= annotationsTotal()">
+                                Next
+                                <i class="bi bi-chevron-right"></i>
+                              </button>
+                            </div>
+                          </div>
+                        }
+                        @if (currentAnnotation(); as annotation) {
+                          <div class="annotation-item border-bottom pb-4 mb-4">
+                            <div class="d-flex align-items-center mb-3">
+                              <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
+                              <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                            </div>
+                            <div class="annotation-content" [class.scratched-content]="annotation.scratched">
+                              @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
+                                <div class="mb-3">
+                                  <div class="text-center mb-2">
+                                    <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
+                                  </div>
+                                  <div>
+                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'image'" class="btn btn-outline-primary btn-sm" title="Download">
+                                      <i class="bi bi-download me-1"></i>Download
+                                    </a>
+                                  </div>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.Video && annotation.fileUrl) {
+                                <div class="mb-3">
+                                  <video controls class="w-100 rounded mb-2" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                    <source [src]="annotation.fileUrl">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                  <div>
+                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'video'" class="btn btn-outline-primary btn-sm" title="Download">
+                                      <i class="bi bi-download me-1"></i>Download
+                                    </a>
+                                  </div>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.Audio && annotation.fileUrl) {
+                                <div class="mb-3">
+                                  <audio controls class="w-100 mb-2" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                    <source [src]="annotation.fileUrl">
+                                    Your browser does not support the audio tag.
+                                  </audio>
+                                  <div>
+                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'audio'" class="btn btn-outline-primary btn-sm" title="Download">
+                                      <i class="bi bi-download me-1"></i>Download
+                                    </a>
+                                  </div>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.File && annotation.fileUrl) {
+                                <div class="mb-3">
+                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'file'" class="btn btn-outline-primary btn-sm" title="Download">
+                                    <i class="bi bi-download me-1"></i>Download File
+                                  </a>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.Calculator && annotation.annotationText) {
+                                <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-calculator me-1"></i>
+                                    Calculator History
+                                  </h6>
+                                  <div class="list-group list-group-flush">
+                                    @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                                      <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                                        <small class="text-muted font-monospace" [class.text-decoration-line-through]="entry.scratched">
+                                          {{ formatCalculatorExpression(entry) }}
+                                        </small>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [class.active]="entry.scratched"
+                                                title="Scratch calculation">
+                                          <i class="bi bi-eraser"></i>
+                                        </button>
+                                      </div>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.MolarityCalculator && annotation.annotationText) {
+                                <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-calculator-fill me-1"></i>
+                                    Molarity Calculator History
+                                  </h6>
+                                  <div class="list-group list-group-flush">
+                                    @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                                      <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                                        <small class="text-muted" [class.text-decoration-line-through]="entry.scratched">
+                                          {{ formatMolarityCalculatorExpression(entry) }}
+                                        </small>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [class.active]="entry.scratched"
+                                                title="Scratch calculation">
+                                          <i class="bi bi-eraser"></i>
+                                        </button>
+                                      </div>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                              @if (annotation.annotationType === AnnotationType.Booking && annotation.instrumentUsageIds && annotation.instrumentUsageIds.length > 0) {
+                                @let bookingId = annotation.instrumentUsageIds[0];
+                                @let bookingData = getBookingData(bookingId);
+                                @if (bookingData) {
+                                  <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                    <h6 class="text-muted mb-2">
+                                      <i class="bi bi-calendar-check me-1"></i>
+                                      Instrument Booking
+                                    </h6>
+                                    <div class="mb-2">
+                                      <strong>{{ bookingData.instrumentName || 'Unknown Instrument' }}</strong>
+                                    </div>
+                                    <div class="mb-2">
+                                      <i class="bi bi-clock me-1"></i>
+                                      <strong>Time:</strong>
+                                      <div class="ms-3">
+                                        <div>Start: {{ bookingData.timeStarted | date:'medium' }}</div>
+                                        <div>End: {{ bookingData.timeEnded | date:'medium' }}</div>
+                                      </div>
+                                    </div>
+                                    <div class="mb-2">
+                                      <i class="bi bi-check-circle me-1"></i>
+                                      <strong>Status:</strong>
+                                      @if (bookingData.approved) {
+                                        <span class="badge bg-success ms-1">Approved</span>
+                                      } @else {
+                                        <span class="badge bg-warning text-dark ms-1">Pending Approval</span>
+                                      }
+                                    </div>
+                                    @if (bookingData.description) {
+                                      <div class="mt-2 pt-2 border-top">
+                                        <small class="text-muted fst-italic">{{ bookingData.description }}</small>
+                                      </div>
+                                    }
+                                  </div>
+                                } @else {
+                                  <div class="text-muted small">
+                                    <i class="bi bi-hourglass-split me-1"></i>
+                                    Loading booking details...
+                                  </div>
+                                }
+                              }
+                              @if (annotation.annotationText && annotation.annotationType !== AnnotationType.Calculator && annotation.annotationType !== AnnotationType.MolarityCalculator && annotation.annotationType !== AnnotationType.Booking) {
+                                <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-card-text me-1"></i>
+                                    Description
+                                  </h6>
+                                  <p class="mb-0">{{ annotation.annotationText }}</p>
+                                </div>
+                              }
+                              @if (annotation.transcription) {
+                                <div class="transcription border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-file-text me-1"></i>
+                                    Transcription
+                                    @if (annotation.language) {
+                                      <span class="badge bg-secondary ms-2">{{ annotation.language }}</span>
+                                    }
+                                  </h6>
+                                  <app-webvtt-editor
+                                    [vttContent]="annotation.transcription"
+                                    [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
+                                    [editable]="true"
+                                    (contentChanged)="onTranscriptionContentChanged($event)">
+                                  </app-webvtt-editor>
+                                </div>
+                              }
+                              @if (annotation.translation) {
+                                <div class="translation border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-translate me-1"></i>
+                                    Translation
+                                  </h6>
+                                  <app-webvtt-editor
+                                    [vttContent]="annotation.translation"
+                                    [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
+                                    [editable]="true"
+                                    (contentChanged)="onTranslationContentChanged($event)">
+                                  </app-webvtt-editor>
+                                </div>
+                              }
+                            </div>
+                            <div class="mt-3">
+                              <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" title="Scratch off">
+                                  <i class="bi bi-eraser"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-info" (click)="shareAnnotation(annotation)" title="Share link">
+                                  <i class="bi bi-share"></i>
+                                </button>
+                                @if (canDeleteAnnotations()) {
+                                  <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" title="Delete annotation">
+                                    <i class="bi bi-trash"></i>
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                            <div class="small text-muted mt-3">
+                              <div>Created: {{ annotation.createdAt | date: 'medium' }}</div>
+                            </div>
+                          </div>
+                        }
+                      } @else {
+                        @for (annotation of currentStepAnnotations(); track annotation.id) {
+                        <div class="annotation-item border-bottom pb-4 mb-4">
+                          <div class="d-flex align-items-center mb-3">
+                            <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
+                            <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                          </div>
+                          <div class="annotation-content" [class.scratched-content]="annotation.scratched">
+                            @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
+                              <div class="mb-3">
+                                <div class="text-center mb-2">
+                                  <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
+                                </div>
+                                <div>
+                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'image'" class="btn btn-outline-primary btn-sm" title="Download">
+                                    <i class="bi bi-download me-1"></i>Download
+                                  </a>
+                                </div>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.Video && annotation.fileUrl) {
+                              <div class="mb-3">
+                                <video controls class="w-100 rounded mb-2" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                  <source [src]="annotation.fileUrl">
+                                  Your browser does not support the video tag.
+                                </video>
+                                <div>
+                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'video'" class="btn btn-outline-primary btn-sm" title="Download">
+                                    <i class="bi bi-download me-1"></i>Download
+                                  </a>
+                                </div>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.Audio && annotation.fileUrl) {
+                              <div class="mb-3">
+                                <audio controls class="w-100 mb-2" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                  <source [src]="annotation.fileUrl">
+                                  Your browser does not support the audio tag.
+                                </audio>
+                                <div>
+                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'audio'" class="btn btn-outline-primary btn-sm" title="Download">
+                                    <i class="bi bi-download me-1"></i>Download
+                                  </a>
+                                </div>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.File && annotation.fileUrl) {
+                              <div class="mb-3">
+                                <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'file'" class="btn btn-outline-primary btn-sm" title="Download">
+                                  <i class="bi bi-download me-1"></i>Download File
+                                </a>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.Calculator && annotation.annotationText) {
+                              <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                <h6 class="text-muted mb-2">
+                                  <i class="bi bi-calculator me-1"></i>
+                                  Calculator History
+                                </h6>
+                                <div class="list-group list-group-flush">
+                                  @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                                    <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                                      <small class="text-muted font-monospace" [class.text-decoration-line-through]="entry.scratched">
+                                        {{ formatCalculatorExpression(entry) }}
+                                      </small>
+                                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                                              (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                              [class.active]="entry.scratched"
+                                              title="Scratch calculation">
+                                        <i class="bi bi-eraser"></i>
+                                      </button>
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.MolarityCalculator && annotation.annotationText) {
+                              <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                <h6 class="text-muted mb-2">
+                                  <i class="bi bi-calculator-fill me-1"></i>
+                                  Molarity Calculator History
+                                </h6>
+                                <div class="list-group list-group-flush">
+                                  @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                                    <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                                      <small class="text-muted" [class.text-decoration-line-through]="entry.scratched">
+                                        {{ formatMolarityCalculatorExpression(entry) }}
+                                      </small>
+                                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                                              (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                              [class.active]="entry.scratched"
+                                              title="Scratch calculation">
+                                        <i class="bi bi-eraser"></i>
+                                      </button>
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                            @if (annotation.annotationType === AnnotationType.Booking && annotation.instrumentUsageIds && annotation.instrumentUsageIds.length > 0) {
+                              @let bookingId = annotation.instrumentUsageIds[0];
+                              @let bookingData = getBookingData(bookingId);
+                              @if (bookingData) {
+                                <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                  <h6 class="text-muted mb-2">
+                                    <i class="bi bi-calendar-check me-1"></i>
+                                    Instrument Booking
+                                  </h6>
+                                  <div class="mb-2">
+                                    <strong>{{ bookingData.instrumentName || 'Unknown Instrument' }}</strong>
+                                  </div>
+                                  <div class="mb-2">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <strong>Time:</strong>
+                                    <div class="ms-3">
+                                      <div>Start: {{ bookingData.timeStarted | date:'medium' }}</div>
+                                      <div>End: {{ bookingData.timeEnded | date:'medium' }}</div>
+                                    </div>
+                                  </div>
+                                  <div class="mb-2">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <strong>Status:</strong>
+                                    @if (bookingData.approved) {
+                                      <span class="badge bg-success ms-1">Approved</span>
+                                    } @else {
+                                      <span class="badge bg-warning text-dark ms-1">Pending Approval</span>
+                                    }
+                                  </div>
+                                  @if (bookingData.description) {
+                                    <div class="mt-2 pt-2 border-top">
+                                      <small class="text-muted fst-italic">{{ bookingData.description }}</small>
+                                    </div>
+                                  }
+                                </div>
+                              } @else {
+                                <div class="text-muted small">
+                                  <i class="bi bi-hourglass-split me-1"></i>
+                                  Loading booking details...
+                                </div>
+                              }
+                            }
+                            @if (annotation.annotationText && annotation.annotationType !== AnnotationType.Calculator && annotation.annotationType !== AnnotationType.MolarityCalculator && annotation.annotationType !== AnnotationType.Booking) {
+                              <div class="annotation-text border rounded p-3 bg-light mb-3">
+                                <h6 class="text-muted mb-2">
+                                  <i class="bi bi-card-text me-1"></i>
+                                  Description
+                                </h6>
+                                <p class="mb-0">{{ annotation.annotationText }}</p>
+                              </div>
+                            }
+                            @if (annotation.transcription) {
+                              <div class="transcription border rounded p-3 bg-light mb-3">
+                                <h6 class="text-muted mb-2">
+                                  <i class="bi bi-file-text me-1"></i>
+                                  Transcription
+                                  @if (annotation.language) {
+                                    <span class="badge bg-secondary ms-2">{{ annotation.language }}</span>
+                                  }
+                                </h6>
+                                <app-webvtt-editor
+                                  [vttContent]="annotation.transcription"
+                                  [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
+                                  [editable]="true"
+                                  (contentChanged)="onTranscriptionContentChanged($event)">
+                                </app-webvtt-editor>
+                              </div>
+                            }
+                            @if (annotation.translation) {
+                              <div class="translation border rounded p-3 bg-light mb-3">
+                                <h6 class="text-muted mb-2">
+                                  <i class="bi bi-translate me-1"></i>
+                                  Translation
+                                </h6>
+                                <app-webvtt-editor
+                                  [vttContent]="annotation.translation"
+                                  [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
+                                  [editable]="true"
+                                  (contentChanged)="onTranslationContentChanged($event)">
+                                </app-webvtt-editor>
+                              </div>
+                            }
+                          </div>
+                          <div class="mt-3">
+                            <div class="btn-group btn-group-sm">
+                              <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" title="Scratch off">
+                                <i class="bi bi-eraser"></i>
+                              </button>
+                              <button type="button" class="btn btn-outline-info" (click)="shareAnnotation(annotation)" title="Share link">
+                                <i class="bi bi-share"></i>
+                              </button>
+                              @if (canDeleteAnnotations()) {
+                                <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" title="Delete annotation">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              }
+                            </div>
+                          </div>
+                          <div class="small text-muted mt-3">
+                            <div>Created: {{ annotation.createdAt | date: 'medium' }}</div>
+                          </div>
+                        </div>
+                      }
+
+                        @if (annotationsTotal() > annotationsLimit()) {
+                          <div class="d-flex justify-content-between align-items-center mt-3">
+                          <div class="text-muted small">
+                            Showing {{ annotationsOffset() + 1 }} to {{ Math.min(annotationsOffset() + annotationsLimit(), annotationsTotal()) }} of {{ annotationsTotal() }}
+                          </div>
+                          <div class="btn-group btn-group-sm">
+                            <button
+                              class="btn btn-outline-secondary"
+                              (click)="previousAnnotationsPage()"
+                              [disabled]="annotationsOffset() === 0">
+                              <i class="bi bi-chevron-left"></i>
+                              Previous
+                            </button>
+                            <button
+                              class="btn btn-outline-secondary"
+                              (click)="nextAnnotationsPage()"
+                              [disabled]="annotationsOffset() + annotationsLimit() >= annotationsTotal()">
+                              Next
+                              <i class="bi bi-chevron-right"></i>
+                            </button>
+                          </div>
+                        </div>
+                        }
+                      }
+                    </div>
+                  } @else {
+                    <div class="step-annotations mt-4">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center gap-3">
+                          <h5 class="text-muted mb-0">
+                            <i class="bi bi-paperclip me-2"></i>
+                            Annotations
+                          </h5>
+                          <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="hideScratched2" [checked]="hideScratched()" (change)="toggleHideScratched()">
+                            <label class="form-check-label text-muted small" for="hideScratched2">
+                              Hide scratched
+                            </label>
+                          </div>
+                          <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn" [class.btn-primary]="annotationDisplayMode() === 'single'" [class.btn-outline-secondary]="annotationDisplayMode() !== 'single'" (click)="toggleAnnotationDisplayMode()" title="Single view">
+                              <i class="bi bi-square"></i>
+                            </button>
+                            <button type="button" class="btn" [class.btn-primary]="annotationDisplayMode() === 'list'" [class.btn-outline-secondary]="annotationDisplayMode() !== 'list'" (click)="toggleAnnotationDisplayMode()" title="List view">
+                              <i class="bi bi-list"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading()">
+                          <i class="bi bi-plus-circle me-1"></i>
+                          Add
+                        </button>
+                      </div>
+
+                      @if (uploading()) {
+                        <div class="alert alert-info mb-3">
+                          <div class="d-flex justify-content-between mb-2">
+                            <span class="small">Uploading annotation...</span>
+                            <span class="small">{{ uploadProgress() }}%</span>
+                          </div>
+                          <div class="progress">
+                            <div
+                              class="progress-bar progress-bar-striped progress-bar-animated"
+                              role="progressbar"
+                              [style.width.%]="uploadProgress()"></div>
+                          </div>
+                        </div>
+                      }
+
+                      <div class="empty-state text-center text-muted p-5">
+                        <i class="bi bi-paperclip fs-1 mb-3 d-block"></i>
+                        <h5>No Annotations</h5>
+                        <p class="mb-3">Add files, recordings, or other annotations to this step</p>
+                        <button class="btn btn-primary" (click)="openAnnotationModal()" [disabled]="uploading()">
+                          <i class="bi bi-paperclip me-2"></i>
+                          Add Annotation
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (currentStep()) {
+              <div class="card-footer flex-shrink-0">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0">
+                    <i class="bi bi-clipboard-check me-2"></i>
+                    Step {{ currentStepIndexInSection() + 1 }} of {{ currentSectionSteps().length }}
+                  </h6>
+                  <div class="btn-group btn-group-sm">
+                    <button
+                      class="btn btn-outline-secondary"
+                      (click)="previousStep()"
+                      [disabled]="currentStepIndex() === 0"
+                      title="Previous Step">
+                      <i class="bi bi-chevron-left"></i>
+                      Previous
+                    </button>
+                    <button
+                      class="btn btn-outline-secondary"
+                      (click)="nextStep()"
+                      [disabled]="currentStepIndex() === allSteps().length - 1"
+                      title="Next Step">
+                      Next
+                      <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

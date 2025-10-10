@@ -1,0 +1,9 @@
+<div class="audio-visualizer-container">
+  <canvas #canvas></canvas>
+  @if (isActive()) {
+    <div class="status-indicator">
+      <i class="bi bi-mic-fill text-success"></i>
+      <span class="text-success small ms-1">Recording...</span>
+    </div>
+  }
+</div>

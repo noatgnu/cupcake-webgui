@@ -1,0 +1,915 @@
+<div class="instruments-navbar-wrapper flex-shrink-0">
+  <app-instruments-navbar />
+</div>
+
+<div class="container-fluid flex-grow-1 d-flex flex-column p-0" style="min-height: 0;">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-gear me-2"></i>Instruments
+        </h4>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <div class="input-group" style="width: 300px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Search instruments..."
+              [(ngModel)]="searchTerm"
+              (input)="onSearchChange()">
+          </div>
+
+          <div class="btn-group" role="group">
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterEnabled() === 'all'"
+              [class.btn-outline-primary]="filterEnabled() !== 'all'"
+              (click)="setEnabledFilter('all')">
+              All ({{ totalCount() }})
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterEnabled() === 'enabled'"
+              [class.btn-outline-primary]="filterEnabled() !== 'enabled'"
+              (click)="setEnabledFilter('enabled')">
+              <i class="bi bi-check-circle me-1"></i>
+              Enabled
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterEnabled() === 'disabled'"
+              [class.btn-outline-primary]="filterEnabled() !== 'disabled'"
+              (click)="setEnabledFilter('disabled')">
+              <i class="bi bi-x-circle me-1"></i>
+              Disabled
+            </button>
+          </div>
+
+          <div class="btn-group" role="group">
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterBookings() === 'all'"
+              [class.btn-outline-primary]="filterBookings() !== 'all'"
+              (click)="setBookingsFilter('all')">
+              All Bookings
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterBookings() === 'accepts'"
+              [class.btn-outline-primary]="filterBookings() !== 'accepts'"
+              (click)="setBookingsFilter('accepts')">
+              <i class="bi bi-calendar-check me-1"></i>
+              Accepts
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="filterBookings() === 'no-bookings'"
+              [class.btn-outline-primary]="filterBookings() !== 'no-bookings'"
+              (click)="setBookingsFilter('no-bookings')">
+              <i class="bi bi-calendar-x me-1"></i>
+              No Bookings
+            </button>
+          </div>
+
+          @if (isStaff()) {
+            <button class="btn btn-primary btn-sm" (click)="openCreateInstrumentModal()">
+              <i class="bi bi-plus-circle me-2"></i>
+              New Instrument
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  </nav>
+
+
+  <div class="instruments-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="instruments-layout d-flex gap-3 h-100">
+        <div class="instruments-panel-left">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Instruments List
+              </h6>
+            </div>
+            <div class="card-body">
+              @if (filteredInstruments().length === 0) {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-gear fs-2 mb-2 d-block"></i>
+                  <small>No instruments found</small>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (instrument of filteredInstruments(); track instrument.id) {
+                    <div
+                      class="list-group-item instrument-list-item"
+                      [class.active]="selectedInstrument()?.id === instrument.id"
+                      (click)="selectInstrument(instrument)"
+                      role="button">
+                      <div class="d-flex align-items-start gap-2">
+                        @if (instrument.image) {
+                          <img
+                            [src]="instrument.image"
+                            [alt]="instrument.instrumentName"
+                            class="instrument-list-thumbnail flex-shrink-0">
+                        } @else {
+                          <i class="bi bi-gear flex-shrink-0 mt-1"></i>
+                        }
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold mb-1">
+                            {{ instrument.instrumentName }}
+                          </div>
+                          @if (instrument.instrumentDescription) {
+                            <small class="text-muted d-block">
+                              {{ instrument.instrumentDescription.substring(0, 60) }}{{ instrument.instrumentDescription.length > 60 ? '...' : '' }}
+                            </small>
+                          }
+                          <div class="mt-1">
+                            @if (instrument.enabled) {
+                              <span class="badge bg-success me-1">Enabled</span>
+                            } @else {
+                              <span class="badge bg-secondary me-1">Disabled</span>
+                            }
+                            @if (instrument.acceptsBookings) {
+                              <span class="badge bg-info">Accepts Bookings</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            @if (totalPages() > 1) {
+              <div class="card-footer">
+                <div class="d-flex justify-content-center">
+                  <ngb-pagination
+                    [(page)]="currentPage"
+                    [pageSize]="pageSize"
+                    [collectionSize]="totalCount()"
+                    (pageChange)="goToPage($event)"
+                    size="sm">
+                  </ngb-pagination>
+                </div>
+                <div class="text-center mt-2">
+                  <small class="text-muted">
+                    Showing {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, totalCount()) }} of {{ totalCount() }}
+                  </small>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="instruments-panel-right">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  @if (selectedInstrument()) {
+                    <span>Instrument Details</span>
+                  } @else {
+                    <span class="text-muted">Select an instrument</span>
+                  }
+                </h6>
+                @if (selectedInstrument()) {
+                  <div class="d-flex gap-2 align-items-center">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="openAnnotationsModal()"
+                      [title]="canManageInstrument() ? 'Manage Documents' : 'View Documents'">
+                      <i class="bi bi-folder2-open"></i>
+                    </button>
+                    @if (canManageInstrument()) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="openPermissionsModal()"
+                        title="Manage Permissions">
+                        <i class="bi bi-shield-lock"></i>
+                      </button>
+                    }
+                    @if (isStaff()) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="openEditInstrumentModal(selectedInstrument()!)"
+                        title="Edit Instrument">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button
+                        class="btn btn-sm"
+                        [class.btn-success]="!selectedInstrument()!.enabled"
+                        [class.btn-warning]="selectedInstrument()!.enabled"
+                        (click)="toggleEnabled(selectedInstrument()!)"
+                        title="Toggle Enabled">
+                        <i class="bi" [class.bi-check-circle]="!selectedInstrument()!.enabled" [class.bi-x-circle]="selectedInstrument()!.enabled"></i>
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        (click)="deleteInstrument(selectedInstrument()!.id)"
+                        title="Delete Instrument">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    }
+                    @if (isStaffOrAdmin() && !loadingDetails() && (!selectedInstrument()!.supportInformation || selectedInstrument()!.supportInformation?.length === 0)) {
+                      <button
+                        class="btn btn-sm btn-outline-success"
+                        (click)="openAddSupportInfoModal(selectedInstrument()!)"
+                        title="Add Support Information">
+                        <i class="bi bi-plus-circle"></i>
+                      </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" (click)="deselectInstrument()">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (!selectedInstrument()) {
+                <div class="empty-state text-center text-muted">
+                  <i class="bi bi-gear"></i>
+                  <h5>No Instrument Selected</h5>
+                  <p>Select an instrument from the list to view its details</p>
+                </div>
+              } @else if (loadingDetails()) {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading details...</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="detail-content">
+                  <ul ngbNav #nav="ngbNav" [(activeId)]="activeTab" class="nav-tabs mb-3">
+                    <li [ngbNavItem]="'overview'">
+                      <button ngbNavLink>
+                        <i class="bi bi-info-circle me-2"></i>Overview
+                      </button>
+                      <ng-template ngbNavContent>
+                        @if (selectedInstrument()?.image) {
+                          <div class="text-center mb-3">
+                            <img [src]="selectedInstrument()!.image" [alt]="selectedInstrument()!.instrumentName" class="img-fluid rounded" style="max-height: 300px;">
+                          </div>
+                        }
+
+                      <div class="pt-3">
+                        <h6 class="text-muted mb-2">Basic Information</h6>
+                        <div class="row">
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">ID</small>
+                            <div>#{{ selectedInstrument()?.id }}</div>
+                          </div>
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Status</small>
+                            <div>
+                              @if (selectedInstrument()?.enabled) {
+                                <span class="badge bg-success">Enabled</span>
+                              } @else {
+                                <span class="badge bg-secondary">Disabled</span>
+                              }
+                            </div>
+                          </div>
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Accepts Bookings</small>
+                            <div>
+                              @if (selectedInstrument()?.acceptsBookings) {
+                                <span class="badge bg-info">Yes</span>
+                              } @else {
+                                <span class="badge bg-secondary">No</span>
+                              }
+                            </div>
+                          </div>
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Is Vaulted</small>
+                            <div>
+                              @if (selectedInstrument()?.isVaulted) {
+                                <span class="badge bg-warning">Vaulted</span>
+                              } @else {
+                                <span class="badge bg-secondary">Not Vaulted</span>
+                              }
+                            </div>
+                          </div>
+                          @if (selectedInstrument()?.ownerUsername) {
+                            <div class="col-6 mb-2">
+                              <small class="text-muted">Creator</small>
+                              <div>{{ selectedInstrument()?.ownerUsername }}</div>
+                            </div>
+                          }
+                          @if (selectedInstrument()?.remoteHostName) {
+                            <div class="col-6 mb-2">
+                              <small class="text-muted">Remote Host</small>
+                              <div>{{ selectedInstrument()?.remoteHostName }}</div>
+                            </div>
+                          }
+                          <div class="col-12 mb-2">
+                            <small class="text-muted">Created</small>
+                            <div>{{ selectedInstrument()?.createdAt | date: 'medium' }}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      @if (selectedInstrument()?.instrumentDescription) {
+                        <div class="border-top pt-3 mt-3">
+                          <h6 class="text-muted mb-2">Description</h6>
+                          <p class="mb-0">{{ selectedInstrument()?.instrumentDescription }}</p>
+                        </div>
+                      }
+
+                      <div class="border-top pt-3 mt-3">
+                        <h6 class="text-muted mb-2">Pre-Approval Settings</h6>
+                        <div class="row">
+                          @if (selectedInstrument()?.maxDaysAheadPreApproval) {
+                            <div class="col-6 mb-2">
+                              <small class="text-muted">Max Days Ahead</small>
+                              <div>{{ selectedInstrument()?.maxDaysAheadPreApproval }} days</div>
+                            </div>
+                          }
+                          @if (selectedInstrument()?.maxDaysWithinUsagePreApproval) {
+                            <div class="col-6 mb-2">
+                              <small class="text-muted">Max Days Within Usage</small>
+                              <div>{{ selectedInstrument()?.maxDaysWithinUsagePreApproval }} days</div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+
+                      <div class="border-top pt-3 mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <h6 class="text-muted mb-0">Metadata</h6>
+                          @if (selectedInstrument()?.metadataTableId && isStaff()) {
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-primary"
+                              (click)="openMetadataModal()"
+                              title="Manage Metadata">
+                              <i class="bi bi-pencil me-1"></i>Manage
+                            </button>
+                          }
+                        </div>
+                        @if (loadingMetadata()) {
+                          <div class="text-center p-2">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                              <span class="visually-hidden">Loading metadata...</span>
+                            </div>
+                          </div>
+                        } @else if (metadataColumns().length > 0) {
+                          <div class="d-flex flex-wrap gap-2">
+                            @for (column of metadataColumns(); track column.id) {
+                              <span class="badge bg-primary" [ngbTooltip]="column.name" placement="top">
+                                {{ column.value || 'N/A' }}
+                              </span>
+                            }
+                          </div>
+                        } @else {
+                          <div class="text-muted small">No metadata available</div>
+                        }
+                      </div>
+
+                      </ng-template>
+                    </li>
+
+                    @if (isStaffOrAdmin()) {
+                      <li [ngbNavItem]="'support'">
+                        <button ngbNavLink>
+                          <i class="bi bi-headset me-2"></i>Support Information
+                        </button>
+                        <ng-template ngbNavContent>
+                          @if (selectedInstrument()?.supportInformation && selectedInstrument()!.supportInformation!.length > 0) {
+                            @if (selectedSupportInfo()) {
+                              <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Support Details</h6>
+                                <button
+                                  class="btn btn-sm btn-outline-primary"
+                                  (click)="openEditSupportInfoModal(selectedInstrument()!)"
+                                  title="Edit Support Information">
+                                  <i class="bi bi-pencil me-2"></i>Edit
+                                </button>
+                              </div>
+
+                              <div class="row">
+                                @if (selectedSupportInfo()?.serialNumber) {
+                                  <div class="col-12 mb-3">
+                                    <small class="text-muted">Serial Number</small>
+                                    <div class="fw-semibold">{{ selectedSupportInfo()?.serialNumber }}</div>
+                                  </div>
+                                }
+
+                            @if (selectedSupportInfo()?.vendorName) {
+                              <div class="col-12 mb-3">
+                                <small class="text-muted">Vendor</small>
+                                <div class="d-flex align-items-center gap-2">
+                                  <div class="fw-semibold">{{ selectedSupportInfo()?.vendorName }}</div>
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    (click)="openContactsManagementModal()"
+                                    title="Manage Contacts">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                  </button>
+                                </div>
+                                @if (vendorContacts().length > 0) {
+                                  <div class="mt-2">
+                                    @for (contact of vendorContacts(); track contact.id) {
+                                      <div class="border rounded p-2 mb-2">
+                                        <div class="fw-semibold small">{{ contact.contactName }}</div>
+                                        @if (contact.contactDetails && contact.contactDetails.length > 0) {
+                                          @for (detail of contact.contactDetails; track detail.id) {
+                                            <div class="small text-muted">
+                                              @if (detail.contactType === 'email') {
+                                                <i class="bi bi-envelope me-1"></i>
+                                              } @else if (detail.contactType === 'phone') {
+                                                <i class="bi bi-telephone me-1"></i>
+                                              } @else if (detail.contactType === 'address') {
+                                                <i class="bi bi-geo-alt me-1"></i>
+                                              } @else {
+                                                <i class="bi bi-info-circle me-1"></i>
+                                              }
+                                              {{ detail.contactValue }}
+                                            </div>
+                                          }
+                                        }
+                                      </div>
+                                    }
+                                  </div>
+                                }
+                              </div>
+                            }
+
+                            @if (selectedSupportInfo()?.manufacturerName) {
+                              <div class="col-12 mb-3">
+                                <small class="text-muted">Manufacturer</small>
+                                <div class="d-flex align-items-center gap-2">
+                                  <div class="fw-semibold">{{ selectedSupportInfo()?.manufacturerName }}</div>
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    (click)="openContactsManagementModal()"
+                                    title="Manage Contacts">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                  </button>
+                                </div>
+                                @if (manufacturerContacts().length > 0) {
+                                  <div class="mt-2">
+                                    @for (contact of manufacturerContacts(); track contact.id) {
+                                      <div class="border rounded p-2 mb-2">
+                                        <div class="fw-semibold small">{{ contact.contactName }}</div>
+                                        @if (contact.contactDetails && contact.contactDetails.length > 0) {
+                                          @for (detail of contact.contactDetails; track detail.id) {
+                                            <div class="small text-muted">
+                                              @if (detail.contactType === 'email') {
+                                                <i class="bi bi-envelope me-1"></i>
+                                              } @else if (detail.contactType === 'phone') {
+                                                <i class="bi bi-telephone me-1"></i>
+                                              } @else if (detail.contactType === 'address') {
+                                                <i class="bi bi-geo-alt me-1"></i>
+                                              } @else {
+                                                <i class="bi bi-info-circle me-1"></i>
+                                              }
+                                              {{ detail.contactValue }}
+                                            </div>
+                                          }
+                                        }
+                                      </div>
+                                    }
+                                  </div>
+                                }
+                              </div>
+                            }
+
+                            @if (selectedSupportInfo()?.locationName) {
+                              <div class="col-6 mb-2">
+                                <small class="text-muted">Location</small>
+                                <div>{{ selectedSupportInfo()?.locationName }}</div>
+                              </div>
+                            }
+
+                            @if (selectedSupportInfo()?.maintenanceFrequencyDays) {
+                              <div class="col-6 mb-2">
+                                <small class="text-muted">Maintenance Frequency</small>
+                                <div>Every {{ selectedSupportInfo()?.maintenanceFrequencyDays }} days</div>
+                              </div>
+                            }
+
+                            @if (selectedSupportInfo()?.warrantyStartDate || selectedSupportInfo()?.warrantyEndDate) {
+                              <div class="col-12 mb-2">
+                                <small class="text-muted">Warranty Period</small>
+                                <div>
+                                  @if (selectedSupportInfo()?.warrantyStartDate) {
+                                    <span>{{ selectedSupportInfo()?.warrantyStartDate | date: 'mediumDate' }}</span>
+                                  }
+                                  @if (selectedSupportInfo()?.warrantyStartDate && selectedSupportInfo()?.warrantyEndDate) {
+                                    <span> - </span>
+                                  }
+                                  @if (selectedSupportInfo()?.warrantyEndDate) {
+                                    <span>{{ selectedSupportInfo()?.warrantyEndDate | date: 'mediumDate' }}</span>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+
+                          <div class="border-top pt-3 mt-3">
+                            <h6 class="text-muted mb-2">Notification Settings</h6>
+                            <div class="row">
+                              @if (selectedInstrument()?.daysBeforeWarrantyNotification) {
+                                <div class="col-6 mb-2">
+                                  <small class="text-muted">Warranty Notification</small>
+                                  <div>{{ selectedInstrument()?.daysBeforeWarrantyNotification }} days before</div>
+                                </div>
+                              }
+                              @if (selectedInstrument()?.daysBeforeMaintenanceNotification) {
+                                <div class="col-6 mb-2">
+                                  <small class="text-muted">Maintenance Notification</small>
+                                  <div>{{ selectedInstrument()?.daysBeforeMaintenanceNotification }} days before</div>
+                                </div>
+                              }
+                            </div>
+                          </div>
+                            }
+                          } @else {
+                            <div class="text-center p-4">
+                              <small class="text-muted">No support information available</small>
+                              <div class="mt-2">
+                                <button
+                                  class="btn btn-sm btn-outline-primary"
+                                  (click)="openAddSupportInfoModal(selectedInstrument()!)">
+                                  <i class="bi bi-plus-circle me-2"></i>Add Support Information
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </ng-template>
+                      </li>
+                    }
+
+                    @if (canManageInstrument()) {
+                      <li [ngbNavItem]="'maintenance'">
+                        <button ngbNavLink (click)="loadMaintenanceLogs(selectedInstrument()!.id)">
+                          <i class="bi bi-wrench me-2"></i>Maintenance Logs
+                        </button>
+                        <ng-template ngbNavContent>
+                          <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Maintenance History</h6>
+                            <button
+                              class="btn btn-sm btn-primary"
+                              (click)="openCreateMaintenanceLogModal()">
+                              <i class="bi bi-plus-circle me-2"></i>Add Log
+                            </button>
+                          </div>
+
+                          @if (lastRoutineMaintenance() || selectedSupportInfo()?.maintenanceFrequencyDays) {
+                            <div class="card mb-3" [class.border-danger]="selectedInstrument()?.maintenanceOverdue" [class.border-warning]="!selectedInstrument()?.maintenanceOverdue">
+                              <div class="card-body">
+                                <div class="row">
+                                  @if (lastRoutineMaintenance()) {
+                                    <div class="col-md-6 mb-2 mb-md-0">
+                                      <small class="text-muted d-block">Last Routine Maintenance</small>
+                                      <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-calendar-check"></i>
+                                        <strong>{{ lastRoutineMaintenance()!.maintenanceDate | date: 'mediumDate' }}</strong>
+                                      </div>
+                                    </div>
+                                  }
+                                  @if (nextMaintenanceDue()) {
+                                    <div class="col-md-6">
+                                      <small class="text-muted d-block">Next Maintenance Due</small>
+                                      <div class="d-flex align-items-center gap-2">
+                                        @if (selectedInstrument()?.maintenanceOverdue) {
+                                          <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                                          <strong class="text-danger">
+                                            {{ nextMaintenanceDue()! | date: 'mediumDate' }} (OVERDUE)
+                                          </strong>
+                                        } @else {
+                                          <i class="bi bi-calendar-event"></i>
+                                          <strong>{{ nextMaintenanceDue()! | date: 'mediumDate' }}</strong>
+                                        }
+                                      </div>
+                                    </div>
+                                  }
+                                  @if (!lastRoutineMaintenance() && selectedSupportInfo()?.maintenanceFrequencyDays) {
+                                    <div class="col-12">
+                                      <div class="alert alert-warning mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No routine maintenance has been logged yet. Maintenance is required every {{ selectedSupportInfo()!.maintenanceFrequencyDays }} days.
+                                      </div>
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          }
+
+                          <div class="d-flex gap-2 mb-3">
+                            <select class="form-select form-select-sm" [(ngModel)]="maintenanceFilterType" (ngModelChange)="onMaintenanceFilterChange()" style="max-width: 200px;">
+                              <option value="">All Types</option>
+                              <option [value]="MaintenanceType.ROUTINE">Routine</option>
+                              <option [value]="MaintenanceType.EMERGENCY">Emergency</option>
+                              <option [value]="MaintenanceType.OTHER">Other</option>
+                            </select>
+                            <select class="form-select form-select-sm" [(ngModel)]="maintenanceFilterStatus" (ngModelChange)="onMaintenanceFilterChange()" style="max-width: 200px;">
+                              <option value="">All Status</option>
+                              <option [value]="Status.PENDING">Pending</option>
+                              <option [value]="Status.IN_PROGRESS">In Progress</option>
+                              <option [value]="Status.COMPLETED">Completed</option>
+                              <option [value]="Status.REQUESTED">Requested</option>
+                              <option [value]="Status.CANCELLED">Cancelled</option>
+                            </select>
+                          </div>
+
+                          @if (loadingMaintenanceLogs()) {
+                            <div class="text-center p-4">
+                              <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading maintenance logs...</span>
+                              </div>
+                            </div>
+                          } @else if (maintenanceLogs().length === 0) {
+                            <div class="text-center p-4">
+                              <i class="bi bi-wrench fs-1 mb-3 d-block text-muted"></i>
+                              <h6>No Maintenance Logs</h6>
+                              <p class="text-muted mb-3">No maintenance has been logged for this instrument yet</p>
+                              <button class="btn btn-sm btn-outline-primary" (click)="openCreateMaintenanceLogModal()">
+                                <i class="bi bi-plus-circle me-2"></i>Add First Log
+                              </button>
+                            </div>
+                          } @else {
+                            <div class="table-responsive">
+                              <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                  <tr>
+                                    <th style="width: 40px;"></th>
+                                    <th style="width: 110px;">Date</th>
+                                    <th style="width: 100px;">Type</th>
+                                    <th style="width: 100px;">Status</th>
+                                    <th style="width: 80px;" class="text-center">Docs</th>
+                                    <th style="width: 120px;">By</th>
+                                    <th style="width: 100px;" class="text-end">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @for (log of maintenanceLogs(); track log.id) {
+                                    <tr>
+                                      <td class="align-middle">
+                                        <button
+                                          class="btn btn-sm btn-link p-0"
+                                          (click)="toggleMaintenanceLogDetails(log.id)"
+                                          [title]="expandedMaintenanceLogId() === log.id ? 'Hide details' : 'Show details'">
+                                          <i class="bi" [class.bi-chevron-down]="expandedMaintenanceLogId() !== log.id" [class.bi-chevron-up]="expandedMaintenanceLogId() === log.id"></i>
+                                        </button>
+                                      </td>
+                                      <td class="align-middle">
+                                        <small>{{ log.maintenanceDate | date: 'shortDate' }}</small>
+                                      </td>
+                                      <td class="align-middle">
+                                        <span class="badge bg-primary">{{ log.maintenanceTypeDisplay }}</span>
+                                      </td>
+                                      <td class="align-middle">
+                                        <span class="badge" [class.bg-success]="log.status === 'completed'" [class.bg-warning]="log.status === 'in_progress'" [class.bg-secondary]="log.status === 'pending'" [class.bg-info]="log.status === 'requested'" [class.bg-danger]="log.status === 'cancelled'">
+                                          {{ log.statusDisplay }}
+                                        </span>
+                                        @if (log.isTemplate) {
+                                          <span class="badge bg-info ms-1">
+                                            <i class="bi bi-bookmark"></i>
+                                          </span>
+                                        }
+                                      </td>
+                                      <td class="align-middle text-center">
+                                        <span class="badge bg-secondary">
+                                          {{ maintenanceLogDocumentCounts().get(log.id) || 0 }}
+                                        </span>
+                                      </td>
+                                      <td class="align-middle">
+                                        @if (log.createdByUsername) {
+                                          <small class="text-muted">{{ log.createdByUsername }}</small>
+                                        }
+                                      </td>
+                                      <td class="align-middle text-end">
+                                        <div class="btn-group btn-group-sm">
+                                          <button class="btn btn-outline-secondary btn-sm" (click)="openEditMaintenanceLogModal(log)" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                          </button>
+                                          <button class="btn btn-outline-danger btn-sm" (click)="deleteMaintenanceLog(log)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    @if (expandedMaintenanceLogId() === log.id) {
+                                      <tr>
+                                        <td colspan="7" class="bg-light">
+                                          <div class="p-2">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                              <div class="flex-grow-1">
+                                                @if (log.maintenanceDescription) {
+                                                  <div class="mb-2">
+                                                    <strong class="text-muted small">Description:</strong>
+                                                    <p class="mb-0">{{ log.maintenanceDescription }}</p>
+                                                  </div>
+                                                }
+                                                @if (log.maintenanceNotes) {
+                                                  <div>
+                                                    <strong class="text-muted small">Notes:</strong>
+                                                    <p class="mb-0">{{ log.maintenanceNotes }}</p>
+                                                  </div>
+                                                }
+                                                @if (!log.maintenanceDescription && !log.maintenanceNotes) {
+                                                  <p class="text-muted mb-0 small">No description or notes available</p>
+                                                }
+                                              </div>
+                                              <button
+                                                class="btn btn-sm btn-outline-primary"
+                                                (click)="openMaintenanceLogAnnotationsModal(log)"
+                                                [title]="canManageInstrument() ? 'Manage Documents' : 'View Documents'">
+                                                <i class="bi bi-folder2-open me-1"></i>
+                                                {{ canManageInstrument() ? 'Manage' : 'View' }} Documents
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    }
+                                  }
+                                </tbody>
+                              </table>
+                            </div>
+
+                            @if (maintenanceLogsTotal() > maintenanceLogsPageSize) {
+                              <div class="d-flex justify-content-center mt-3">
+                                <ngb-pagination
+                                  [(page)]="maintenanceLogsPage"
+                                  [pageSize]="maintenanceLogsPageSize"
+                                  [collectionSize]="maintenanceLogsTotal()"
+                                  (pageChange)="onMaintenancePageChange($event)"
+                                  size="sm">
+                                </ngb-pagination>
+                              </div>
+                            }
+                          }
+                        </ng-template>
+                      </li>
+                    }
+
+                    @if (canBookInstrument() || canManageInstrument()) {
+                      <li [ngbNavItem]="'bookings'">
+                        <button ngbNavLink (click)="loadBookings(selectedInstrument()!.id)">
+                          <i class="bi bi-calendar-check me-2"></i>Bookings
+                        </button>
+                        <ng-template ngbNavContent>
+                          <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Instrument Bookings</h6>
+                            @if (canBookInstrument()) {
+                              <button
+                                class="btn btn-sm btn-primary"
+                                (click)="openCreateBookingModal()">
+                                <i class="bi bi-plus-circle me-2"></i>New Booking
+                              </button>
+                            }
+                          </div>
+
+                          @if (loadingBookings()) {
+                            <div class="text-center p-4">
+                              <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading bookings...</span>
+                              </div>
+                            </div>
+                          } @else if (bookings().length === 0) {
+                            <div class="text-center p-4">
+                              <i class="bi bi-calendar-x fs-1 mb-3 d-block text-muted"></i>
+                              <h6>No Bookings</h6>
+                              <p class="text-muted mb-3">No bookings have been created for this instrument yet</p>
+                              @if (canBookInstrument()) {
+                                <button class="btn btn-sm btn-outline-primary" (click)="openCreateBookingModal()">
+                                  <i class="bi bi-plus-circle me-2"></i>Create First Booking
+                                </button>
+                              }
+                            </div>
+                          } @else {
+                            <div class="table-responsive">
+                              <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                  <tr>
+                                    <th style="width: 140px;">Start Time</th>
+                                    <th style="width: 140px;">End Time</th>
+                                    <th style="width: 80px;">Duration</th>
+                                    <th style="width: 120px;">User</th>
+                                    <th>Description</th>
+                                    <th style="width: 100px;" class="text-center">Status</th>
+                                    <th style="width: 100px;" class="text-end">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @for (booking of bookings(); track booking.id) {
+                                    <tr>
+                                      <td class="align-middle">
+                                        <small>{{ booking.timeStarted | date: 'short' }}</small>
+                                      </td>
+                                      <td class="align-middle">
+                                        @if (booking.timeEnded) {
+                                          <small>{{ booking.timeEnded | date: 'short' }}</small>
+                                        } @else {
+                                          <span class="badge bg-info">In Progress</span>
+                                        }
+                                      </td>
+                                      <td class="align-middle">
+                                        @if (calculateDuration(booking) !== null) {
+                                          <small>{{ calculateDuration(booking) }}h</small>
+                                        } @else {
+                                          <small class="text-muted">-</small>
+                                        }
+                                      </td>
+                                      <td class="align-middle">
+                                        @if (booking.userUsername) {
+                                          <small class="text-muted">{{ booking.userUsername }}</small>
+                                        }
+                                      </td>
+                                      <td class="align-middle">
+                                        @if (booking.description) {
+                                          <small>{{ booking.description }}</small>
+                                        } @else {
+                                          <small class="text-muted">No description</small>
+                                        }
+                                      </td>
+                                      <td class="align-middle text-center">
+                                        @if (booking.maintenance) {
+                                          <span class="badge bg-warning">Maintenance</span>
+                                        }
+                                        @if (booking.approved) {
+                                          <span class="badge bg-success">Approved</span>
+                                        } @else {
+                                          <span class="badge bg-secondary">Pending</span>
+                                        }
+                                      </td>
+                                      <td class="align-middle text-end">
+                                        <div class="btn-group btn-group-sm">
+                                          @if (canManageInstrument()) {
+                                            @if (!booking.approved) {
+                                              <button class="btn btn-outline-success btn-sm" (click)="approveBooking(booking)" title="Approve">
+                                                <i class="bi bi-check-circle"></i>
+                                              </button>
+                                            } @else {
+                                              <button class="btn btn-outline-warning btn-sm" (click)="unapproveBooking(booking)" title="Unapprove">
+                                                <i class="bi bi-x-circle"></i>
+                                              </button>
+                                            }
+                                          }
+                                          @if (canBookInstrument()) {
+                                            <button class="btn btn-outline-secondary btn-sm" (click)="openEditBookingModal(booking)" title="Edit">
+                                              <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" (click)="deleteBooking(booking)" title="Delete">
+                                              <i class="bi bi-trash"></i>
+                                            </button>
+                                          }
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            </div>
+
+                            @if (bookingsTotal() > bookingsPageSize) {
+                              <div class="d-flex justify-content-center mt-3">
+                                <ngb-pagination
+                                  [(page)]="bookingsPage"
+                                  [pageSize]="bookingsPageSize"
+                                  [collectionSize]="bookingsTotal()"
+                                  (pageChange)="onBookingsPageChange($event)"
+                                  size="sm">
+                                </ngb-pagination>
+                              </div>
+                            }
+                          }
+                        </ng-template>
+                      </li>
+                    }
+                  </ul>
+
+                  <div [ngbNavOutlet]="nav"></div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

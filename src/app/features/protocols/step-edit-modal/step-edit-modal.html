@@ -1,0 +1,206 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-pencil me-2"></i>
+    Edit Step
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="stepForm">
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <label class="form-label mb-0">
+          Step Description <span class="text-danger">*</span>
+        </label>
+        <div class="btn-group btn-group-sm">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="toggleTemplateHelp()">
+            <i class="bi bi-question-circle me-1"></i>
+            Template Help
+          </button>
+          <button
+            type="button"
+            class="btn"
+            [class.btn-outline-primary]="!showPreview"
+            [class.btn-primary]="showPreview"
+            (click)="togglePreview()">
+            <i class="bi bi-eye me-1"></i>
+            Preview
+          </button>
+        </div>
+      </div>
+
+      @if (showTemplateHelp) {
+        <div class="alert alert-info small mb-2">
+          <h6 class="alert-heading">Reagent Template Syntax</h6>
+          <p class="mb-2"><strong>Quick Insert:</strong> Type <kbd>space</kbd> followed by <kbd>%</kbd> to show available reagent variables.</p>
+          <p class="mb-2">Or manually type these templates:</p>
+          <ul class="mb-2">
+            <li><code>%ID.name%</code> - Reagent name</li>
+            <li><code>%ID.quantity%</code> - Base quantity</li>
+            <li><code>%ID.scaled_quantity%</code> - Scaled quantity (if reagent is scalable)</li>
+            <li><code>%ID.unit%</code> - Unit</li>
+          </ul>
+          <p class="mb-0">Replace <code>ID</code> with the step reagent ID. Templates will be replaced with actual values when viewing the step.</p>
+        </div>
+      }
+
+      <div class="row">
+        <div [class]="showPreview ? 'col-md-6' : 'col-12'">
+          <div class="position-relative">
+            <quill-editor
+              formControlName="stepDescription"
+              [modules]="quillConfig"
+              placeholder="Enter step description"
+              (onEditorCreated)="onEditorCreated($event)"
+              (onContentChanged)="onContentChanged($event)"
+              [class.is-invalid]="stepForm.get('stepDescription')?.invalid && stepForm.get('stepDescription')?.touched">
+            </quill-editor>
+
+            <div #dropdownMenu class="dropdown-menu show shadow" style="display: none; z-index: 1050; max-height: 250px; overflow-y: auto;">
+              @if (filteredReagents.length === 0) {
+                <div class="dropdown-item-text text-muted">No reagents found</div>
+              }
+              @for (reagent of filteredReagents; track reagent.id) {
+                <h6 class="dropdown-header">{{reagent.reagentName}} (ID: {{reagent.id}})</h6>
+                <button type="button" class="dropdown-item" (click)="insertReagentTemplate(reagent.id, 'name')">
+                  %{{reagent.id}}.name%
+                </button>
+                <button type="button" class="dropdown-item" (click)="insertReagentTemplate(reagent.id, 'quantity')">
+                  %{{reagent.id}}.quantity% → {{reagent.quantity}}
+                </button>
+                @if (reagent.scalable) {
+                  <button type="button" class="dropdown-item" (click)="insertReagentTemplate(reagent.id, 'scaled_quantity')">
+                    %{{reagent.id}}.scaled_quantity% → {{reagent.scaledQuantity || (reagent.quantity * reagent.scalableFactor)}}
+                  </button>
+                }
+                <button type="button" class="dropdown-item" (click)="insertReagentTemplate(reagent.id, 'unit')">
+                  %{{reagent.id}}.unit% → {{reagent.reagentUnit}}
+                </button>
+                @if (!$last) {
+                  <div class="dropdown-divider"></div>
+                }
+              }
+            </div>
+          </div>
+          @if (stepForm.get('stepDescription')?.invalid && stepForm.get('stepDescription')?.touched) {
+            <div class="invalid-feedback d-block">
+              Step description is required
+            </div>
+          }
+        </div>
+
+        @if (showPreview) {
+          <div class="col-md-6">
+            <div class="border rounded p-3" style="min-height: 200px;">
+              <div [innerHTML]="stepForm.get('stepDescription')?.value | stepTemplate:reagents"></div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Duration</label>
+      <app-duration-input formControlName="stepDuration"></app-duration-input>
+      <div class="form-text">
+        Optional: Estimated time to complete this step
+      </div>
+    </div>
+
+    @if (reagents.length > 0) {
+      <div class="card">
+        <div class="card-header py-2">
+          <h6 class="mb-0">
+            <i class="bi bi-flask me-2"></i>
+            Step Reagents ({{ reagents.length }})
+          </h6>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 80px;">ID</th>
+                  <th>Reagent</th>
+                  <th style="width: 100px;">Quantity</th>
+                  <th style="width: 70px;">Unit</th>
+                  <th style="width: 200px;">Insert</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (reagent of reagents; track reagent.id) {
+                  <tr>
+                    <td>
+                      <span class="badge text-bg-primary">{{ reagent.id }}</span>
+                    </td>
+                    <td>
+                      <strong>{{ reagent.reagentName }}</strong>
+                      @if (reagent.scalable) {
+                        <span class="badge text-bg-warning ms-1">
+                          <i class="bi bi-arrows-angle-expand"></i>
+                        </span>
+                      }
+                    </td>
+                    <td>{{ reagent.quantity }}</td>
+                    <td>{{ reagent.reagentUnit }}</td>
+                    <td>
+                      <div class="btn-group btn-group-sm" role="group">
+                        <button
+                          type="button"
+                          class="btn btn-outline-primary"
+                          (click)="insertTemplate('%' + reagent.id + '.quantity%')">
+                          <i class="bi bi-123"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-outline-secondary"
+                          (click)="insertTemplate('%' + reagent.id + '.unit%')">
+                          <i class="bi bi-rulers"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-outline-info"
+                          (click)="insertTemplate('%' + reagent.id + '.name%')">
+                          <i class="bi bi-tag"></i>
+                        </button>
+                        @if (reagent.scalable) {
+                          <button
+                            type="button"
+                            class="btn btn-outline-warning"
+                            (click)="insertTemplate('%' + reagent.id + '.scaled_quantity%')">
+                            <i class="bi bi-calculator"></i>
+                          </button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="updateStep()"
+    [disabled]="!stepForm.valid || saving">
+    @if (saving) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+    }
+    <i class="bi bi-save me-1"></i>
+    Save Changes
+  </button>
+</div>

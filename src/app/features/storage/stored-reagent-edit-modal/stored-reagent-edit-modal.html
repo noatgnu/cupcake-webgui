@@ -1,0 +1,205 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-flask me-2"></i>
+    Edit Stored Reagent
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <strong>Reagent:</strong> {{ storedReagent.reagentName }}
+  </div>
+  <div class="mb-3">
+    <strong>Original Quantity:</strong> {{ storedReagent.quantity }}{{ storedReagent.reagentUnit ? ' ' + storedReagent.reagentUnit : '' }}
+  </div>
+  @if (storedReagent.reagentUnit) {
+    <div class="mb-3">
+      <strong>Unit:</strong> {{ storedReagent.reagentUnit }}
+    </div>
+  }
+
+  <form>
+    <!-- Current Quantity -->
+    <div class="mb-3">
+      <label for="currentQuantity" class="form-label">
+        Current Quantity{{ storedReagent.reagentUnit ? ' (' + storedReagent.reagentUnit + ')' : '' }} <span class="text-danger">*</span>
+      </label>
+      <input
+        type="number"
+        class="form-control"
+        id="currentQuantity"
+        [(ngModel)]="currentQuantity"
+        name="currentQuantity"
+        [disabled]="saving()"
+        min="0"
+        step="0.01"
+        required>
+    </div>
+
+    <!-- Barcode -->
+    <div class="mb-3">
+      <app-barcode-input
+        [(barcode)]="barcode"
+        [disabled]="saving()"
+        label="Barcode">
+      </app-barcode-input>
+    </div>
+
+    <!-- Notes -->
+    <div class="mb-3">
+      <label for="notes" class="form-label">Notes</label>
+      <textarea
+        class="form-control"
+        id="notes"
+        [(ngModel)]="notes"
+        name="notes"
+        [disabled]="saving()"
+        rows="3"></textarea>
+    </div>
+
+    <!-- Expiration Date -->
+    <div class="mb-3">
+      <label for="expirationDate" class="form-label">Expiration Date</label>
+      <input
+        type="date"
+        class="form-control"
+        id="expirationDate"
+        [(ngModel)]="expirationDate"
+        name="expirationDate"
+        [disabled]="saving()">
+    </div>
+
+    <!-- Low Stock Settings -->
+    <div class="mb-3">
+      <label for="lowStockThreshold" class="form-label">
+        Low Stock Threshold{{ storedReagent.reagentUnit ? ' (' + storedReagent.reagentUnit + ')' : '' }}
+      </label>
+      <input
+        type="number"
+        class="form-control"
+        id="lowStockThreshold"
+        [(ngModel)]="lowStockThreshold"
+        name="lowStockThreshold"
+        [disabled]="saving()"
+        min="0"
+        step="0.01">
+      <div class="form-text">Alert when quantity falls below this threshold</div>
+    </div>
+
+    <div class="mb-3">
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="notifyOnLowStock"
+          [(ngModel)]="notifyOnLowStock"
+          name="notifyOnLowStock"
+          [disabled]="saving()">
+        <label class="form-check-label" for="notifyOnLowStock">
+          Notify on low stock
+        </label>
+      </div>
+    </div>
+
+    <!-- Image Upload -->
+    <div class="mb-3">
+      <app-image-upload
+        label="Reagent Image"
+        [maxWidth]="800"
+        [maxHeight]="800"
+        [initialImage]="initialImage"
+        (imageChange)="onImageChange($event)"
+        (imageCleared)="onImageCleared()">
+      </app-image-upload>
+    </div>
+
+    <!-- Access Settings -->
+    <div class="mb-3">
+      <label class="form-label">Access Settings</label>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="shareable"
+          [(ngModel)]="shareable"
+          name="shareable"
+          [disabled]="saving()">
+        <label class="form-check-label" for="shareable">
+          Shareable
+        </label>
+      </div>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="accessAll"
+          [(ngModel)]="accessAll"
+          name="accessAll"
+          [disabled]="saving()">
+        <label class="form-check-label" for="accessAll">
+          Access for all users
+        </label>
+      </div>
+    </div>
+
+    <!-- Test Notifications (Staff/Admin Only) -->
+    @if (isStaffOrAdmin()) {
+      <div class="mb-3">
+        <label class="form-label">
+          <i class="bi bi-bell me-1"></i>
+          Test Notifications
+          <span class="badge bg-warning text-dark ms-2">Staff Only</span>
+        </label>
+        <div class="card">
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Send a test notification to yourself to verify notification settings.
+            </p>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-8">
+                <label for="notificationType" class="form-label small">Notification Type</label>
+                <select
+                  id="notificationType"
+                  class="form-select form-select-sm"
+                  [(ngModel)]="selectedNotificationType"
+                  name="notificationType"
+                  [disabled]="sendingNotification()">
+                  @for (type of getAlertTypes(); track type) {
+                    <option [value]="type">{{ reagentAlertTypeLabels[type] }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-md-4">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary w-100"
+                  (click)="sendTestNotification()"
+                  [disabled]="sendingNotification()">
+                  @if (sendingNotification()) {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                  } @else {
+                    <i class="bi bi-send me-1"></i>
+                  }
+                  Send Test
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || currentQuantity < 0">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    }
+    Save Changes
+  </button>
+</div>

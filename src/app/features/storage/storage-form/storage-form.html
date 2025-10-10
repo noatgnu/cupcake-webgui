@@ -1,0 +1,73 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    {{ storageObject ? 'Edit Storage Object' : 'New Storage Object' }}
+  </h5>
+  <button type="button" class="btn-close" aria-label="Close" (click)="cancel()"></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <div class="modal-body">
+    @if (error()) {
+      <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        {{ error() }}
+      </div>
+    }
+
+    <div class="mb-3">
+      <label for="objectType" class="form-label">Storage Type *</label>
+      <select
+        id="objectType"
+        class="form-select"
+        formControlName="objectType"
+        [class.is-invalid]="form.get('objectType')?.invalid && form.get('objectType')?.touched">
+        @for (type of storageTypes; track type) {
+          <option [value]="type">{{ typeLabels[type] }}</option>
+        }
+      </select>
+      @if (form.get('objectType')?.invalid && form.get('objectType')?.touched) {
+        <div class="invalid-feedback">
+          Storage type is required
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label for="objectName" class="form-label">Name *</label>
+      <input
+        type="text"
+        id="objectName"
+        class="form-control"
+        formControlName="objectName"
+        placeholder="Enter storage object name"
+        [class.is-invalid]="form.get('objectName')?.invalid && form.get('objectName')?.touched">
+      @if (form.get('objectName')?.invalid && form.get('objectName')?.touched) {
+        <div class="invalid-feedback">
+          Name is required
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label for="objectDescription" class="form-label">Description</label>
+      <textarea
+        id="objectDescription"
+        class="form-control"
+        formControlName="objectDescription"
+        rows="3"
+        placeholder="Enter description (optional)"></textarea>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="submitting()">
+      Cancel
+    </button>
+    <button type="submit" class="btn btn-primary" [disabled]="submitting() || form.invalid">
+      @if (submitting()) {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      }
+      {{ storageObject ? 'Update' : 'Create' }}
+    </button>
+  </div>
+</form>

@@ -1,0 +1,124 @@
+<div class="sidebar-content h-100 d-flex flex-column" [class.collapsed]="isCollapsed()">
+  <!-- Sidebar Header -->
+  <div class="sidebar-header p-3 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <img src="cupcake_logo.png" alt="Cupcake" class="sidebar-logo" style="height: 32px;">
+      @if (!isCollapsed()) {
+        <h5 class="mb-0 fw-bold">{{ (siteConfig$ | async)?.siteName || 'Cupcake' }}</h5>
+      }
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav flex-grow-1 p-3">
+    <ul class="nav flex-column gap-1">
+      @for (item of navItems; track item.route) {
+        <li class="nav-item">
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            class="nav-link d-flex align-items-center px-3 py-2 rounded"
+            [class.justify-content-center]="isCollapsed()"
+            [class.gap-3]="!isCollapsed()"
+            [title]="isCollapsed() ? item.label : ''">
+            <i class="bi {{item.icon}} fs-5"></i>
+            @if (!isCollapsed()) {
+              <span>{{item.label}}</span>
+            }
+          </a>
+        </li>
+      }
+    </ul>
+
+    @if (isAdmin()) {
+      @if (!isCollapsed()) {
+        <div class="px-3 py-2">
+          <div class="small text-muted text-uppercase fw-semibold">Admin</div>
+        </div>
+      } @else {
+        <hr class="my-2 mx-3">
+      }
+      <ul class="nav flex-column gap-1">
+        @for (item of adminItems; track item.route) {
+          <li class="nav-item">
+            <a
+              [routerLink]="item.route"
+              routerLinkActive="active"
+              class="nav-link d-flex align-items-center px-3 py-2 rounded"
+              [class.justify-content-center]="isCollapsed()"
+              [class.gap-3]="!isCollapsed()"
+              [title]="isCollapsed() ? item.label : ''">
+              <i class="bi {{item.icon}} fs-5"></i>
+              @if (!isCollapsed()) {
+                <span>{{item.label}}</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </nav>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer p-3 border-top">
+    @if (currentUser$ | async; as user) {
+      @if (isCollapsed()) {
+        <div class="d-flex flex-column align-items-center gap-2 mb-2">
+          <i class="bi bi-person-circle fs-4"></i>
+          <app-notification-dropdown></app-notification-dropdown>
+          <app-messaging-dropdown></app-messaging-dropdown>
+        </div>
+      } @else {
+        <div class="mb-2 p-2 border rounded">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-person-circle fs-4"></i>
+            <div class="flex-grow-1 small">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold">{{ user.username }}</div>
+                <div class="d-flex gap-1">
+                  <app-notification-dropdown></app-notification-dropdown>
+                  <app-messaging-dropdown></app-messaging-dropdown>
+                </div>
+              </div>
+              @if (user.email) {
+                <div class="text-muted" style="font-size: 0.75rem;">{{ user.email }}</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+    <button
+      class="btn btn-outline-secondary w-100 mb-2 d-flex align-items-center gap-2"
+      [class.justify-content-center]="isCollapsed()"
+      (click)="toggleTheme()"
+      [title]="getThemeLabel()">
+      <i [class]="getThemeIcon()"></i>
+      @if (!isCollapsed()) {
+        <span>{{ getThemeLabel() }}</span>
+      }
+    </button>
+    <button
+      class="btn btn-outline-danger w-100 mb-2 d-flex align-items-center gap-2"
+      [class.justify-content-center]="isCollapsed()"
+      (click)="logout()"
+      [title]="isCollapsed() ? 'Logout' : ''">
+      <i class="bi bi-box-arrow-right"></i>
+      @if (!isCollapsed()) {
+        <span>Logout</span>
+      }
+    </button>
+    @if (!isCollapsed()) {
+      <div class="d-flex align-items-center gap-2 text-muted small justify-content-center">
+        <i class="bi bi-info-circle"></i>
+        <span>Version 1.0.0</span>
+      </div>
+      @if ((siteConfig$ | async)?.showPoweredBy !== false) {
+        <div class="d-flex align-items-center gap-2 text-muted small justify-content-center mt-1">
+          <i class="bi bi-lightning-charge text-warning"></i>
+          <span style="font-size: 0.7rem;">Powered by <strong>CUPCAKE</strong></span>
+        </div>
+      }
+    }
+  </div>
+</div>

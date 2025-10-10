@@ -1,0 +1,150 @@
+<div class="step-content">
+  <h4 class="mb-4">Lab Group and Staff</h4>
+
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <label for="labGroup" class="form-label mb-0">
+        Lab Group <span class="text-danger">*</span>
+      </label>
+      @if (state.selectedLabGroupId()) {
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger"
+          (click)="clearLabGroupAndStaff()"
+          title="Clear lab group and staff selection">
+          <i class="bi bi-x-circle me-1"></i>Clear Selection
+        </button>
+      }
+    </div>
+    <div class="position-relative">
+      <input
+        type="text"
+        class="form-control"
+        id="labGroup"
+        [value]="state.labGroupSearchTerm()"
+        (input)="onLabGroupSearchInput($any($event.target).value)"
+        (focus)="state.showLabGroupSuggestions.set(true)"
+        (blur)="hideLabGroupSuggestions()"
+        placeholder="Search for lab group">
+      @if (state.searchingLabGroups()) {
+        <span class="position-absolute top-50 end-0 translate-middle-y me-2">
+          <div class="spinner-border spinner-border-sm" role="status"></div>
+        </span>
+      }
+      @if (state.showLabGroupSuggestions() && state.labGroupSuggestions().length > 0) {
+        <div class="list-group position-absolute w-100 mt-1 shadow-sm" style="z-index: 1000; max-height: 200px; overflow-y: auto;">
+          @for (labGroup of state.labGroupSuggestions(); track labGroup.id) {
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              (mousedown)="selectLabGroup(labGroup)">
+              <div class="fw-semibold">{{ labGroup.name }}</div>
+              @if (labGroup.description) {
+                <small class="text-muted">{{ labGroup.description }}</small>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (state.selectedLabGroupId() && state.labGroupMembers().length > 0) {
+    <div class="mb-3">
+      <label class="form-label">Staff Members</label>
+      <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+        @for (member of state.labGroupMembers(); track member.id) {
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              [id]="'staff-' + member.id"
+              [checked]="state.selectedStaffIds().includes(member.id!)"
+              (change)="toggleStaffSelection(member.id!)">
+            <label class="form-check-label" [for]="'staff-' + member.id">
+              {{ member.username }}
+              @if (member.email) {
+                <small class="text-muted">({{ member.email }})</small>
+              }
+            </label>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="mb-3">
+    <label for="funder" class="form-label">Funder</label>
+    <div class="position-relative">
+      <input
+        type="text"
+        class="form-control"
+        id="funder"
+        [value]="state.funder()"
+        (input)="onFunderSearchInput($any($event.target).value)"
+        (focus)="state.showFunderSuggestions.set(true)"
+        (blur)="hideFunderSuggestions()"
+        placeholder="Enter funder">
+      @if (state.showFunderSuggestions() && state.funderSuggestions().length > 0) {
+        <div class="list-group position-absolute w-100 mt-1 shadow-sm" style="z-index: 1000; max-height: 200px; overflow-y: auto;">
+          @for (suggestion of state.funderSuggestions(); track suggestion) {
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              (mousedown)="selectFunder(suggestion)">
+              {{ suggestion }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="costCenter" class="form-label">Cost Center</label>
+    <div class="position-relative">
+      <input
+        type="text"
+        class="form-control"
+        id="costCenter"
+        [value]="state.costCenter()"
+        (input)="onCostCenterSearchInput($any($event.target).value)"
+        (focus)="state.showCostCenterSuggestions.set(true)"
+        (blur)="hideCostCenterSuggestions()"
+        placeholder="Enter cost center">
+      @if (state.showCostCenterSuggestions() && state.costCenterSuggestions().length > 0) {
+        <div class="list-group position-absolute w-100 mt-1 shadow-sm" style="z-index: 1000; max-height: 200px; overflow-y: auto;">
+          @for (suggestion of state.costCenterSuggestions(); track suggestion) {
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              (mousedown)="selectCostCenter(suggestion)">
+              {{ suggestion }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between mt-4">
+    <button
+      type="button"
+      class="btn btn-outline-secondary"
+      (click)="onPrevious()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Previous
+    </button>
+    <button
+      type="button"
+      class="btn btn-primary"
+      (click)="onSaveAndContinue()"
+      [disabled]="!canGoNext() || state.submitting()">
+      @if (state.submitting()) {
+        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+      }
+      Save & Continue
+      <i class="bi bi-arrow-right ms-2"></i>
+    </button>
+  </div>
+</div>

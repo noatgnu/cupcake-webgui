@@ -1,0 +1,147 @@
+<div class="container-fluid flex-grow-1 d-flex flex-column p-0" style="min-height: 0;">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-folder me-2"></i>My Projects
+        </h4>
+        <div class="d-flex gap-2 align-items-center">
+          <div class="input-group" style="width: 300px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Search projects..."
+              [(ngModel)]="searchTerm"
+              (input)="onSearchChange()">
+          </div>
+          <button class="btn btn-primary btn-sm" (click)="createProject()">
+            <i class="bi bi-plus-circle me-2"></i>
+            Create Project
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="projects-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="projects-layout d-flex gap-3 h-100">
+        <div class="projects-panel-left">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Projects List
+              </h6>
+            </div>
+            <div class="card-body">
+              @if (projects().length === 0) {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-folder fs-2 mb-2 d-block"></i>
+                  <small>No projects found</small>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (project of projects(); track project.id) {
+                    <div
+                      class="list-group-item project-list-item"
+                      [class.active]="selectedProject()?.id === project.id"
+                      (click)="selectProject(project)"
+                      role="button">
+                      <div class="d-flex align-items-start gap-2">
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold mb-1">
+                            {{ project.projectName }}
+                          </div>
+                          @if (project.projectDescription) {
+                            <small class="text-muted d-block">
+                              {{ project.projectDescription }}
+                            </small>
+                          }
+                          <div class="mt-1">
+                            <small class="text-muted">
+                              <i class="bi bi-calendar me-1"></i>
+                              {{ project.createdAt | date: 'short' }}
+                            </small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            @if (totalCount() > pageSize) {
+              <div class="card-footer">
+                <div class="d-flex justify-content-center">
+                  <ngb-pagination
+                    [page]="currentPage()"
+                    [pageSize]="pageSize"
+                    [collectionSize]="totalCount()"
+                    (pageChange)="goToPage($event)"
+                    size="sm">
+                  </ngb-pagination>
+                </div>
+                <div class="text-center mt-2">
+                  <small class="text-muted">
+                    Showing {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, totalCount()) }} of {{ totalCount() }}
+                  </small>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="projects-panel-right">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  @if (selectedProject()) {
+                    <span>Project Details</span>
+                  } @else {
+                    <span class="text-muted">Select a project</span>
+                  }
+                </h6>
+                @if (selectedProject()) {
+                  <div class="d-flex gap-2 align-items-center">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="editProject()"
+                      title="Edit Project">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="deselectProject()">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (!selectedProject()) {
+                <div class="empty-state text-center text-muted">
+                  <i class="bi bi-folder"></i>
+                  <h5>No Project Selected</h5>
+                  <p>Select a project from the list to view its details</p>
+                </div>
+              } @else {
+                <app-project-detail [project]="selectedProject()!"></app-project-detail>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

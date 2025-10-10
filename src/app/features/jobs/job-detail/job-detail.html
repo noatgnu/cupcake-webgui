@@ -1,0 +1,290 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  @if (loading()) {
+    <div class="text-center p-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else if (job()) {
+    <!-- Header Section -->
+    <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+      <div class="container-fluid">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <div class="d-flex align-items-center">
+            <button class="btn btn-outline-secondary btn-sm me-3" (click)="backToList()">
+              <i class="bi bi-arrow-left me-1"></i>
+              Back
+            </button>
+            <h4 class="navbar-brand m-0 fw-bold">
+              <i class="bi bi-briefcase me-2"></i>
+              {{ job()!.jobName || 'Untitled Job' }}
+            </h4>
+            <span class="badge ms-3"
+              [class.bg-secondary]="job()!.status === 'draft'"
+              [class.bg-primary]="job()!.status === 'submitted'"
+              [class.bg-warning]="job()!.status === 'pending' || job()!.status === 'in_progress'"
+              [class.bg-success]="job()!.status === 'completed'"
+              [class.bg-danger]="job()!.status === 'cancelled'">
+              {{ job()!.statusDisplay || job()!.status }}
+            </span>
+            <span class="badge bg-info ms-2">{{ job()!.jobTypeDisplay || job()!.jobType }}</span>
+            <span class="text-muted ms-2">#{{ job()!.id }}</span>
+          </div>
+
+          @if (canEdit()) {
+            <button class="btn btn-primary btn-sm" (click)="editJob()">
+              <i class="bi bi-pencil me-2"></i>
+              Continue Editing Draft
+            </button>
+          }
+        </div>
+      </div>
+    </nav>
+
+    <div class="flex-grow-1 p-4" style="overflow-y: auto;">
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="bi bi-info-circle me-2"></i>
+              Job Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label text-muted">Instrument</label>
+                <div class="fw-semibold">{{ job()!.instrumentName || 'N/A' }}</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-muted">Lab Group</label>
+                <div class="fw-semibold">{{ job()!.labGroupName || 'Not assigned' }}</div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label text-muted">Sample Number</label>
+                <div class="fw-semibold">{{ job()!.sampleNumber || 'Not specified' }}</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-muted">Sample Type</label>
+                <div class="fw-semibold">{{ job()!.sampleTypeDisplay || job()!.sampleType || 'Not specified' }}</div>
+              </div>
+            </div>
+
+            @if (job()!.funder || job()!.costCenter) {
+              <div class="row mb-3">
+                @if (job()!.funder) {
+                  <div class="col-md-6">
+                    <label class="form-label text-muted">Funder</label>
+                    <div class="fw-semibold">{{ job()!.funder }}</div>
+                  </div>
+                }
+                @if (job()!.costCenter) {
+                  <div class="col-md-6">
+                    <label class="form-label text-muted">Cost Center</label>
+                    <div class="fw-semibold">{{ job()!.costCenter }}</div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (job()!.staffUsernames && job()!.staffUsernames!.length > 0) {
+              <div class="row mb-3">
+                <div class="col-12">
+                  <label class="form-label text-muted">Assigned Staff</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    @for (staff of job()!.staffUsernames; track staff) {
+                      <span class="badge bg-secondary">{{ staff }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (job()!.metadataTableName) {
+              <div class="row">
+                <div class="col-12">
+                  <label class="form-label text-muted">Metadata Table</label>
+                  <div class="fw-semibold">{{ job()!.metadataTableName }}</div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (job()!.searchEngine || job()!.method || job()!.location) {
+          <div class="card mb-3">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="bi bi-gear me-2"></i>
+                Technical Details
+              </h5>
+            </div>
+            <div class="card-body">
+              @if (job()!.searchEngine) {
+                <div class="mb-3">
+                  <label class="form-label text-muted">Search Engine</label>
+                  <div class="fw-semibold">
+                    {{ job()!.searchEngine }}
+                    @if (job()!.searchEngineVersion) {
+                      <span class="text-muted">(v{{ job()!.searchEngineVersion }})</span>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (job()!.method) {
+                <div class="mb-3">
+                  <label class="form-label text-muted">Method</label>
+                  <div class="fw-semibold">{{ job()!.method }}</div>
+                </div>
+              }
+
+              @if (job()!.location) {
+                <div>
+                  <label class="form-label text-muted">Location</label>
+                  <div class="fw-semibold">{{ job()!.location }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="bi bi-person me-2"></i>
+              User Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label text-muted">Created By</label>
+              <div class="fw-semibold">{{ job()!.userUsername || 'Unknown' }}</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">Created At</label>
+              <div class="fw-semibold">{{ job()!.createdAt | date: 'medium' }}</div>
+            </div>
+            <div>
+              <label class="form-label text-muted">Last Updated</label>
+              <div class="fw-semibold">{{ job()!.updatedAt | date: 'medium' }}</div>
+            </div>
+          </div>
+        </div>
+
+        @if (job()!.submittedAt || job()!.completedAt) {
+          <div class="card mb-3">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="bi bi-clock-history me-2"></i>
+                Timeline
+              </h5>
+            </div>
+            <div class="card-body">
+              @if (job()!.submittedAt) {
+                <div class="mb-3">
+                  <label class="form-label text-muted">Submitted At</label>
+                  <div class="fw-semibold">{{ job()!.submittedAt | date: 'medium' }}</div>
+                </div>
+              }
+              @if (job()!.completedAt) {
+                <div>
+                  <label class="form-label text-muted">Completed At</label>
+                  <div class="fw-semibold">{{ job()!.completedAt | date: 'medium' }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (isDraft()) {
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Draft Job</strong>
+            <p class="mb-0 small mt-2">This job is still in draft status. Complete the submission process to submit it for processing.</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (hasMetadataTable()) {
+      <div class="row mt-3">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <i class="bi bi-table me-2"></i>
+                Metadata Table
+              </h5>
+              @if (!canEditMetadata()) {
+                <span class="badge bg-secondary">
+                  <i class="bi bi-eye me-1"></i>
+                  View Only
+                </span>
+              } @else {
+                <span class="badge bg-success">
+                  <i class="bi bi-pencil me-1"></i>
+                  Edit Access
+                </span>
+              }
+            </div>
+            <div class="card-body">
+              @if (!isAssignedStaff() && !isDraft()) {
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle me-2"></i>
+                  <strong>Limited Access</strong>
+                  <p class="mb-0 small mt-2">
+                    You can view this metadata table, but only assigned staff members can edit it.
+                  </p>
+                </div>
+              }
+              @if (isAssignedStaff()) {
+                <div class="alert alert-success mb-3">
+                  <i class="bi bi-check-circle me-2"></i>
+                  <strong>Staff Access</strong>
+                  <p class="mb-0 small mt-2">
+                    You are assigned as staff on this job and can edit all metadata fields, including staff-only columns.
+                  </p>
+                </div>
+              }
+
+              <app-metadata-table-editor
+                [tableId]="job()!.metadataTable!"
+                [canEditStaffOnly]="isAssignedStaff()"
+                [showStaffOnlyFilter]="isAssignedStaff()">
+              </app-metadata-table-editor>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="row mt-3">
+      <div class="col-12">
+        <app-job-annotations-section
+          [jobId]="job()!.id!"
+          [canEditStaffOnly]="job()!.canEditStaffOnlyColumns || false"
+          [isJobOwner]="isJobOwner()">
+        </app-job-annotations-section>
+      </div>
+    </div>
+    </div>
+  } @else {
+    <div class="text-center p-5">
+      <i class="bi bi-exclamation-triangle fs-1 mb-3 d-block text-muted"></i>
+      <h5>Job Not Found</h5>
+      <p class="text-muted">The requested job could not be found.</p>
+      <button class="btn btn-primary" (click)="backToList()">
+        <i class="bi bi-arrow-left me-2"></i>
+        Back to Jobs
+      </button>
+    </div>
+  }
+</div>

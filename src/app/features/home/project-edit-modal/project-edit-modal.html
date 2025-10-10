@@ -1,0 +1,64 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    @if (mode === 'create') {
+      <i class="bi bi-plus-circle me-2"></i>Create Project
+    } @else {
+      <i class="bi bi-pencil me-2"></i>Edit Project
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <label for="projectName" class="form-label">
+      Project Name <span class="text-danger">*</span>
+    </label>
+    <input
+      type="text"
+      class="form-control"
+      id="projectName"
+      [value]="projectName()"
+      (input)="projectName.set($any($event.target).value)"
+      placeholder="Enter project name"
+      [disabled]="saving()">
+  </div>
+
+  <div class="mb-3">
+    <label for="projectDescription" class="form-label">
+      Project Description
+    </label>
+    <textarea
+      class="form-control"
+      id="projectDescription"
+      rows="4"
+      [value]="projectDescription()"
+      (input)="projectDescription.set($any($event.target).value)"
+      placeholder="Enter project description (optional)"
+      [disabled]="saving()"></textarea>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button
+    type="button"
+    class="btn btn-secondary"
+    (click)="cancel()"
+    [disabled]="saving()">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="save()"
+    [disabled]="saving() || !projectName().trim()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    }
+    @if (mode === 'create') {
+      Create
+    } @else {
+      Update
+    }
+  </button>
+</div>

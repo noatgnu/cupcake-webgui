@@ -1,0 +1,135 @@
+<div class="notifications-view h-100 d-flex flex-column">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-bell me-2"></i>Notifications
+        </h4>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <select class="form-select form-select-sm" style="width: auto;" [(ngModel)]="filterType" (change)="applyFilters()">
+            <option value="">All Types</option>
+            @for (type of notificationTypes; track type) {
+              <option [value]="type">{{ type }}</option>
+            }
+          </select>
+          <select class="form-select form-select-sm" style="width: auto;" [(ngModel)]="filterPriority" (change)="applyFilters()">
+            <option value="">All Priorities</option>
+            @for (priority of notificationPriorities; track priority) {
+              <option [value]="priority">{{ priority }}</option>
+            }
+          </select>
+          <select class="form-select form-select-sm" style="width: auto;" [(ngModel)]="filterIsRead" (change)="applyFilters()">
+            <option value="">All</option>
+            <option value="false">Unread</option>
+            <option value="true">Read</option>
+          </select>
+          <button class="btn btn-sm btn-outline-secondary" (click)="clearFilters()">
+            <i class="bi bi-x-circle me-1"></i>Clear Filters
+          </button>
+          <button class="btn btn-sm btn-primary" (click)="markAllAsRead()">
+            <i class="bi bi-check-all me-1"></i>Mark All as Read
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="content flex-grow-1 p-3 overflow-auto">
+    @if (loading()) {
+      <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else if (notifications().length === 0) {
+      <div class="text-center p-5 text-muted">
+        <i class="bi bi-bell-slash display-1 mb-3 d-block"></i>
+        <p class="lead">No notifications found</p>
+      </div>
+    } @else {
+      <div class="notifications-list">
+        @for (notification of notifications(); track notification.id) {
+          <div
+            class="notification-card card mb-3"
+            [class.unread]="!notification.isRead">
+            <div class="card-body">
+              <div class="d-flex gap-3">
+                <div class="flex-shrink-0">
+                  <i [class]="getPriorityIcon(notification.priority) + ' fs-3 ' + getPriorityClass(notification.priority)"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="flex-grow-1">
+                      <h5 class="card-title mb-1">{{ notification.title }}</h5>
+                      <div class="d-flex gap-2 mb-2">
+                        <span [class]="'badge ' + getPriorityBadgeClass(notification.priority)">
+                          {{ notification.priority }}
+                        </span>
+                        <span class="badge bg-secondary">
+                          {{ notification.notificationType }}
+                        </span>
+                        @if (!notification.isRead) {
+                          <span class="badge bg-info">Unread</span>
+                        }
+                      </div>
+                    </div>
+                    @if (!notification.isRead) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="markAsRead(notification)">
+                        Mark as Read
+                      </button>
+                    }
+                  </div>
+                  <p class="card-text">{{ notification.message }}</p>
+                  @if (hasReagentLink(notification)) {
+                    <button
+                      class="btn btn-primary btn-sm mb-2"
+                      (click)="navigateToReagent(notification)">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>
+                      View Reagent
+                    </button>
+                  }
+                  <div class="text-muted small">
+                    <i class="bi bi-clock me-1"></i>
+                    {{ getTimeAgo(notification.createdAt) }}
+                    <span class="mx-2">|</span>
+                    {{ formatDate(notification.createdAt) }}
+                  </div>
+                  @if (notification.senderName) {
+                    <div class="text-muted small mt-1">
+                      <i class="bi bi-person me-1"></i>
+                      From: {{ notification.senderName }}
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  @if (total() > pageSize) {
+    <div class="footer p-3 border-top">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 justify-content-center">
+          <li class="page-item" [class.disabled]="page() === 1">
+            <button class="page-link" (click)="previousPage()">Previous</button>
+          </li>
+          <li class="page-item disabled">
+            <span class="page-link">
+              Page {{ page() }} of {{ Math.ceil(total() / pageSize) }}
+              ({{ total() }} total)
+            </span>
+          </li>
+          <li class="page-item" [class.disabled]="page() * pageSize >= total()">
+            <button class="page-link" (click)="nextPage()">Next</button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  }
+</div>

@@ -1,0 +1,147 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-journal-medical me-2"></i>Protocols
+        </h4>
+        <div class="d-flex gap-2 align-items-center">
+          <div class="input-group" style="width: 300px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Search protocols..."
+              [(ngModel)]="searchTerm"
+              (ngModelChange)="onSearchChange()">
+          </div>
+          <button class="btn btn-primary btn-sm" (click)="createNewProtocol()">
+            <i class="bi bi-plus-lg me-2"></i>
+            Create Protocol
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="protocol-content flex-grow-1 p-3" style="min-height: 0;">
+    <div class="card h-100 d-flex flex-column">
+      <div class="card-header flex-shrink-0">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">
+            <i class="bi bi-list-check me-2"></i>
+            All Protocols
+          </h6>
+          <span class="badge bg-secondary">{{ total() }}</span>
+        </div>
+      </div>
+      <div class="card-body flex-grow-1 p-0" style="overflow-y: auto; min-height: 0;">
+        @if (loading()) {
+          <div class="text-center p-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        } @else if (protocols().length === 0) {
+          <div class="empty-state text-center text-muted p-5">
+            <i class="bi bi-journal-medical fs-1 mb-3 d-block"></i>
+            @if (searchTerm) {
+              <h5>No Protocols Found</h5>
+              <p class="mb-3">No protocols match your search criteria</p>
+              <button class="btn btn-outline-primary" (click)="searchTerm = ''; onSearchChange()">
+                Clear Search
+              </button>
+            } @else {
+              <h5>No Protocols</h5>
+              <p class="mb-3">Create your first protocol to get started</p>
+              <button class="btn btn-primary" (click)="createNewProtocol()">
+                <i class="bi bi-plus-lg me-2"></i>
+                Create Protocol
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="list-group list-group-flush">
+            @for (protocol of protocols(); track protocol.id) {
+              <button
+                type="button"
+                class="list-group-item list-group-item-action text-start"
+                (click)="openProtocolEditor(protocol.id)">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                      <h6 class="mb-0">{{ protocol.protocolTitle || 'Untitled Protocol' }}</h6>
+                      <div class="form-check form-switch ms-2">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          [checked]="protocol.enabled"
+                          (click)="toggleEnabled(protocol, $event)"
+                          title="Make protocol viewable to everyone">
+                        <label class="form-check-label small">
+                          Public
+                        </label>
+                      </div>
+                    </div>
+                    @if (protocol.protocolDescription) {
+                      <p class="mb-1 small text-muted">{{ protocol.protocolDescription }}</p>
+                    }
+                    <div class="d-flex gap-3 small text-muted">
+                      @if (protocol.stepsCount !== undefined && protocol.stepsCount !== null) {
+                        <span><i class="bi bi-list-check me-1"></i>{{ protocol.stepsCount }} steps</span>
+                      }
+                      @if (protocol.averageComplexity !== undefined && protocol.averageComplexity !== null) {
+                        <span><i class="bi bi-speedometer2 me-1"></i>{{ protocol.averageComplexity.toFixed(1) }}/5</span>
+                      }
+                      @if (protocol.averageDuration !== undefined && protocol.averageDuration !== null) {
+                        <span><i class="bi bi-clock me-1"></i>{{ protocol.averageDuration.toFixed(1) }}/5</span>
+                      }
+                      @if (protocol.isVaulted) {
+                        <span class="badge bg-warning text-dark"><i class="bi bi-safe2 me-1"></i>Vaulted</span>
+                      }
+                    </div>
+                    <small class="text-muted">Updated {{ protocol.updatedAt | date: 'short' }}</small>
+                  </div>
+                  <div class="btn-group btn-group-sm ms-2">
+                    <button
+                      class="btn btn-outline-primary"
+                      (click)="startSession(protocol, $event)"
+                      title="Start Session">
+                      <i class="bi bi-play-circle"></i>
+                    </button>
+                    <button
+                      class="btn btn-outline-danger"
+                      (click)="deleteProtocol(protocol.id, $event)"
+                      title="Delete Protocol">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (total() > pageSize) {
+        <div class="card-footer flex-shrink-0">
+          <nav>
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+              <li class="page-item" [class.disabled]="page() === 1">
+                <button class="page-link" (click)="previousPage()">Previous</button>
+              </li>
+              <li class="page-item disabled">
+                <span class="page-link">{{ page() }} / {{ Math.ceil(total() / pageSize) }}</span>
+              </li>
+              <li class="page-item" [class.disabled]="page() * pageSize >= total()">
+                <button class="page-link" (click)="nextPage()">Next</button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      }
+    </div>
+  </div>
+</div>

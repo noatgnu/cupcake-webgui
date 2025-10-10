@@ -1,0 +1,100 @@
+<div class="step-content">
+  <h4 class="mb-4">Job Title and Project</h4>
+
+  <div class="mb-3">
+    <label for="jobTitle" class="form-label">
+      Job Title <span class="text-danger">*</span>
+    </label>
+    <input
+      type="text"
+      class="form-control"
+      id="jobTitle"
+      [value]="state.jobTitle()"
+      (input)="state.jobTitle.set($any($event.target).value)"
+      placeholder="Enter job title">
+  </div>
+
+  <div class="mb-3">
+    <label for="projectTitle" class="form-label">
+      Project Title <span class="text-danger">*</span>
+    </label>
+    <div class="position-relative">
+      <input
+        type="text"
+        class="form-control"
+        id="projectTitle"
+        [value]="state.projectTitle()"
+        (input)="onProjectTitleInput($any($event.target).value)"
+        (focus)="state.showProjectSuggestions.set(true)"
+        (blur)="hideProjectSuggestions()"
+        placeholder="Search for existing project or enter new project title">
+      @if (state.searchingProjects()) {
+        <span class="position-absolute top-50 end-0 translate-middle-y me-2">
+          <div class="spinner-border spinner-border-sm" role="status"></div>
+        </span>
+      }
+      @if (state.showProjectSuggestions() && state.projectSuggestions().length > 0) {
+        <div class="list-group position-absolute w-100 mt-1 shadow-sm" style="z-index: 1000; max-height: 200px; overflow-y: auto;">
+          @for (project of state.projectSuggestions(); track project.id) {
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              (mousedown)="selectProject(project)">
+              <div class="fw-semibold">{{ project.projectName }}</div>
+              @if (project.projectDescription) {
+                <small class="text-muted">{{ project.projectDescription }}</small>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (state.selectedProjectId()) {
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      Selected existing project: <strong>{{ state.projectTitle() }}</strong>
+    </div>
+  } @else if (state.projectTitle().trim().length > 0) {
+    <div class="mb-3">
+      <label for="projectDescription" class="form-label">Project Description</label>
+      <textarea
+        class="form-control"
+        id="projectDescription"
+        rows="3"
+        [value]="state.projectDescription()"
+        (input)="state.projectDescription.set($any($event.target).value)"
+        placeholder="Enter project description"></textarea>
+      <small class="text-muted">A new project will be created with this information.</small>
+    </div>
+  }
+
+  <div class="d-flex justify-content-end mt-4">
+    @if (!state.jobId()) {
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="onCreateDraft()"
+        [disabled]="!canCreateDraft() || state.submitting()">
+        @if (state.submitting()) {
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        }
+        <i class="bi bi-save me-2"></i>
+        Create Draft Job
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="onSaveAndContinue()"
+        [disabled]="!canGoNext() || state.submitting()">
+        @if (state.submitting()) {
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        }
+        Save & Continue
+        <i class="bi bi-arrow-right ms-2"></i>
+      </button>
+    }
+  </div>
+</div>

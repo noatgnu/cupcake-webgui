@@ -1,0 +1,28 @@
+.notification-dropdown {
+  position: relative;
+
+  .dropdown-menu {
+    position: fixed;
+    z-index: 9999;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }
+
+  .notification-item {
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+
+    &:hover {
+      background-color: var(--bs-light);
+    }
+
+    &.unread {
+      background-color: var(--bs-primary-bg-subtle);
+      border-left-color: var(--bs-primary);
+    }
+  }
+
+  .badge {
+    font-size: 0.65rem;
+  }
+}

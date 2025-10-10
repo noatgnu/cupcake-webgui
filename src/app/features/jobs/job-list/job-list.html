@@ -1,0 +1,271 @@
+<div class="container-fluid flex-grow-1 d-flex flex-column p-0" style="min-height: 0;">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-briefcase me-2"></i>Instrument Jobs
+        </h4>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <div class="input-group" style="width: 300px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Search jobs..."
+              [(ngModel)]="searchTerm"
+              (input)="onSearchChange()">
+          </div>
+
+          <select
+            class="form-select"
+            style="width: 180px;"
+            [value]="filterStatus()"
+            (change)="filterStatus.set($any($event.target).value); onFilterChange()">
+            <option value="">All Status</option>
+            <option [value]="Status.DRAFT">Draft</option>
+            <option [value]="Status.SUBMITTED">Submitted</option>
+            <option [value]="Status.PENDING">Pending</option>
+            <option [value]="Status.IN_PROGRESS">In Progress</option>
+            <option [value]="Status.COMPLETED">Completed</option>
+            <option [value]="Status.CANCELLED">Cancelled</option>
+          </select>
+
+          <select
+            class="form-select"
+            style="width: 180px;"
+            [value]="filterJobType()"
+            (change)="filterJobType.set($any($event.target).value); onFilterChange()">
+            <option value="">All Types</option>
+            <option [value]="JobType.ANALYSIS">Analysis</option>
+            <option [value]="JobType.MAINTENANCE">Maintenance</option>
+            <option [value]="JobType.OTHER">Other</option>
+          </select>
+          <button class="btn btn-primary btn-sm" (click)="createJob()">
+            <i class="bi bi-plus-circle me-2"></i>
+            Submit New Job
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="jobs-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="jobs-layout d-flex gap-3 h-100">
+        <div class="jobs-panel-left">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Jobs List
+              </h6>
+            </div>
+            <div class="card-body">
+              @if (jobs().length === 0) {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-briefcase fs-2 mb-2 d-block"></i>
+                  <small>No jobs found</small>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (job of jobs(); track job.id) {
+                    <div
+                      class="list-group-item job-list-item"
+                      [class.active]="selectedJob()?.id === job.id"
+                      (click)="selectJob(job)"
+                      role="button">
+                      <div class="d-flex align-items-start gap-2">
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold mb-1">
+                            {{ job.jobName || 'Untitled Job' }}
+                          </div>
+                          <small class="text-muted d-block">
+                            {{ job.instrumentName || 'N/A' }}
+                          </small>
+                          <div class="mt-1">
+                            <span class="badge"
+                              [class.bg-secondary]="job.status === 'draft'"
+                              [class.bg-primary]="job.status === 'submitted'"
+                              [class.bg-warning]="job.status === 'pending' || job.status === 'in_progress'"
+                              [class.bg-success]="job.status === 'completed'"
+                              [class.bg-danger]="job.status === 'cancelled'">
+                              {{ job.statusDisplay || job.status }}
+                            </span>
+                            @if (job.labGroupName) {
+                              <span class="badge bg-info ms-1">{{ job.labGroupName }}</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            @if (totalPages() > 1) {
+              <div class="card-footer">
+                <div class="d-flex justify-content-center">
+                  <ngb-pagination
+                    [(page)]="currentPage"
+                    [pageSize]="pageSize"
+                    [collectionSize]="totalCount()"
+                    (pageChange)="goToPage($event)"
+                    size="sm">
+                  </ngb-pagination>
+                </div>
+                <div class="text-center mt-2">
+                  <small class="text-muted">
+                    Showing {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, totalCount()) }} of {{ totalCount() }}
+                  </small>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="jobs-panel-right">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  @if (selectedJob()) {
+                    <span>Job Details</span>
+                  } @else {
+                    <span class="text-muted">Select a job</span>
+                  }
+                </h6>
+                @if (selectedJob()) {
+                  <div class="d-flex gap-2 align-items-center">
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="viewJob(selectedJob()!.id!)"
+                      title="View Full Details">
+                      <i class="bi bi-eye me-1"></i>
+                      View Details
+                    </button>
+                    @if (canEdit()) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="editJob()"
+                        title="Continue Editing Draft">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" (click)="deselectJob()">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (!selectedJob()) {
+                <div class="empty-state text-center text-muted">
+                  <i class="bi bi-briefcase"></i>
+                  <h5>No Job Selected</h5>
+                  <p>Select a job from the list to view its details</p>
+                </div>
+              } @else {
+                <div class="detail-content">
+                  <div class="mb-3">
+                    <h5>{{ selectedJob()!.jobName || 'Untitled Job' }}</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                      <span class="badge"
+                        [class.bg-secondary]="selectedJob()!.status === 'draft'"
+                        [class.bg-primary]="selectedJob()!.status === 'submitted'"
+                        [class.bg-warning]="selectedJob()!.status === 'pending' || selectedJob()!.status === 'in_progress'"
+                        [class.bg-success]="selectedJob()!.status === 'completed'"
+                        [class.bg-danger]="selectedJob()!.status === 'cancelled'">
+                        {{ selectedJob()!.statusDisplay || selectedJob()!.status }}
+                      </span>
+                      <span class="badge bg-info">{{ selectedJob()!.jobTypeDisplay || selectedJob()!.jobType }}</span>
+                    </div>
+                  </div>
+
+                  <div class="border-top pt-3 mt-3">
+                    <h6 class="text-muted mb-2">Basic Information</h6>
+                    <div class="row">
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">ID</small>
+                        <div>#{{ selectedJob()!.id }}</div>
+                      </div>
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Instrument</small>
+                        <div>{{ selectedJob()!.instrumentName || 'N/A' }}</div>
+                      </div>
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Lab Group</small>
+                        <div>{{ selectedJob()!.labGroupName || 'Not assigned' }}</div>
+                      </div>
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Samples</small>
+                        <div>{{ selectedJob()!.sampleNumber || 'Not specified' }}</div>
+                      </div>
+                      @if (selectedJob()!.funder) {
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Funder</small>
+                          <div>{{ selectedJob()!.funder }}</div>
+                        </div>
+                      }
+                      @if (selectedJob()!.costCenter) {
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Cost Center</small>
+                          <div>{{ selectedJob()!.costCenter }}</div>
+                        </div>
+                      }
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Created By</small>
+                        <div>{{ selectedJob()!.userUsername || 'Unknown' }}</div>
+                      </div>
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Created</small>
+                        <div>{{ selectedJob()!.createdAt | date: 'short' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  @if (selectedJob()!.staffUsernames && selectedJob()!.staffUsernames!.length > 0) {
+                    <div class="border-top pt-3 mt-3">
+                      <h6 class="text-muted mb-2">Assigned Staff</h6>
+                      <div class="d-flex flex-wrap gap-2">
+                        @for (staff of selectedJob()!.staffUsernames; track staff) {
+                          <span class="badge bg-secondary">{{ staff }}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (selectedJob()!.metadataTableName) {
+                    <div class="border-top pt-3 mt-3">
+                      <h6 class="text-muted mb-2">Metadata</h6>
+                      <div>{{ selectedJob()!.metadataTableName }}</div>
+                    </div>
+                  }
+
+                  @if (isDraft()) {
+                    <div class="border-top pt-3 mt-3">
+                      <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Draft Job</strong>
+                        <p class="mb-0 small mt-2">This job is still in draft status. Complete the submission process to submit it for processing.</p>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

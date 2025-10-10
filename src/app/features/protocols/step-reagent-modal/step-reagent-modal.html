@@ -1,0 +1,156 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-flask me-2"></i>
+    {{ stepReagent ? 'Edit' : 'Add' }} Step Reagent
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="reagentForm">
+    <div class="mb-3">
+      <label for="reagentName" class="form-label">
+        Reagent Name <span class="text-danger">*</span>
+      </label>
+      <input
+        type="text"
+        class="form-control"
+        id="reagentName"
+        formControlName="reagentName"
+        placeholder="Type to search or create new reagent..."
+        [ngbTypeahead]="searchReagent"
+        [inputFormatter]="formatReagent"
+        [resultFormatter]="formatReagent"
+        (selectItem)="onSelectReagent($event)"
+        [editable]="true"
+        [class.is-invalid]="reagentForm.get('reagentName')?.invalid && reagentForm.get('reagentName')?.touched">
+      @if (reagentForm.get('reagentName')?.invalid && reagentForm.get('reagentName')?.touched) {
+        <div class="invalid-feedback">
+          Reagent name is required
+        </div>
+      }
+      <div class="form-text">
+        Type to search existing reagents or enter a new name
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="reagentUnit" class="form-label">
+        Unit <span class="text-danger">*</span>
+      </label>
+      <select
+        class="form-select"
+        id="reagentUnit"
+        formControlName="reagentUnit"
+        [class.is-invalid]="reagentForm.get('reagentUnit')?.invalid && reagentForm.get('reagentUnit')?.touched">
+        <option value="">Select unit</option>
+        <optgroup label="Volume">
+          <option value="nL">nL</option>
+          <option value="uL">uL</option>
+          <option value="mL">mL</option>
+          <option value="L">L</option>
+        </optgroup>
+        <optgroup label="Mass">
+          <option value="ng">ng</option>
+          <option value="ug">ug</option>
+          <option value="mg">mg</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+        </optgroup>
+        <optgroup label="Mole">
+          <option value="nM">nM</option>
+          <option value="uM">uM</option>
+          <option value="mM">mM</option>
+          <option value="M">M</option>
+        </optgroup>
+        <optgroup label="Count">
+          <option value="ea">ea</option>
+        </optgroup>
+        <optgroup label="Other">
+          <option value="pieces">pieces</option>
+          <option value="other">other</option>
+        </optgroup>
+      </select>
+      @if (reagentForm.get('reagentUnit')?.invalid && reagentForm.get('reagentUnit')?.touched) {
+        <div class="invalid-feedback">
+          Unit is required
+        </div>
+      }
+      <div class="form-text">
+        Unit of measurement for this reagent
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="quantity" class="form-label">
+        Quantity <span class="text-danger">*</span>
+      </label>
+      <input
+        type="number"
+        class="form-control"
+        id="quantity"
+        formControlName="quantity"
+        placeholder="0"
+        step="0.01"
+        min="0"
+        [class.is-invalid]="reagentForm.get('quantity')?.invalid && reagentForm.get('quantity')?.touched">
+      @if (reagentForm.get('quantity')?.invalid && reagentForm.get('quantity')?.touched) {
+        <div class="invalid-feedback">
+          Quantity must be greater than or equal to 0
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="scalable"
+          formControlName="scalable">
+        <label class="form-check-label" for="scalable">
+          Scalable Reagent
+        </label>
+      </div>
+      <div class="form-text">
+        Check if this reagent quantity should scale based on experimental conditions
+      </div>
+    </div>
+
+    @if (reagentForm.get('scalable')?.value) {
+      <div class="mb-3">
+        <label for="scalableFactor" class="form-label">
+          Scaling Factor
+        </label>
+        <input
+          type="number"
+          class="form-control"
+          id="scalableFactor"
+          formControlName="scalableFactor"
+          placeholder="1"
+          step="0.1"
+          min="0">
+        <div class="form-text">
+          Factor by which to scale the quantity (default: 1)
+        </div>
+      </div>
+    }
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="save()"
+    [disabled]="!reagentForm.valid || saving">
+    @if (saving) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+    }
+    <i class="bi bi-save me-1"></i>
+    {{ stepReagent ? 'Update' : 'Add' }} Reagent
+  </button>
+</div>

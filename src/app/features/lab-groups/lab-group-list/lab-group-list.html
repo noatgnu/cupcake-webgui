@@ -1,0 +1,324 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-people me-2"></i>Lab Groups
+        </h4>
+        <div class="d-flex gap-2 align-items-center">
+          <div class="input-group" style="width: 300px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Search lab groups..."
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="onSearchChange()">
+          </div>
+          @if (isStaff() || currentLabGroup()) {
+            <button
+              class="btn btn-primary btn-sm"
+              (click)="openCreateModal(currentLabGroup() ?? undefined)">
+              <i class="bi bi-plus-lg me-2"></i>
+              @if (currentLabGroup()) {
+                <span>Create Sub-Group</span>
+              } @else {
+                <span>Create Lab Group</span>
+              }
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <div class="lab-group-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (error()) {
+      <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        {{ error() }}
+      </div>
+    }
+
+    <div class="lab-group-layout d-flex gap-3 h-100">
+      <!-- Left Panel - Lab Groups Hierarchy -->
+      <div class="lab-group-panel-left">
+        <div class="card h-100 d-flex flex-column">
+          <div class="card-header flex-shrink-0">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">
+                <i class="bi bi-diagram-3 me-2"></i>
+                @if (currentLabGroup()) {
+                  <span>Sub-Groups</span>
+                } @else {
+                  <span>Root Groups</span>
+                }
+              </h6>
+              <span class="badge bg-secondary">{{ childTotal() }}</span>
+            </div>
+            @if (breadcrumbs().length > 0) {
+              <nav aria-label="breadcrumb">
+                <ol class="breadcrumb breadcrumb-sm mb-0">
+                  <li class="breadcrumb-item">
+                    <a href="javascript:void(0)" (click)="navigateToRoot()">
+                      <i class="bi bi-house-door"></i>
+                    </a>
+                  </li>
+                  @for (crumb of breadcrumbs(); track crumb.id; let isLast = $last) {
+                    <li class="breadcrumb-item" [class.active]="isLast">
+                      @if (!isLast) {
+                        <a href="javascript:void(0)" (click)="navigateToBreadcrumb(crumb)">
+                          {{ crumb.name }}
+                        </a>
+                      } @else {
+                        <span>{{ crumb.name }}</span>
+                      }
+                    </li>
+                  }
+                </ol>
+              </nav>
+            }
+          </div>
+          <div class="card-body flex-grow-1 p-0" style="overflow-y: auto; min-height: 0;">
+            @if (loadingChildren()) {
+              <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            } @else if (childLabGroups().length === 0) {
+              <div class="empty-state-small text-center text-muted p-3">
+                <i class="bi bi-people fs-2 mb-2 d-block"></i>
+                <small>No lab groups found</small>
+              </div>
+            } @else {
+              <div class="list-group list-group-flush">
+                @for (labGroup of childLabGroups(); track labGroup.id) {
+                  @if (hasGroupAccess(labGroup)) {
+                    <button
+                      type="button"
+                      class="list-group-item list-group-item-action text-start"
+                      (click)="handleLabGroupClick(labGroup)">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                          <div class="d-flex align-items-center">
+                            <h6 class="mb-1">{{ labGroup.name }}</h6>
+                            @if (labGroup.subGroupsCount > 0) {
+                              <i class="bi bi-chevron-right ms-2 text-muted"></i>
+                            }
+                          </div>
+                          @if (labGroup.description) {
+                            <p class="mb-1 small text-muted">{{ labGroup.description }}</p>
+                          }
+                          <div class="d-flex gap-3 small text-muted">
+                            <span><i class="bi bi-person me-1"></i>{{ labGroup.memberCount }}</span>
+                            @if (labGroup.subGroupsCount > 0) {
+                              <span><i class="bi bi-diagram-3 me-1"></i>{{ labGroup.subGroupsCount }}</span>
+                            }
+                            @if (labGroup.isCreator) {
+                              <span class="badge bg-primary">Creator</span>
+                            }
+                            @if (labGroup.isMember && !labGroup.isCreator) {
+                              <span class="badge bg-secondary">Member</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  }
+                }
+              </div>
+            }
+          </div>
+          @if (childTotal() > pageSize) {
+            <div class="card-footer flex-shrink-0">
+              <nav>
+                <ul class="pagination pagination-sm mb-0 justify-content-center">
+                  <li class="page-item" [class.disabled]="childPage() === 1">
+                    <button class="page-link" (click)="previousChildPage()">Previous</button>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link">{{ childPage() }} / {{ Math.ceil(childTotal() / pageSize) }}</span>
+                  </li>
+                  <li class="page-item" [class.disabled]="childPage() * pageSize >= childTotal()">
+                    <button class="page-link" (click)="nextChildPage()">Next</button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Right Panel - Members -->
+      <div class="lab-group-panel-right">
+        <div class="card h-100 d-flex flex-column">
+          <div class="card-header flex-shrink-0">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <h6 class="mb-0 flex-shrink-0">
+                <i class="bi bi-person-badge me-2"></i>
+                @if (currentLabGroup()) {
+                  <span>{{ currentLabGroup()!.name }}</span>
+                } @else {
+                  <span class="text-muted">Root Level</span>
+                }
+              </h6>
+              @if (currentLabGroup()) {
+                <div class="btn-group btn-group-sm ms-auto flex-shrink-0">
+                  @if (currentLabGroup()!.canManage) {
+                    <button class="btn btn-outline-secondary" (click)="openEditModal(currentLabGroup()!)" title="Edit">
+                      <i class="bi bi-pencil"></i> Edit
+                    </button>
+                  }
+                  @if (currentLabGroup()!.canInvite) {
+                    <button class="btn btn-outline-primary" (click)="openInviteModal(currentLabGroup()!)" title="Invite Members">
+                      <i class="bi bi-person-plus"></i> Invite
+                    </button>
+                  }
+                  @if (currentLabGroup()!.canManage) {
+                    <button class="btn btn-outline-info" (click)="openPermissionsModal(currentLabGroup()!)" title="Permissions">
+                      <i class="bi bi-shield-lock"></i> Permissions
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+          <div class="card-body flex-grow-1" style="overflow-y: auto; min-height: 0;">
+            @if (!currentLabGroup()) {
+              <div class="empty-state text-center text-muted p-5">
+                <i class="bi bi-people fs-1 mb-3 d-block"></i>
+                <h5>Root Level</h5>
+                <p>Navigate into a lab group to view its details and members</p>
+              </div>
+            } @else {
+              <div class="mb-3">
+                <h6>Group Information</h6>
+                <dl class="row mb-0">
+                  <dt class="col-sm-3">Creator</dt>
+                  <dd class="col-sm-9">{{ currentLabGroup()!.creatorName || 'Unknown' }}</dd>
+
+                  @if (currentLabGroup()!.parentGroupName) {
+                    <dt class="col-sm-3">Parent Group</dt>
+                    <dd class="col-sm-9">{{ currentLabGroup()!.parentGroupName }}</dd>
+                  }
+
+                  <dt class="col-sm-3">Members</dt>
+                  <dd class="col-sm-9">{{ currentLabGroup()!.memberCount }}</dd>
+
+                  @if (currentLabGroup()!.subGroupsCount > 0) {
+                    <dt class="col-sm-3">Sub-Groups</dt>
+                    <dd class="col-sm-9">{{ currentLabGroup()!.subGroupsCount }}</dd>
+                  }
+
+                  <dt class="col-sm-3">Status</dt>
+                  <dd class="col-sm-9">
+                    @if (currentLabGroup()!.isActive) {
+                      <span class="badge bg-success">Active</span>
+                    } @else {
+                      <span class="badge bg-secondary">Inactive</span>
+                    }
+                  </dd>
+
+                  <dt class="col-sm-3">Member Invites</dt>
+                  <dd class="col-sm-9">
+                    @if (currentLabGroup()!.allowMemberInvites) {
+                      <span class="badge bg-success">Allowed</span>
+                    } @else {
+                      <span class="badge bg-secondary">Not Allowed</span>
+                    }
+                  </dd>
+                </dl>
+              </div>
+
+              <hr>
+
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Members</h6>
+                <div class="d-flex gap-2 align-items-center">
+                  @if (currentLabGroup()!.subGroupsCount > 0) {
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="directMembersOnly"
+                        [checked]="directMembersOnly()"
+                        (change)="toggleDirectMembersOnly()">
+                      <label class="form-check-label small" for="directMembersOnly">
+                        Direct only
+                      </label>
+                    </div>
+                  }
+                  <span class="badge bg-secondary">{{ memberTotal() }}</span>
+                </div>
+              </div>
+              @if (loadingMembers()) {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              } @else if (members().length === 0) {
+                <div class="empty-state text-center text-muted p-4">
+                  <i class="bi bi-person fs-1 mb-3 d-block"></i>
+                  <h6>No Members</h6>
+                  <p class="mb-0">This lab group doesn't have any members yet</p>
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (member of members(); track member.id) {
+                    <div class="list-group-item">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                          <h6 class="mb-1">
+                            {{ member.firstName }} {{ member.lastName }}
+                            @if (member.username) {
+                              <small class="text-muted">(@{{ member.username }})</small>
+                            }
+                          </h6>
+                          <small class="text-muted d-block">{{ member.email }}</small>
+                          <div class="d-flex gap-2 mt-1">
+                            @if (member.isStaff) {
+                              <span class="badge bg-warning">Staff</span>
+                            }
+                            @if (member.isSuperuser) {
+                              <span class="badge bg-danger">Superuser</span>
+                            }
+                            @if (!member.isActive) {
+                              <span class="badge bg-secondary">Inactive</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+                @if (memberTotal() > memberPageSize) {
+                  <div class="mt-3">
+                    <nav>
+                      <ul class="pagination pagination-sm mb-0 justify-content-center">
+                        <li class="page-item" [class.disabled]="memberPage() === 1">
+                          <button class="page-link" (click)="previousMemberPage()">Previous</button>
+                        </li>
+                        <li class="page-item disabled">
+                          <span class="page-link">{{ memberPage() }} / {{ Math.ceil(memberTotal() / memberPageSize) }}</span>
+                        </li>
+                        <li class="page-item" [class.disabled]="memberPage() >= Math.ceil(memberTotal() / memberPageSize)">
+                          <button class="page-link" (click)="nextMemberPage()">Next</button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
+                }
+              }
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

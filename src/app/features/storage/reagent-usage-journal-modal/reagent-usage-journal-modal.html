@@ -1,0 +1,35 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-journal-text me-2"></i>
+    Usage Journal - {{ storedReagent.reagentName }}
+  </h5>
+  <button type="button" class="btn-close" (click)="close()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="d-flex gap-3">
+      <div>
+        <strong>Reagent:</strong> {{ storedReagent.reagentName }}
+      </div>
+      <div>
+        <strong>Current Quantity:</strong> {{ storedReagent.currentQuantity }}{{ storedReagent.reagentUnit ? ' ' + storedReagent.reagentUnit : '' }}
+      </div>
+      <div>
+        <strong>Original Quantity:</strong> {{ storedReagent.quantity }}{{ storedReagent.reagentUnit ? ' ' + storedReagent.reagentUnit : '' }}
+      </div>
+    </div>
+  </div>
+
+  <app-reagent-usage-journal
+    [reagentId]="storedReagent.reagent"
+    [reagentUnit]="storedReagent.reagentUnit">
+  </app-reagent-usage-journal>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()">
+    <i class="bi bi-x-circle me-1"></i>
+    Close
+  </button>
+</div>

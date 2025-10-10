@@ -1,0 +1,36 @@
+.image-upload-container {
+  .image-preview {
+    img {
+      max-width: 100%;
+      max-height: 400px;
+      object-fit: contain;
+    }
+  }
+
+  .camera-view {
+    .video-preview {
+      width: 100%;
+      max-height: 400px;
+      border: 1px solid var(--bs-border-color);
+      border-radius: var(--bs-border-radius);
+      background-color: #000;
+    }
+
+    .camera-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  .upload-controls {
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  .alert-sm {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+}

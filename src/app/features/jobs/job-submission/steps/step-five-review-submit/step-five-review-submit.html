@@ -1,0 +1,61 @@
+<div class="step-content">
+  <h4 class="mb-4">Review & Submit</h4>
+
+  @if (!state.metadataTableCreated()) {
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <strong>Create Metadata Table</strong>
+      <p class="mb-0 small mt-2">
+        Click "Create Metadata Table" to generate the metadata table from your selected template with {{ state.sampleNumber() }} sample(s).
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="btn btn-primary w-100"
+      (click)="onCreateMetadataTable()"
+      [disabled]="state.submitting()">
+      @if (state.submitting()) {
+        <span class="spinner-border spinner-border-sm me-2"></span>
+      }
+      <i class="bi bi-table me-1"></i>
+      Create Metadata Table
+    </button>
+  } @else {
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Review Your Metadata</strong>
+      <p class="mb-0 small mt-2">
+        Review your metadata entries below. You can edit user-visible columns. Once you submit, staff members can review and edit staff-only fields.
+      </p>
+    </div>
+
+    <app-metadata-table-editor
+      [tableId]="state.metadataTableId()!"
+      [canEditStaffOnly]="false">
+    </app-metadata-table-editor>
+  }
+
+  <div class="d-flex justify-content-between mt-4 pt-4 border-top">
+    <button
+      type="button"
+      class="btn btn-outline-secondary"
+      (click)="onPrevious()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Previous
+    </button>
+    @if (state.metadataTableCreated()) {
+      <button
+        type="button"
+        class="btn btn-success"
+        (click)="onSubmitJob()"
+        [disabled]="state.submitting()">
+        @if (state.submitting()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        <i class="bi bi-check-circle me-2"></i>
+        Submit Job
+      </button>
+    }
+  </div>
+</div>

@@ -1,0 +1,217 @@
+<div class="messages-view h-100 d-flex flex-column">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-chat-dots me-2"></i>Messages
+        </h4>
+        <div class="input-group" style="width: 300px;">
+          <span class="input-group-text">
+            <i class="bi bi-search"></i>
+          </span>
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Search threads..."
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onSearchChange()">
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content Area -->
+  <div class="flex-grow-1 d-flex" style="min-height: 0;">
+    <!-- Thread List Sidebar -->
+    <div class="threads-sidebar border-end">
+
+    <div class="threads-list">
+      @if (loadingThreads()) {
+        <div class="text-center p-4">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      } @else if (threads().length === 0) {
+        <div class="text-center p-4 text-muted">
+          <i class="bi bi-inbox display-4 mb-2 d-block"></i>
+          <p class="small mb-0">No threads found</p>
+        </div>
+      } @else {
+        @for (thread of threads(); track thread.id) {
+          <div
+            class="thread-item p-3 border-bottom"
+            [class.active]="selectedThread()?.id === thread.id"
+            (click)="selectThread(thread)"
+            role="button">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <h6 class="mb-0 flex-grow-1 text-truncate">{{ thread.title }}</h6>
+              @if (thread.lastMessageAt) {
+                <small class="text-muted">{{ getTimeAgo(thread.lastMessageAt) }}</small>
+              }
+            </div>
+            @if (thread.latestMessage) {
+              <p class="small text-muted mb-1 text-truncate">
+                <strong>{{ thread.latestMessage.senderUsername }}:</strong>
+                {{ thread.latestMessage.content }}
+              </p>
+            }
+            <div class="d-flex gap-2">
+              <span class="badge bg-secondary small">
+                <i class="bi bi-people me-1"></i>{{ thread.participantsCount }}
+              </span>
+              <span class="badge bg-secondary small">
+                <i class="bi bi-chat me-1"></i>{{ thread.messagesCount }}
+              </span>
+              @if (thread.isPrivate) {
+                <span class="badge bg-warning text-dark small">
+                  <i class="bi bi-lock"></i>
+                </span>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    @if (threadsTotal() > threadsPageSize) {
+      <div class="threads-footer p-2 border-top">
+        <nav>
+          <ul class="pagination pagination-sm mb-0 justify-content-center">
+            <li class="page-item" [class.disabled]="threadsPage() === 1">
+              <button class="page-link" (click)="previousThreadsPage()">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+            </li>
+            <li class="page-item disabled">
+              <span class="page-link small">
+                {{ threadsPage() }} / {{ Math.ceil(threadsTotal() / threadsPageSize) }}
+              </span>
+            </li>
+            <li class="page-item" [class.disabled]="threadsPage() * threadsPageSize >= threadsTotal()">
+              <button class="page-link" (click)="nextThreadsPage()">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    }
+  </div>
+
+  <!-- Messages Panel -->
+  <div class="messages-panel flex-grow-1 d-flex flex-column">
+    @if (!selectedThread()) {
+      <div class="empty-state d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+        <i class="bi bi-chat-dots display-1 mb-3"></i>
+        <h4>Select a conversation</h4>
+        <p>Choose a thread from the list to start messaging</p>
+      </div>
+    } @else {
+      <!-- Thread Header -->
+      <div class="messages-header p-3 border-bottom">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-1">{{ selectedThread()!.title }}</h5>
+            @if (selectedThread()!.description) {
+              <p class="small text-muted mb-0">{{ selectedThread()!.description }}</p>
+            }
+            <div class="d-flex gap-2 mt-2">
+              <span class="badge bg-secondary small">
+                <i class="bi bi-people me-1"></i>{{ selectedThread()!.participantsCount }} participants
+              </span>
+              @if (selectedThread()!.isPrivate) {
+                <span class="badge bg-warning text-dark small">
+                  <i class="bi bi-lock me-1"></i>Private
+                </span>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages List -->
+      <div class="messages-list flex-grow-1 p-3 overflow-auto">
+        @if (loadingMessages()) {
+          <div class="text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading messages...</span>
+            </div>
+          </div>
+        } @else if (messages().length === 0) {
+          <div class="text-center p-5 text-muted">
+            <i class="bi bi-chat display-4 mb-3 d-block"></i>
+            <p>No messages yet. Start the conversation!</p>
+          </div>
+        } @else {
+          <div class="messages-container">
+            @for (message of messages(); track message.id) {
+              <div class="message-item mb-3">
+                <div class="d-flex gap-2 align-items-start">
+                  <div class="flex-shrink-0">
+                    <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                         style="width: 36px; height: 36px;">
+                      <span class="small fw-bold">
+                        {{ message.senderUsername ? message.senderUsername.charAt(0).toUpperCase() : '?' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="d-flex gap-2 align-items-baseline mb-1">
+                      <strong class="small">{{ message.senderUsername || 'Unknown' }}</strong>
+                      <small class="text-muted">{{ getTimeAgo(message.createdAt) }}</small>
+                      @if (message.isEdited) {
+                        <small class="text-muted">(edited)</small>
+                      }
+                    </div>
+                    @if (message.replyToContent) {
+                      <div class="reply-context p-2 mb-2 border-start border-3 border-secondary bg-light small">
+                        <div class="text-muted"><i class="bi bi-reply me-1"></i>Reply to {{ message.replyToSender }}</div>
+                        <div class="text-truncate">{{ message.replyToContent }}</div>
+                      </div>
+                    }
+                    <div class="message-content">
+                      <p class="mb-0" style="white-space: pre-wrap;">{{ message.content }}</p>
+                    </div>
+                    <div class="message-meta small text-muted mt-1">
+                      {{ formatDate(message.createdAt) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Message Input -->
+      <div class="messages-footer p-3 border-top">
+        <form (ngSubmit)="sendMessage()">
+          <div class="input-group">
+            <textarea
+              class="form-control"
+              placeholder="Type a message..."
+              rows="2"
+              [(ngModel)]="newMessageContent"
+              name="messageContent"
+              [disabled]="sendingMessage()"
+              (keydown.enter)="($any($event).ctrlKey) && sendMessage()"></textarea>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="!newMessageContent.trim() || sendingMessage()">
+              @if (sendingMessage()) {
+                <span class="spinner-border spinner-border-sm"></span>
+              } @else {
+                <i class="bi bi-send"></i>
+              }
+            </button>
+          </div>
+          <small class="text-muted">Press Ctrl+Enter to send</small>
+        </form>
+      </div>
+    }
+    </div>
+  </div>
+</div>

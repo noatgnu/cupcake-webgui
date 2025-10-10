@@ -1,0 +1,49 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-upc-scan me-2"></i>
+    Scan Barcode to Search
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()"></button>
+</div>
+
+<div class="modal-body">
+  @if (error()) {
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      {{ error() }}
+    </div>
+  }
+
+  @if (scanning()) {
+    <div class="scanner-container">
+      <div #scannerContainer class="scanner-viewport"></div>
+      <div class="scanner-instructions mt-3 text-center">
+        <p class="text-muted">
+          <i class="bi bi-camera me-2"></i>
+          Point your camera at a barcode to scan
+        </p>
+      </div>
+    </div>
+  }
+
+  <div class="mt-3">
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="includeSubStorage"
+        [(ngModel)]="includeSubStorage"
+        name="includeSubStorage">
+      <label class="form-check-label" for="includeSubStorage">
+        <i class="bi bi-box-seam me-1"></i>
+        Include reagents from nested storage locations
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()">
+    Cancel
+  </button>
+</div>

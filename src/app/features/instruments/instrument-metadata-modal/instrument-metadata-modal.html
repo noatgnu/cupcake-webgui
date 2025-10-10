@@ -1,0 +1,303 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-tags me-2"></i>
+    Manage Metadata
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  @if (loading()) {
+    <div class="text-center p-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else {
+    <div class="mb-3">
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        (click)="toggleAddForm()">
+        <i class="bi" [class.bi-plus-circle]="!showAddForm()" [class.bi-x-circle]="showAddForm()"></i>
+        {{ showAddForm() ? 'Cancel' : 'Add Field' }}
+      </button>
+    </div>
+
+    @if (showAddForm()) {
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6 class="card-title">New Metadata Field</h6>
+
+          <div class="mb-3">
+            <div class="btn-group btn-group-sm" role="group">
+              <button
+                type="button"
+                class="btn"
+                [class.btn-primary]="showOfficialColumns()"
+                [class.btn-outline-secondary]="!showOfficialColumns()"
+                (click)="toggleOfficialColumns()">
+                <i class="bi bi-list-check me-1"></i>
+                Official Fields
+              </button>
+              <button
+                type="button"
+                class="btn"
+                [class.btn-primary]="showTemplates()"
+                [class.btn-outline-secondary]="!showTemplates()"
+                (click)="toggleTemplates()">
+                <i class="bi bi-bookmark me-1"></i>
+                Templates
+              </button>
+            </div>
+          </div>
+
+          @if (showOfficialColumns()) {
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Select Official SDRF Field</label>
+              <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+                @for (column of officialColumns; track column.name) {
+                  <button
+                    type="button"
+                    class="list-group-item list-group-item-action"
+                    [class.active]="selectedOfficialColumn?.name === column.name"
+                    (click)="selectOfficialColumn(column)">
+                    <div class="d-flex w-100 justify-content-between">
+                      <strong>{{ column.name }}</strong>
+                      <span class="badge bg-secondary">{{ column.type }}</span>
+                    </div>
+                    @if (column.description) {
+                      <small class="text-muted">{{ column.description }}</small>
+                    }
+                  </button>
+                }
+                @if (officialColumns.length === 0) {
+                  <div class="list-group-item text-muted">
+                    No official fields found
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (showTemplates()) {
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Select Template</label>
+              @if (loadingTemplates()) {
+                <div class="text-center p-2">
+                  <span class="spinner-border spinner-border-sm"></span>
+                </div>
+              } @else {
+                <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+                  @for (template of templates(); track template.id) {
+                    <button
+                      type="button"
+                      class="list-group-item list-group-item-action"
+                      [class.active]="selectedTemplate?.id === template.id"
+                      (click)="selectTemplate(template)">
+                      <div class="d-flex w-100 justify-content-between">
+                        <strong>{{ template.columnName }}</strong>
+                        @if (template.ontologyType) {
+                          <span class="badge bg-info">{{ template.ontologyType }}</span>
+                        }
+                      </div>
+                      @if (template.description) {
+                        <small class="text-muted">{{ template.description }}</small>
+                      }
+                    </button>
+                  }
+                  @if (templates().length === 0) {
+                    <div class="list-group-item text-muted">
+                      No templates available
+                    </div>
+                  }
+                </div>
+                @if (totalTemplatePages() > 1) {
+                  <div class="d-flex justify-content-between align-items-center mt-2">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      (click)="previousTemplatePage()"
+                      [disabled]="templatePage() === 1">
+                      <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span class="small text-muted">
+                      Page {{ templatePage() }} of {{ totalTemplatePages() }}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      (click)="nextTemplatePage()"
+                      [disabled]="templatePage() === totalTemplatePages()">
+                      <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                }
+              }
+            </div>
+          }
+
+          @if (hasOntologyType && newFieldName.trim()) {
+            <div class="mb-2">
+              <small class="text-muted d-block mb-1">Search Mode:</small>
+              <div class="btn-group btn-group-sm" role="group">
+                <button
+                  type="button"
+                  class="btn"
+                  [class]="searchType() === 'icontains' ? 'btn-primary' : 'btn-outline-primary'"
+                  (click)="onSearchTypeChange('icontains')">
+                  <i class="bi bi-search me-1"></i>Contains
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  [class]="searchType() === 'istartswith' ? 'btn-primary' : 'btn-outline-primary'"
+                  (click)="onSearchTypeChange('istartswith')">
+                  <i class="bi bi-arrow-right me-1"></i>Starts with
+                </button>
+              </div>
+            </div>
+          }
+
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label small">Field Name</label>
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="newFieldName"
+                placeholder="Select from above or enter custom"
+                [disabled]="saving()">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small">
+                Value
+                @if (hasOntologyType && newFieldName.trim()) {
+                  <span class="badge bg-success ms-2">
+                    <i class="bi bi-search me-1"></i>Autocomplete
+                  </span>
+                }
+              </label>
+              @if (hasOntologyType && newFieldName.trim()) {
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control"
+                    [(ngModel)]="newFieldValue"
+                    placeholder="Type to search..."
+                    [ngbTypeahead]="searchOntology"
+                    [resultFormatter]="formatSuggestion"
+                    [inputFormatter]="inputFormatter"
+                    (selectItem)="onSuggestionSelected($event)"
+                    [editable]="true"
+                    [showHint]="true"
+                    [focusFirst]="false"
+                    container="body"
+                    [disabled]="saving()">
+                  @if (isLoadingSuggestions()) {
+                    <span class="input-group-text">
+                      <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                      </div>
+                    </span>
+                  } @else {
+                    <span class="input-group-text">
+                      <i class="bi bi-search text-muted"></i>
+                    </span>
+                  }
+                </div>
+              } @else {
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="newFieldValue"
+                  placeholder="Enter value"
+                  [disabled]="saving()">
+              }
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button
+                type="button"
+                class="btn btn-success w-100"
+                (click)="addField()"
+                [disabled]="!newFieldName.trim() || saving()">
+                @if (saving()) {
+                  <span class="spinner-border spinner-border-sm"></span>
+                } @else {
+                  <i class="bi bi-check"></i>
+                }
+              </button>
+            </div>
+          </div>
+
+          @if (selectedTemplate || selectedOfficialColumn) {
+            <div class="alert alert-info mt-2 mb-0 small">
+              <i class="bi bi-info-circle me-1"></i>
+              Selected: <strong>{{ selectedTemplate?.columnName || selectedOfficialColumn?.name }}</strong>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (metadataFields().length === 0) {
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        No metadata fields. Click "Add Field" to create one.
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th style="width: 40%">Field Name</th>
+              <th style="width: 45%">Value</th>
+              <th style="width: 15%">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (field of metadataFields(); track field.id) {
+              <tr>
+                <td>
+                  <strong>{{ field.name }}</strong>
+                  @if (field.ontologyType) {
+                    <br><span class="badge bg-info small">{{ field.ontologyType }}</span>
+                  }
+                </td>
+                <td>
+                  <span [class.text-muted]="!field.value">
+                    {{ field.value || 'No value' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary"
+                      (click)="editField(field)"
+                      title="Edit Value">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger"
+                      (click)="deleteField(field)"
+                      title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()">
+    Close
+  </button>
+</div>

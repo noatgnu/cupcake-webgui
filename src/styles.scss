@@ -1,1 +1,80 @@
-/* You can add global styles to this file, and also import other style files */
+// Import Bootstrap
+@import 'bootstrap/scss/bootstrap';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+@import 'quill/dist/quill.snow.css';
+
+// CSS Custom Properties for theme support
+:root {
+  --cupcake-card-header-bg: rgba(0, 0, 0, 0.03);
+  --cupcake-text: #212529;
+  --cupcake-text-muted: #6c757d;
+  --cupcake-bg-secondary: #f8f9fa;
+  --cupcake-bg-tertiary: #e9ecef;
+
+  // Map cupcake primary to Bootstrap primary
+  --bs-primary: var(--cupcake-primary, #1976d2);
+  --bs-primary-rgb: var(--cupcake-primary-rgb, 25, 118, 210);
+}
+
+[data-bs-theme="dark"] {
+  --cupcake-card-header-bg: rgba(255, 255, 255, 0.03);
+  --cupcake-text: #ffffff;
+  --cupcake-text-muted: #adb5bd;
+  --cupcake-bg-secondary: #1e1e1e;
+  --cupcake-bg-tertiary: #2d2d2d;
+
+  // Map cupcake primary to Bootstrap primary in dark mode
+  --bs-primary: var(--cupcake-primary, #1976d2);
+  --bs-primary-rgb: var(--cupcake-primary-rgb, 25, 118, 210);
+}
+
+// Make Bootstrap utilities respect the theme
+.card-header {
+  background-color: var(--cupcake-card-header-bg) !important;
+  color: var(--cupcake-text);
+}
+
+.bg-secondary {
+  background-color: var(--cupcake-bg-tertiary) !important;
+  color: var(--cupcake-text) !important;
+}
+
+.bg-light {
+  background-color: var(--cupcake-bg-secondary) !important;
+  color: var(--cupcake-text) !important;
+}
+
+.text-muted {
+  color: var(--cupcake-text-muted) !important;
+}
+
+.template-value {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  cursor: help;
+  border: 1px solid;
+  display: inline-block;
+  background-color: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+  border-color: var(--bs-primary-border-subtle);
+}
+
+.template-value-scaled {
+  background-color: var(--bs-danger-bg-subtle);
+  color: var(--bs-danger-text-emphasis);
+  border-color: var(--bs-danger-border-subtle);
+}
+
+.template-value-name {
+  background-color: var(--bs-info-bg-subtle);
+  color: var(--bs-info-text-emphasis);
+  border-color: var(--bs-info-border-subtle);
+}
+
+.template-value-unit {
+  background-color: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+  border-color: var(--bs-warning-border-subtle);
+}

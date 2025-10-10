@@ -1,0 +1,120 @@
+.messages-view {
+  height: 100%;
+
+  .threads-sidebar {
+    width: 350px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    .threads-header {
+      flex-shrink: 0;
+    }
+
+    .threads-list {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+
+      .thread-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background-color: var(--cupcake-bg-secondary, #f8f9fa);
+        }
+
+        &.active {
+          background-color: var(--cupcake-primary, #1976d2);
+          color: white;
+
+          .text-muted {
+            color: rgba(255, 255, 255, 0.7) !important;
+          }
+
+          .badge {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+          }
+        }
+      }
+    }
+
+    .threads-footer {
+      flex-shrink: 0;
+    }
+  }
+
+  .messages-panel {
+    min-width: 0;
+
+    .messages-header {
+      flex-shrink: 0;
+    }
+
+    .messages-list {
+      flex: 1;
+      min-height: 0;
+      background-color: var(--cupcake-bg-secondary, #f8f9fa);
+
+      .messages-container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .message-item {
+        .avatar {
+          font-size: 0.875rem;
+        }
+
+        .message-content {
+          p {
+            line-height: 1.5;
+          }
+        }
+
+        .reply-context {
+          font-size: 0.875rem;
+          margin-left: -0.5rem;
+        }
+      }
+    }
+
+    .messages-footer {
+      flex-shrink: 0;
+
+      textarea {
+        resize: none;
+      }
+    }
+
+    .empty-state {
+      i {
+        opacity: 0.3;
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .messages-view {
+    .threads-sidebar {
+      width: 100%;
+      position: absolute;
+      background: white;
+      z-index: 10;
+
+      &.has-selection {
+        display: none;
+      }
+    }
+
+    .messages-panel {
+      width: 100%;
+
+      &.no-selection {
+        display: none;
+      }
+    }
+  }
+}

@@ -1,0 +1,475 @@
+<!-- Hidden file inputs -->
+<input
+  #sdrfFileInput
+  type="file"
+  accept=".txt,.tsv"
+  style="display: none;"
+  (change)="importSdrf($event)">
+<input
+  #excelFileInput
+  type="file"
+  accept=".xlsx,.xls"
+  style="display: none;"
+  (change)="importExcel($event)">
+
+@if (isLoading()) {
+  <div class="text-center p-4">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2 text-muted">Loading metadata table...</p>
+  </div>
+} @else if (table()) {
+  <div class="metadata-table-wrapper">
+    <!-- Header Section -->
+    <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+      <div class="container-fluid">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <div class="d-flex align-items-center">
+            <h5 class="navbar-brand m-0 fw-bold">
+              <i class="bi bi-table me-2"></i>{{ table()!.name }}
+            </h5>
+            <span class="badge bg-primary ms-3">{{ table()!.sampleCount }} samples</span>
+            <span class="badge bg-info ms-2">{{ userColumns().length }} columns</span>
+          </div>
+          <div class="d-flex gap-2">
+        <!-- Staff Only Filter -->
+        @if (showStaffOnlyFilter) {
+          <div class="btn-group btn-group-sm" role="group">
+            <input
+              type="radio"
+              class="btn-check"
+              name="staffFilter"
+              id="filterAll"
+              autocomplete="off"
+              [checked]="staffOnlyFilter() === 'all'"
+              (change)="staffOnlyFilter.set('all')">
+            <label class="btn btn-outline-primary" for="filterAll">
+              <i class="bi bi-grid-3x3-gap me-1"></i>All
+            </label>
+
+            <input
+              type="radio"
+              class="btn-check"
+              name="staffFilter"
+              id="filterUser"
+              autocomplete="off"
+              [checked]="staffOnlyFilter() === 'user'"
+              (change)="staffOnlyFilter.set('user')">
+            <label class="btn btn-outline-primary" for="filterUser">
+              <i class="bi bi-person me-1"></i>User Only
+            </label>
+
+            <input
+              type="radio"
+              class="btn-check"
+              name="staffFilter"
+              id="filterStaff"
+              autocomplete="off"
+              [checked]="staffOnlyFilter() === 'staff'"
+              (change)="staffOnlyFilter.set('staff')">
+            <label class="btn btn-outline-primary" for="filterStaff">
+              <i class="bi bi-shield-lock me-1"></i>Staff Only
+            </label>
+          </div>
+        }
+
+        <!-- Column Filter -->
+        @if (userColumns().length > 0) {
+          <div class="input-group input-group-sm" style="width: 200px;">
+            <span class="input-group-text">
+              <i class="bi bi-funnel"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Filter columns..."
+              [value]="columnFilter()"
+              (input)="onColumnFilterChange($any($event.target).value)">
+            @if (columnFilter()) {
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                (click)="clearColumnFilter()">
+                <i class="bi bi-x"></i>
+              </button>
+            }
+          </div>
+        }
+
+        <!-- Import Dropdown -->
+        @if (table()!.canEdit && !readonlyMode) {
+          <div class="btn-group" ngbDropdown>
+            <button
+              type="button"
+              class="btn btn-outline-success btn-sm dropdown-toggle"
+              ngbDropdownToggle
+              title="Import">
+              <i class="bi bi-upload"></i>
+              <span class="d-none d-lg-inline ms-1">Import</span>
+            </button>
+            <div class="dropdown-menu" ngbDropdownMenu>
+              <button class="dropdown-item" (click)="triggerSdrfFileInput()">
+                <i class="bi bi-file-earmark-text me-2"></i>Import SDRF
+              </button>
+              <button class="dropdown-item" (click)="triggerExcelFileInput()">
+                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Excel
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Export Dropdown -->
+        @if (userColumns().length > 0) {
+          <div class="btn-group" ngbDropdown placement="bottom-end">
+            <button
+              type="button"
+              class="btn btn-outline-info btn-sm dropdown-toggle"
+              ngbDropdownToggle
+              title="Export">
+              <i class="bi bi-download"></i>
+              <span class="d-none d-lg-inline ms-1">Export</span>
+            </button>
+            <div class="dropdown-menu" ngbDropdownMenu>
+              <button class="dropdown-item" (click)="exportToSdrf('sdrf')">
+                <i class="bi bi-file-earmark-text me-2"></i>Export as SDRF
+              </button>
+              <button class="dropdown-item" (click)="exportToSdrf('excel')">
+                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Export as Excel
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Validate SDRF Button -->
+        @if (userColumns().length > 0) {
+          <button
+            type="button"
+            class="btn btn-outline-info btn-sm"
+            (click)="openValidationModal()"
+            title="Validate SDRF">
+            <i class="bi bi-check-circle"></i>
+            <span class="d-none d-lg-inline ms-1">Validate SDRF</span>
+          </button>
+        }
+
+        <!-- Search & Replace Button -->
+        @if (table()!.canEdit && userColumns().length > 0 && !readonlyMode) {
+          <button
+            type="button"
+            class="btn btn-outline-warning btn-sm"
+            (click)="openSearchReplaceModal()"
+            title="Search & Replace">
+            <i class="bi bi-search"></i>
+            <span class="d-none d-lg-inline ms-1">Search & Replace</span>
+          </button>
+        }
+
+        <!-- Add Column Button -->
+        @if (table()!.canEdit && !readonlyMode) {
+          <button
+            type="button"
+            class="btn btn-success btn-sm"
+            (click)="openAddColumnModal()"
+            title="Add Column">
+            <i class="bi bi-plus-circle"></i>
+            <span class="d-none d-lg-inline ms-1">Add Column</span>
+          </button>
+        }
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="p-4">
+    <!-- Sample Pool Table Section -->
+    @if (hasPools() && userColumns().length > 0) {
+      <div class="card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h6 class="mb-0">
+            <i class="bi bi-layers me-2"></i>Sample Pool Table
+            <span class="badge bg-warning ms-2">{{ sortedPools().length }} pools</span>
+          </h6>
+          @if (table()!.canEdit && !readonlyMode) {
+            <button
+              type="button"
+              class="btn btn-success btn-sm"
+              (click)="createPool()"
+              title="Create Sample Pool">
+              <i class="bi bi-plus-circle"></i>
+              <span class="d-none d-lg-inline ms-1">Create Pool</span>
+            </button>
+          }
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" style="width: 150px;" class="bg-secondary bg-opacity-10 text-secondary">
+                    <i class="bi bi-layers me-1"></i>Pool
+                  </th>
+                  @for (column of userColumns(); track column.id) {
+                    <th scope="col" [class]="getColumnHeaderClass(column)" [title]="column.name" style="min-width: 150px;">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">{{ column.name }}</span>
+                      </div>
+                    </th>
+                  }
+                  @if (table()!.canEdit && !readonlyMode) {
+                    <th scope="col" style="width: 120px;" class="text-center">Actions</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (poolRow of poolTableRows(); track poolRow._poolId) {
+                  <tr>
+                    <td class="fw-semibold text-muted">
+                      <i class="bi bi-layers me-2 text-warning"></i>{{ poolRow._poolName }}
+                    </td>
+                    @for (column of userColumns(); track column.id) {
+                      <td
+                        class="metadata-cell"
+                        [class.editable]="table()!.canEdit && !readonlyMode"
+                        [class.opacity-50]="column.hidden"
+                        (click)="table()!.canEdit && !readonlyMode && editPoolColumnValue(poolRow._poolData, column)">
+                        <div class="cell-content">
+                          {{ poolRow['col_' + column.id] || '-' }}
+                          @if (table()!.canEdit && !readonlyMode) {
+                            <i class="bi bi-pencil cell-edit-icon"></i>
+                          }
+                        </div>
+                      </td>
+                    }
+                    @if (table()!.canEdit && !readonlyMode) {
+                      <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                          <button
+                            type="button"
+                            class="btn btn-outline-info"
+                            (click)="viewPoolDetails(poolRow._poolData)"
+                            title="View Pool Details">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-primary"
+                            (click)="editPool(poolRow._poolData)"
+                            title="Edit Pool">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline-danger"
+                            (click)="deletePool(poolRow._poolData)"
+                            title="Delete Pool">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (selectedColumnIds().size > 0 && !readonlyMode) {
+      <div class="alert alert-info py-2 px-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-check-square me-1"></i>
+            {{ selectedColumnIds().size }} column(s) selected
+          </span>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-warning" (click)="bulkToggleStaffOnly(true)" title="Mark selected as Staff Only">
+              <i class="bi bi-shield-lock me-1"></i>Mark Staff Only
+            </button>
+            <button type="button" class="btn btn-outline-secondary" (click)="bulkToggleStaffOnly(false)" title="Mark selected as User Visible">
+              <i class="bi bi-person me-1"></i>Mark User Visible
+            </button>
+            <button type="button" class="btn btn-danger" (click)="bulkDeleteColumns()" title="Delete selected columns">
+              <i class="bi bi-trash me-1"></i>Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (userColumns().length === 0) {
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        No columns available. Use "Import SDRF" or "Add Column" to get started.
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover metadata-table">
+          <thead class="sticky-top">
+            <tr>
+              @if (!readonlyMode) {
+                <th scope="col" class="text-center" style="width: 40px;">
+                  <input type="checkbox" class="form-check-input"
+                         [checked]="allColumnsSelected()"
+                         [indeterminate]="someColumnsSelected()"
+                         (change)="toggleAllColumns()"
+                         title="Select all columns">
+                </th>
+              }
+              <th scope="col" class="text-center" style="width: 80px;">Sample</th>
+              @for (column of userColumns(); track column.id) {
+                <th scope="col" [class]="getColumnHeaderClass(column)" [title]="column.name + (column.type ? ' (' + column.type + ')' : '')">
+                  <div class="d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center gap-2">
+                        @if (!readonlyMode) {
+                          <input type="checkbox" class="form-check-input me-2"
+                                 [checked]="column.id && selectedColumnIds().has(column.id)"
+                                 (change)="column.id && toggleColumnSelection(column.id)"
+                                 (click)="$event.stopPropagation()">
+                        }
+                        <span class="fw-semibold">{{ column.name }}</span>
+                        @if (column.staffOnly) {
+                          <span class="badge bg-warning text-dark" title="Staff Only Column">
+                            <i class="bi bi-shield-lock"></i>
+                          </span>
+                        }
+                      </div>
+                      @if (table()!.canEdit) {
+                        <div class="btn-group btn-group-sm header-actions" role="group">
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            [class]="column.hidden ? 'btn-outline-warning' : 'btn-outline-success'"
+                            (click)="toggleColumnHidden(column); $event.stopPropagation()"
+                            [title]="column.hidden ? 'Show column' : 'Hide column'">
+                            <i class="bi" [class]="column.hidden ? 'bi-eye-slash' : 'bi-eye'"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            (click)="editColumnValue(column); $event.stopPropagation()"
+                            title="Edit default value"
+                            [disabled]="readonlyMode || !canEditColumn(column)">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-info"
+                            (click)="openAutofillModal(column); $event.stopPropagation()"
+                            title="Auto-fill column values"
+                            [disabled]="readonlyMode || !canEditColumn(column)">
+                            <i class="bi bi-magic"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            (click)="editColumnSettings(column); $event.stopPropagation()"
+                            title="Column settings"
+                            [disabled]="readonlyMode || !canEditColumn(column)">
+                            <i class="bi bi-gear"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            (click)="removeColumn(column); $event.stopPropagation()"
+                            title="Remove column"
+                            [disabled]="readonlyMode || !canEditColumn(column)">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                    @if (column.value) {
+                      <small class="text-muted">Default: {{ column.value }}</small>
+                    }
+                  </div>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of paginatedRows(); track row._sampleIndex) {
+              <tr>
+                @if (!readonlyMode) {
+                  <td class="text-center"></td>
+                }
+                <td class="text-center fw-bold">{{ row._sampleIndex }}</td>
+                @for (column of userColumns(); track column.id) {
+                  <td
+                    class="metadata-cell"
+                    [class.editable]="canEditColumn(column) && !readonlyMode"
+                    [class.opacity-50]="column.hidden"
+                    (click)="canEditColumn(column) && !readonlyMode && editSampleColumnValue(column, row._sampleIndex)">
+                    <div class="cell-content">
+                      {{ row['col_' + column.id] || '-' }}
+                      @if (canEditColumn(column) && !readonlyMode) {
+                        <i class="bi bi-pencil cell-edit-icon"></i>
+                      }
+                    </div>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="text-muted">
+            Showing {{ ((currentPage() - 1) * pageSize()) + 1 }} to {{ Math.min(currentPage() * pageSize(), tableRows().length) }} of {{ tableRows().length }} samples
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <label class="text-muted mb-0" style="font-size: 0.875rem;">Rows per page:</label>
+            <select
+              class="form-select form-select-sm"
+              style="width: auto;"
+              [value]="pageSize()"
+              (change)="onPageSizeChange(+$any($event.target).value)">
+              <option [value]="10">10</option>
+              <option [value]="25">25</option>
+              <option [value]="50">50</option>
+              <option [value]="100">100</option>
+            </select>
+          </div>
+        </div>
+        @if (totalPages() > 1) {
+          <nav aria-label="Table pagination">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" [class.disabled]="currentPage() === 1">
+                <button class="page-link" (click)="previousPage()" [disabled]="currentPage() === 1">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+              </li>
+              @for (page of [].constructor(totalPages()); track $index; let i = $index) {
+                @if (i + 1 === currentPage() || Math.abs(i + 1 - currentPage()) <= 2 || i + 1 === 1 || i + 1 === totalPages()) {
+                  <li class="page-item" [class.active]="currentPage() === i + 1">
+                    <button class="page-link" (click)="onPageChange(i + 1)">{{ i + 1 }}</button>
+                  </li>
+                } @else if (Math.abs(i + 1 - currentPage()) === 3) {
+                  <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                  </li>
+                }
+              }
+              <li class="page-item" [class.disabled]="currentPage() === totalPages()">
+                <button class="page-link" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        }
+      </div>
+    }
+    </div>
+  </div>
+} @else {
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    No metadata table found.
+  </div>
+}

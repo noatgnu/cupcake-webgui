@@ -1,0 +1,297 @@
+<div class="job-annotations-container">
+  <ul class="nav nav-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab() === 'user'"
+        type="button"
+        (click)="setActiveTab('user')">
+        <i class="bi bi-person me-1"></i>
+        User Annotations
+        <span class="badge ms-1" [class.bg-primary]="activeTab() === 'user'" [class.bg-secondary]="activeTab() !== 'user'">
+          {{ userTotalCount() }}
+        </span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab() === 'staff'"
+        type="button"
+        (click)="setActiveTab('staff')">
+        <i class="bi bi-shield-lock me-1"></i>
+        Staff Annotations
+        <span class="badge ms-1" [class.bg-primary]="activeTab() === 'staff'" [class.bg-secondary]="activeTab() !== 'staff'">
+          {{ staffTotalCount() }}
+        </span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content border border-top-0 rounded-bottom p-3">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex gap-2 flex-grow-1">
+          <div class="input-group" style="max-width: 400px;">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Search annotations..."
+              [value]="searchQuery()"
+              (input)="onSearchChange($any($event.target).value)">
+          </div>
+
+          <select
+            class="form-select"
+            style="max-width: 200px;"
+            [value]="selectedTypeFilter()"
+            (change)="onTypeFilterChange($any($event.target).value)">
+            @for (type of annotationTypes; track type.value) {
+              <option [value]="type.value">{{ type.label }}</option>
+            }
+          </select>
+        </div>
+
+        @if (activeTab() === 'user' && canCreateUserAnnotation()) {
+          <button
+            class="btn btn-primary btn-sm"
+            (click)="addAnnotation(false)">
+            <i class="bi bi-plus-circle me-1"></i>Add
+          </button>
+        }
+        @if (activeTab() === 'staff' && canCreateStaffAnnotation()) {
+          <button
+            class="btn btn-warning btn-sm"
+            (click)="addAnnotation(true)">
+            <i class="bi bi-plus-circle me-1"></i>Add
+          </button>
+        }
+      </div>
+
+      @if (filteredAnnotations.length === 0) {
+        <div class="empty-state text-center text-muted p-5">
+          <i class="bi bi-chat-left-text fs-1 mb-3 d-block"></i>
+          @if (searchQuery() || selectedTypeFilter() !== 'all') {
+            <p class="mb-0">No annotations match your search criteria</p>
+            <button class="btn btn-sm btn-outline-secondary mt-2" (click)="searchQuery.set(''); selectedTypeFilter.set('all'); loadAnnotations()">
+              Clear Filters
+            </button>
+          } @else {
+            <p class="mb-0">No annotations yet</p>
+            @if ((activeTab() === 'user' && canCreateUserAnnotation()) || (activeTab() === 'staff' && canCreateStaffAnnotation())) {
+              <p class="small mt-2">Click "Add" to create your first annotation</p>
+            }
+          }
+        </div>
+      } @else {
+        <div class="annotations-list">
+          @for (annotation of filteredAnnotations; track annotation.id) {
+            <div class="annotation-item border rounded p-3 mb-3" [class.border-warning]="annotation.role === 'staff'">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <i class="bi {{ getAnnotationTypeIcon(annotation) }}" [class.text-primary]="annotation.role === 'user'" [class.text-warning]="annotation.role === 'staff'"></i>
+                  <span class="badge" [class.bg-secondary]="annotation.role === 'user'" [class.bg-warning]="annotation.role === 'staff'" [class.text-dark]="annotation.role === 'staff'">
+                    {{ getAnnotationTypeBadge(annotation) }}
+                  </span>
+                  @if (annotation.annotationUser) {
+                    <small class="text-muted">by {{ annotation.annotationUser }}</small>
+                  }
+                  <small class="text-muted">{{ annotation.createdAt | date: 'short' }}</small>
+                </div>
+                <div class="d-flex gap-1">
+                  @if (canRetriggerTranscription(annotation)) {
+                    <button
+                      class="btn btn-sm btn-outline-warning"
+                      (click)="retriggerTranscription(annotation)"
+                      title="Retrigger transcription">
+                      <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                  }
+                  @if (annotation.canEdit) {
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      (click)="editAnnotation(annotation)"
+                      title="Edit annotation">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  }
+                  @if (annotation.canDelete) {
+                    <button
+                      class="btn btn-sm btn-outline-danger"
+                      (click)="deleteAnnotation(annotation)"
+                      title="Delete annotation">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <div class="annotation-content">
+                @if (annotation.annotationType === AnnotationType.Text) {
+                  <div class="annotation-text">
+                    {{ annotation.annotationText }}
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
+                  <div class="mb-2">
+                    <img [src]="annotation.fileUrl" class="img-fluid rounded mb-2" alt="Annotation image" style="max-height: 400px;">
+                    <div>
+                      <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'image'" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-download me-1"></i>Download
+                      </a>
+                    </div>
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.Video && annotation.fileUrl) {
+                  <div class="mb-2">
+                    <video controls class="w-100 rounded mb-2" style="max-height: 400px;" (timeupdate)="onMediaTimeUpdate(annotation.id!, $event)">
+                      <source [src]="annotation.fileUrl">
+                      Your browser does not support the video tag.
+                    </video>
+                    <div>
+                      <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'video'" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-download me-1"></i>Download
+                      </a>
+                    </div>
+                    @if (annotation.transcription) {
+                      <div class="mt-2">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                          <small class="text-muted">
+                            <i class="bi bi-file-text me-1"></i>Transcription
+                          </small>
+                          @if (annotation.language) {
+                            <span class="badge bg-secondary">{{ annotation.language }}</span>
+                          }
+                        </div>
+                        <app-webvtt-editor
+                          [vttContent]="annotation.transcription"
+                          [externalCurrentTime]="getMediaCurrentTime(annotation.id!)"
+                          [editable]="annotation.canEdit || false"
+                          (contentChanged)="onTranscriptionChanged(annotation.id!, $event)">
+                        </app-webvtt-editor>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.Audio && annotation.fileUrl) {
+                  <div class="mb-2">
+                    <audio controls class="w-100 mb-2" (timeupdate)="onMediaTimeUpdate(annotation.id!, $event)">
+                      <source [src]="annotation.fileUrl">
+                      Your browser does not support the audio tag.
+                    </audio>
+                    <div>
+                      <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'audio'" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-download me-1"></i>Download
+                      </a>
+                    </div>
+                    @if (annotation.transcription) {
+                      <div class="mt-2">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                          <small class="text-muted">
+                            <i class="bi bi-file-text me-1"></i>Transcription
+                          </small>
+                          @if (annotation.language) {
+                            <span class="badge bg-secondary">{{ annotation.language }}</span>
+                          }
+                        </div>
+                        <app-webvtt-editor
+                          [vttContent]="annotation.transcription"
+                          [externalCurrentTime]="getMediaCurrentTime(annotation.id!)"
+                          [editable]="annotation.canEdit || false"
+                          (contentChanged)="onTranscriptionChanged(annotation.id!, $event)">
+                        </app-webvtt-editor>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.File && annotation.fileUrl) {
+                  <div class="mb-2">
+                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'file'" class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-download me-1"></i>Download File
+                    </a>
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.Calculator && annotation.annotationText) {
+                  <div class="border rounded p-3 bg-light">
+                    <h6 class="text-muted mb-2">
+                      <i class="bi bi-calculator me-1"></i>
+                      Calculator History
+                    </h6>
+                    <div class="list-group list-group-flush">
+                      @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                        <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                          <small class="font-monospace" [class.text-decoration-line-through]="entry.scratched">
+                            {{ formatCalculatorExpression(entry) }}
+                          </small>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.MolarityCalculator && annotation.annotationText) {
+                  <div class="border rounded p-3 bg-light">
+                    <h6 class="text-muted mb-2">
+                      <i class="bi bi-calculator-fill me-1"></i>
+                      Molarity Calculator History
+                    </h6>
+                    <div class="list-group list-group-flush">
+                      @for (entry of parseCalculatorHistory(annotation.annotationText); track entry.id) {
+                        <div class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                          <small [class.text-decoration-line-through]="entry.scratched">
+                            {{ formatMolarityCalculatorExpression(entry) }}
+                          </small>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (annotation.annotationType === AnnotationType.Booking) {
+                  <div class="border rounded p-3 bg-light">
+                    <h6 class="text-muted mb-2">
+                      <i class="bi bi-calendar-check me-1"></i>
+                      Instrument Booking
+                    </h6>
+                    <div>{{ annotation.annotationText }}</div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (currentTotalPages() > 1) {
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+              Showing {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, currentTotalCount()) }} of {{ currentTotalCount() }}
+            </small>
+            <ngb-pagination
+              [collectionSize]="currentTotalCount()"
+              [page]="currentPage()"
+              [pageSize]="pageSize"
+              [maxSize]="3"
+              [boundaryLinks]="true"
+              (pageChange)="onPageChange($event)"
+              size="sm">
+            </ngb-pagination>
+          </div>
+        }
+      }
+    }
+  </div>
+</div>

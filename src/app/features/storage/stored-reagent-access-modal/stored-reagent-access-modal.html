@@ -1,0 +1,203 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-shield-lock me-2"></i>
+    Manage Reagent Access
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()"></button>
+</div>
+
+<div class="modal-body">
+  <p class="text-muted mb-3">
+    Configure access permissions for <strong>{{ storedReagent.reagentName }}</strong>
+  </p>
+
+  <div class="mb-3">
+    <div class="form-check form-switch mb-2">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="shareableSwitch"
+        [checked]="shareable()"
+        (change)="toggleShareable()">
+      <label class="form-check-label" for="shareableSwitch">
+        <i class="bi bi-share me-2"></i>
+        <strong>Enable Sharing</strong>
+      </label>
+      <small class="d-block text-muted ms-4">Allow this reagent to be accessed by others</small>
+    </div>
+
+    @if (shareable()) {
+      <div class="form-check form-switch ms-3">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="accessAllSwitch"
+          [checked]="accessAll()"
+          (change)="toggleAccessAll()">
+        <label class="form-check-label" for="accessAllSwitch">
+          <i class="bi bi-globe me-2"></i>
+          <strong>Public Access</strong>
+        </label>
+        <small class="d-block text-muted ms-4">Allow all users to access this reagent</small>
+      </div>
+    }
+  </div>
+
+  @if (shareable() && !accessAll()) {
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <button
+          class="nav-link"
+          [class.active]="activeTab() === 'labgroups'"
+          (click)="activeTab.set('labgroups')">
+          <i class="bi bi-people me-1"></i>
+          Lab Groups
+        </button>
+      </li>
+      <li class="nav-item">
+        <button
+          class="nav-link"
+          [class.active]="activeTab() === 'users'"
+          (click)="activeTab.set('users')">
+          <i class="bi bi-person me-1"></i>
+          Individual Users
+        </button>
+      </li>
+    </ul>
+
+    @if (activeTab() === 'labgroups') {
+      @if (loading()) {
+        <div class="text-center p-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      } @else if (allLabGroups().length === 0) {
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          No lab groups available
+        </div>
+      } @else {
+        <div class="list-group">
+          @for (labGroup of allLabGroups(); track labGroup.id) {
+            <label class="list-group-item d-flex align-items-center">
+              <input
+                type="checkbox"
+                class="form-check-input me-3"
+                [checked]="isLabGroupSelected(labGroup.id)"
+                (change)="toggleLabGroup(labGroup.id)">
+              <div class="flex-grow-1">
+                <div class="fw-semibold">{{ labGroup.name }}</div>
+                @if (labGroup.description) {
+                  <small class="text-muted">{{ labGroup.description }}</small>
+                }
+              </div>
+            </label>
+          }
+        </div>
+
+        @if (labGroupsTotal() > pageSize) {
+          <div class="mt-3">
+            <nav>
+              <ul class="pagination pagination-sm mb-0 justify-content-center">
+                <li class="page-item" [class.disabled]="labGroupsPage() === 1">
+                  <button class="page-link" (click)="previousLabGroupsPage()">Previous</button>
+                </li>
+                <li class="page-item disabled">
+                  <span class="page-link">{{ labGroupsPage() }} / {{ Math.ceil(labGroupsTotal() / pageSize) }}</span>
+                </li>
+                <li class="page-item" [class.disabled]="labGroupsPage() >= Math.ceil(labGroupsTotal() / pageSize)">
+                  <button class="page-link" (click)="nextLabGroupsPage()">Next</button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        }
+      }
+    }
+
+    @if (activeTab() === 'users') {
+      @if (loading()) {
+        <div class="text-center p-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      } @else if (allUsers().length === 0) {
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          No users available
+        </div>
+      } @else {
+        <div class="list-group">
+          @for (user of allUsers(); track user.id) {
+            <label class="list-group-item d-flex align-items-center">
+              <input
+                type="checkbox"
+                class="form-check-input me-3"
+                [checked]="isUserSelected(user.id)"
+                (change)="toggleUser(user.id)">
+              <div class="flex-grow-1">
+                <div class="fw-semibold">{{ user.username }}</div>
+                @if (user.firstName || user.lastName) {
+                  <small class="text-muted">{{ user.firstName }} {{ user.lastName }}</small>
+                }
+                @if (user.email) {
+                  <small class="text-muted d-block">{{ user.email }}</small>
+                }
+              </div>
+            </label>
+          }
+        </div>
+
+        @if (usersTotal() > pageSize) {
+          <div class="mt-3">
+            <nav>
+              <ul class="pagination pagination-sm mb-0 justify-content-center">
+                <li class="page-item" [class.disabled]="usersPage() === 1">
+                  <button class="page-link" (click)="previousUsersPage()">Previous</button>
+                </li>
+                <li class="page-item disabled">
+                  <span class="page-link">{{ usersPage() }} / {{ Math.ceil(usersTotal() / pageSize) }}</span>
+                </li>
+                <li class="page-item" [class.disabled]="usersPage() >= Math.ceil(usersTotal() / pageSize)">
+                  <button class="page-link" (click)="nextUsersPage()">Next</button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        }
+      }
+    }
+
+    <div class="mt-3">
+      <div class="alert alert-secondary">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Summary:</strong>
+        {{ selectedLabGroups().size }} lab group(s) and {{ selectedUsers().size }} user(s) selected
+      </div>
+    </div>
+  } @else if (shareable() && accessAll()) {
+    <div class="alert alert-success">
+      <i class="bi bi-check-circle me-2"></i>
+      This reagent is accessible to all users
+    </div>
+  } @else {
+    <div class="alert alert-warning">
+      <i class="bi bi-lock me-2"></i>
+      This reagent is private and only accessible to you
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || loading()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    }
+    Save Changes
+  </button>
+</div>

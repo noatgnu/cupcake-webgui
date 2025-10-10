@@ -1,0 +1,173 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-wrench me-2"></i>
+    {{ isEdit ? 'Edit' : 'New' }} Maintenance Log
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  @if (!isEdit && showTemplateSelector()) {
+    <div class="card mb-3 bg-light">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+          <i class="bi bi-bookmark me-2"></i>Use Template
+        </h6>
+        @if (templates().length > 0) {
+          <button type="button" class="btn-close" (click)="showTemplateSelector.set(false)" aria-label="Close"></button>
+        }
+      </div>
+      <div class="card-body">
+        @if (loadingTemplates()) {
+          <div class="text-center p-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+              <span class="visually-hidden">Loading templates...</span>
+            </div>
+          </div>
+        } @else if (filteredTemplates().length === 0 && !templateSearch) {
+          <p class="text-muted mb-0 text-center">
+            <i class="bi bi-info-circle me-2"></i>No templates available. Save this log as a template for future use.
+          </p>
+        } @else {
+          <div class="mb-2">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              placeholder="Search templates..."
+              [(ngModel)]="templateSearch"
+              (ngModelChange)="onTemplateSearchChange()"
+              name="templateSearch">
+          </div>
+          @if (filteredTemplates().length === 0) {
+            <p class="text-muted mb-0 text-center small">No templates match your search</p>
+          } @else {
+            <div class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+              @for (template of filteredTemplates(); track template.id) {
+                <button
+                  type="button"
+                  class="list-group-item list-group-item-action text-start"
+                  (click)="applyTemplate(template)">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-primary">{{ template.maintenanceTypeDisplay }}</span>
+                      </div>
+                      @if (template.maintenanceDescription) {
+                        <small class="d-block text-truncate">{{ template.maintenanceDescription }}</small>
+                      }
+                    </div>
+                    <i class="bi bi-chevron-right"></i>
+                  </div>
+                </button>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (!isEdit && !showTemplateSelector() && templates().length > 0) {
+    <div class="alert alert-info d-flex justify-content-between align-items-center mb-3">
+      <span>
+        <i class="bi bi-bookmark me-2"></i>Template applied
+      </span>
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="clearTemplate()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Choose Different Template
+      </button>
+    </div>
+  }
+
+  <form>
+    <div class="mb-3">
+      <label for="maintenanceDate" class="form-label">Maintenance Date <span class="text-danger">*</span></label>
+      <input
+        type="date"
+        class="form-control"
+        id="maintenanceDate"
+        [(ngModel)]="maintenanceDate"
+        name="maintenanceDate"
+        required>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="maintenanceType" class="form-label">Type <span class="text-danger">*</span></label>
+        <select
+          class="form-select"
+          id="maintenanceType"
+          [(ngModel)]="maintenanceType"
+          name="maintenanceType"
+          required>
+          @for (type of maintenanceTypes; track type) {
+            <option [value]="type">{{ maintenanceTypeLabels[type] }}</option>
+          }
+        </select>
+      </div>
+
+      @if (isEdit) {
+        <div class="col-md-6 mb-3">
+          <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
+          <select
+            class="form-select"
+            id="status"
+            [(ngModel)]="status"
+            name="status"
+            required>
+            @for (statusValue of statuses; track statusValue) {
+              <option [value]="statusValue">{{ statusLabels[statusValue] }}</option>
+            }
+          </select>
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label for="maintenanceDescription" class="form-label">Description</label>
+      <textarea
+        class="form-control"
+        id="maintenanceDescription"
+        [(ngModel)]="maintenanceDescription"
+        name="maintenanceDescription"
+        placeholder="Describe the maintenance performed"
+        rows="4"></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label for="maintenanceNotes" class="form-label">Notes</label>
+      <textarea
+        class="form-control"
+        id="maintenanceNotes"
+        [(ngModel)]="maintenanceNotes"
+        name="maintenanceNotes"
+        placeholder="Additional notes or observations"
+        rows="3"></textarea>
+    </div>
+
+    <div class="form-check form-switch">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="isTemplate"
+        [(ngModel)]="isTemplate"
+        name="isTemplate">
+      <label class="form-check-label" for="isTemplate">
+        <i class="bi bi-bookmark me-1"></i>
+        Save as Template
+      </label>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" (click)="cancel()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    <i class="bi bi-check-circle me-2"></i>
+    {{ isEdit ? 'Update' : 'Create' }}
+  </button>
+</div>

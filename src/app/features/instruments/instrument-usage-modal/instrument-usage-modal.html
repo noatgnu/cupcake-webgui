@@ -1,0 +1,74 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-calendar-plus me-2"></i>
+    {{ isEdit ? 'Edit' : 'Create' }} Instrument Booking
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <label class="form-label fw-bold">Instrument</label>
+    <p class="form-control-plaintext">{{ instrument.instrumentName }}</p>
+  </div>
+
+  <div class="mb-3">
+    <label for="timeStarted" class="form-label">Start Time <span class="text-danger">*</span></label>
+    <input
+      type="datetime-local"
+      class="form-control"
+      id="timeStarted"
+      [(ngModel)]="timeStarted"
+      name="timeStarted"
+      required>
+  </div>
+
+  <div class="mb-3">
+    <label for="timeEnded" class="form-label">End Time</label>
+    <input
+      type="datetime-local"
+      class="form-control"
+      id="timeEnded"
+      [(ngModel)]="timeEnded"
+      name="timeEnded">
+    <small class="form-text text-muted">Leave empty if booking is still in progress</small>
+  </div>
+
+  <div class="mb-3">
+    <label for="description" class="form-label">Description</label>
+    <textarea
+      class="form-control"
+      id="description"
+      [(ngModel)]="description"
+      name="description"
+      rows="3"
+      placeholder="Enter booking description or notes"></textarea>
+  </div>
+
+  <div class="mb-3">
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="maintenance"
+        [(ngModel)]="maintenance"
+        name="maintenance">
+      <label class="form-check-label" for="maintenance">
+        This is a maintenance booking
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    <i class="bi bi-check-circle me-2"></i>
+    {{ isEdit ? 'Update' : 'Create' }} Booking
+  </button>
+</div>

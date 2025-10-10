@@ -1,0 +1,138 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-person-vcard me-2"></i>
+    @if (isView) {
+      View Contact
+    } @else if (isEdit) {
+      Edit Contact
+    } @else {
+      Create Contact
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  <form>
+    <div class="mb-3">
+      <label for="contactName" class="form-label">Contact Name <span class="text-danger">*</span></label>
+      <input
+        type="text"
+        class="form-control"
+        id="contactName"
+        [(ngModel)]="contactName"
+        name="contactName"
+        [disabled]="isView"
+        placeholder="Enter contact name"
+        required>
+    </div>
+
+    <div class="mb-3">
+      <h6 class="mb-3">Contact Details</h6>
+
+      @if (contactDetails().length > 0) {
+        <div class="list-group mb-3">
+          @for (detail of contactDetails(); track detail.id) {
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center mb-1">
+                    <i class="bi {{ getContactTypeIcon(detail.contactType) }} me-2"></i>
+                    <strong>{{ detail.contactMethodAltName }}</strong>
+                    <span class="badge bg-secondary ms-2">{{ getContactTypeLabel(detail.contactType) }}</span>
+                  </div>
+                  <div class="text-muted small">{{ detail.contactValue }}</div>
+                </div>
+                @if (!isView) {
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    (click)="removeContactDetail(detail)"
+                    [disabled]="saving()"
+                    title="Remove">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          No contact details added yet.
+        </div>
+      }
+
+      @if (!isView) {
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-plus-circle me-2"></i>
+              Add Contact Detail
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="newDetailType" class="form-label">Type</label>
+                <select
+                  class="form-select"
+                  id="newDetailType"
+                  [(ngModel)]="newDetailType"
+                  name="newDetailType">
+                  @for (type of contactTypes; track type) {
+                    <option [value]="type">{{ getContactTypeLabel(type) }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="newDetailName" class="form-label">Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="newDetailName"
+                  [(ngModel)]="newDetailName"
+                  name="newDetailName"
+                  placeholder="e.g., Work Email, Mobile">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="newDetailValue" class="form-label">Value</label>
+              <input
+                type="text"
+                class="form-control"
+                id="newDetailValue"
+                [(ngModel)]="newDetailValue"
+                name="newDetailValue"
+                placeholder="Enter contact value">
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              (click)="addContactDetail()"
+              [disabled]="saving() || !newDetailName || !newDetailValue">
+              <i class="bi bi-plus-circle me-2"></i>
+              Add Detail
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" (click)="cancel()" [disabled]="saving()">
+    {{ isView ? 'Close' : 'Cancel' }}
+  </button>
+  @if (!isView) {
+    <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || !contactName">
+      @if (saving()) {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      }
+      <i class="bi bi-check-circle me-2"></i>
+      {{ isEdit ? 'Update' : 'Create' }}
+    </button>
+  }
+</div>

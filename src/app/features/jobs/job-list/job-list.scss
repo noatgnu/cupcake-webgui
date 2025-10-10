@@ -1,0 +1,85 @@
+.jobs-layout {
+  min-height: 0;
+}
+
+.jobs-panel-left {
+  flex: 0 0 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .card-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+}
+
+.jobs-panel-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .card-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+}
+
+.job-list-item {
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  &.active {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-left: 3px solid #0d6efd;
+  }
+}
+
+.empty-state {
+  padding: 4rem 2rem;
+
+  i {
+    font-size: 4rem;
+    opacity: 0.3;
+  }
+
+  h5 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+}
+
+.empty-state-small {
+  padding: 2rem 1rem;
+
+  i {
+    font-size: 3rem;
+    opacity: 0.3;
+  }
+}
+
+.detail-content {
+  .border-top {
+    border-top: 1px solid rgba(0, 0, 0, 0.125) !important;
+  }
+}

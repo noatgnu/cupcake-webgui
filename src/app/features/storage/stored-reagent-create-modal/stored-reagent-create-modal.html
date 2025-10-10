@@ -1,0 +1,234 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-flask me-2"></i>
+    Add Stored Reagent
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="alert alert-info d-flex align-items-center">
+    <i class="bi bi-info-circle me-2"></i>
+    <div>Add a reagent to <strong>{{ storageObject.objectName }}</strong></div>
+  </div>
+
+  <form>
+    <!-- Reagent Information -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header border-bottom">
+        <h6 class="mb-0"><i class="bi bi-flask me-2"></i>Reagent Information</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="reagentName" class="form-label">Reagent Name <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input
+              [resultTemplate]="rt"
+              (selectItem)="onSelectReagent($event)"
+              id="reagentName"
+              type="search"
+              class="form-control"
+              [(ngModel)]="reagentName"
+              name="reagentName"
+              [ngbTypeahead]="search"
+              [inputFormatter]="formatIngredient"
+              [resultFormatter]="resultFormatter"
+              [disabled]="saving()"
+              placeholder="Search for reagent or enter new name"
+              required
+            />
+          </div>
+          <ng-template #rt let-r="result" let-t="term">
+            <ngb-highlight [result]="r.name + (r.unit ? ' (' + r.unit + ')' : '')" [term]="t"></ngb-highlight>
+          </ng-template>
+          <div class="form-text">Start typing to search existing reagents, or enter a new reagent name</div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+            <input
+              type="number"
+              id="quantity"
+              class="form-control"
+              [(ngModel)]="quantity"
+              name="quantity"
+              [disabled]="saving()"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div class="col-md-6">
+            <label for="reagentUnit" class="form-label">Unit <span class="text-danger">*</span></label>
+            <select id="reagentUnit" class="form-select" [(ngModel)]="reagentUnit" name="reagentUnit" [disabled]="saving()" required>
+              <option value="">Select unit</option>
+              <optgroup label="Volume">
+                <option value="nL">nL</option>
+                <option value="uL">uL</option>
+                <option value="mL">mL</option>
+                <option value="L">L</option>
+              </optgroup>
+              <optgroup label="Mass">
+                <option value="ng">ng</option>
+                <option value="ug">ug</option>
+                <option value="mg">mg</option>
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+              </optgroup>
+              <optgroup label="Mole">
+                <option value="nM">nM</option>
+                <option value="uM">uM</option>
+                <option value="mM">mM</option>
+                <option value="M">M</option>
+              </optgroup>
+              <optgroup label="Count">
+                <option value="ea">ea</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="pieces">pieces</option>
+                <option value="other">other</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional Details -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header border-bottom">
+        <h6 class="mb-0"><i class="bi bi-pencil me-2"></i>Additional Details</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <app-barcode-input
+            [(barcode)]="barcode"
+            [disabled]="saving()"
+            label="Barcode">
+          </app-barcode-input>
+        </div>
+
+        <div class="mb-3">
+          <label for="notes" class="form-label">Notes</label>
+          <textarea
+            class="form-control"
+            id="notes"
+            [(ngModel)]="notes"
+            name="notes"
+            [disabled]="saving()"
+            rows="3"
+            placeholder="Add any additional details about this item"></textarea>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="expirationDate" class="form-label">Expiration Date</label>
+            <input
+              type="date"
+              class="form-control"
+              id="expirationDate"
+              [(ngModel)]="expirationDate"
+              name="expirationDate"
+              [disabled]="saving()">
+          </div>
+
+          <div class="col-md-6">
+            <label for="lowStockThreshold" class="form-label">Low Stock Threshold</label>
+            <input
+              type="number"
+              class="form-control"
+              id="lowStockThreshold"
+              [(ngModel)]="lowStockThreshold"
+              name="lowStockThreshold"
+              [disabled]="saving()"
+              min="0"
+              step="0.01"
+              placeholder="Alert threshold">
+          </div>
+        </div>
+
+        <div class="form-check mt-3">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="notifyOnLowStock"
+            [(ngModel)]="notifyOnLowStock"
+            name="notifyOnLowStock"
+            [disabled]="saving()">
+          <label class="form-check-label" for="notifyOnLowStock">
+            Notify on low stock
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Upload -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header border-bottom">
+        <h6 class="mb-0"><i class="bi bi-image me-2"></i>Image</h6>
+      </div>
+      <div class="card-body">
+        <app-image-upload
+          label="Reagent Image"
+          [maxWidth]="800"
+          [maxHeight]="800"
+          (imageChange)="onImageChange($event)"
+          (imageCleared)="onImageCleared()">
+        </app-image-upload>
+      </div>
+    </div>
+
+    <!-- Access Settings -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header border-bottom">
+        <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Access Controls</h6>
+      </div>
+      <div class="card-body">
+        <div class="d-flex gap-4">
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="shareable"
+              [(ngModel)]="shareable"
+              name="shareable"
+              [disabled]="saving()">
+            <label class="form-check-label" for="shareable">
+              <i class="bi bi-share me-1"></i>Shareable
+            </label>
+          </div>
+
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="accessAll"
+              [(ngModel)]="accessAll"
+              name="accessAll"
+              [disabled]="saving()">
+            <label class="form-check-label" for="accessAll">
+              <i class="bi bi-people me-1"></i>Allow Everyone to Access
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+    <i class="bi bi-x-circle me-1"></i>Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || !reagentName || !reagentUnit || quantity <= 0">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    } @else {
+      <i class="bi bi-plus-circle me-1"></i>
+    }
+    Add Reagent
+  </button>
+</div>

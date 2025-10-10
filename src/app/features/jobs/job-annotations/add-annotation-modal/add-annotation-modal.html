@@ -1,0 +1,214 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi" [class.bi-chat-left-text]="!isStaffAnnotation" [class.bi-shield-lock]="isStaffAnnotation" [class.me-2]="true"></i>
+    {{ modalTitle }}
+  </h5>
+  <button type="button" class="btn-close" aria-label="Close" (click)="cancel()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="btn-group w-100" role="group">
+      <input type="radio" class="btn-check" name="annotationMode" id="modeText" value="text" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeText">
+        <i class="bi bi-chat-text me-1"></i>Text
+      </label>
+
+      <input type="radio" class="btn-check" name="annotationMode" id="modeUpload" value="upload" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeUpload">
+        <i class="bi bi-cloud-upload me-1"></i>Upload
+      </label>
+
+      <input type="radio" class="btn-check" name="annotationMode" id="modeRecord" value="record" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeRecord">
+        <i class="bi bi-record-circle me-1"></i>Record
+      </label>
+
+      @if (isStaffAnnotation) {
+        <input type="radio" class="btn-check" name="annotationMode" id="modeBook" value="book" [(ngModel)]="annotationMode">
+        <label class="btn btn-outline-primary" for="modeBook">
+          <i class="bi bi-calendar-check me-1"></i>Book
+        </label>
+      }
+
+      <input type="radio" class="btn-check" name="annotationMode" id="modeCalculator" value="calculator" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeCalculator">
+        <i class="bi bi-calculator me-1"></i>Calc
+      </label>
+
+      <input type="radio" class="btn-check" name="annotationMode" id="modeMolarity" value="molarity" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeMolarity">
+        <i class="bi bi-calculator-fill me-1"></i>Molarity
+      </label>
+    </div>
+  </div>
+
+  @if (annotationMode === 'text') {
+    <div class="mb-3">
+      <label for="textAnnotation" class="form-label">Annotation Text</label>
+      <textarea
+        class="form-control"
+        id="textAnnotation"
+        rows="8"
+        [(ngModel)]="annotationText"
+        placeholder="Enter your annotation text here..."
+        required></textarea>
+      <div class="form-text">
+        Add notes, observations, or any relevant information about this job
+      </div>
+    </div>
+  } @else if (annotationMode === 'upload') {
+    <div class="mb-3">
+      <label for="annotationFile" class="form-label">Select File</label>
+      <input
+        type="file"
+        class="form-control"
+        id="annotationFile"
+        (change)="onFileSelected($event)">
+      @if (selectedFile()) {
+        <div class="mt-2 d-flex align-items-center justify-content-between">
+          <div class="small text-muted">
+            <i class="bi bi-file-earmark me-1"></i>
+            {{ selectedFile()!.name }} ({{ (selectedFile()!.size / 1024 / 1024).toFixed(2) }} MB)
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearFile()">
+            <i class="bi bi-x-circle me-1"></i>Clear
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label for="annotationType" class="form-label">Annotation Type</label>
+      <select
+        class="form-select"
+        id="annotationType"
+        [(ngModel)]="selectedAnnotationType">
+        <option [value]="AnnotationType.Image">Image</option>
+        <option [value]="AnnotationType.Video">Video</option>
+        <option [value]="AnnotationType.Audio">Audio</option>
+        <option [value]="AnnotationType.File">File</option>
+        <option [value]="AnnotationType.Text">Text</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="annotationText" class="form-label">Annotation Text (Optional)</label>
+      <textarea
+        class="form-control"
+        id="annotationText"
+        rows="3"
+        [(ngModel)]="annotationText"
+        placeholder="Add notes or description for this annotation"></textarea>
+    </div>
+
+    @if (hasAudio()) {
+      <div class="mb-3">
+        <div class="card bg-light">
+          <div class="card-body">
+            <div class="form-check form-switch">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="autoTranscribe"
+                [(ngModel)]="autoTranscribe">
+              <label class="form-check-label" for="autoTranscribe">
+                <i class="bi bi-mic-fill me-1"></i>
+                <strong>Auto-transcribe audio</strong>
+              </label>
+            </div>
+            <small class="text-muted d-block mt-2">
+              @if (autoTranscribe) {
+                <i class="bi bi-check-circle text-success me-1"></i>
+                Automatically generate transcript and translation from audio/video content
+              } @else {
+                <i class="bi bi-x-circle text-warning me-1"></i>
+                Transcription will be skipped - you can manually transcribe later if needed
+              }
+            </small>
+          </div>
+        </div>
+      </div>
+    }
+  } @else if (annotationMode === 'record') {
+    <app-media-recorder-annotation
+      (recordingComplete)="onRecordingComplete($event)"
+      (cancelled)="onRecordingCancelled()">
+    </app-media-recorder-annotation>
+
+    @if (selectedFile()) {
+      <div class="alert alert-info d-flex align-items-center justify-content-between mt-3">
+        <div>
+          <i class="bi bi-file-earmark me-1"></i>
+          <strong>Recording ready:</strong> {{ selectedFile()!.name }}
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearFile()">
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </button>
+      </div>
+    }
+
+    <div class="mb-3 mt-3">
+      <label for="annotationTextRecord" class="form-label">Annotation Text (Optional)</label>
+      <textarea
+        class="form-control"
+        id="annotationTextRecord"
+        rows="3"
+        [(ngModel)]="annotationText"
+        placeholder="Add notes or description for this recording"></textarea>
+    </div>
+
+    @if (hasAudio()) {
+      <div class="mb-3">
+        <div class="card bg-light">
+          <div class="card-body">
+            <div class="form-check form-switch">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="autoTranscribeRecord"
+                [(ngModel)]="autoTranscribe">
+              <label class="form-check-label" for="autoTranscribeRecord">
+                <i class="bi bi-mic-fill me-1"></i>
+                <strong>Auto-transcribe audio</strong>
+              </label>
+            </div>
+            <small class="text-muted d-block mt-2">
+              @if (autoTranscribe) {
+                <i class="bi bi-check-circle text-success me-1"></i>
+                Automatically generate transcript and translation from recorded content
+              } @else {
+                <i class="bi bi-x-circle text-warning me-1"></i>
+                Transcription will be skipped - you can manually transcribe later if needed
+              }
+            </small>
+          </div>
+        </div>
+      </div>
+    }
+  } @else if (annotationMode === 'book') {
+    <app-instrument-booking-annotation
+      (cancelled)="onBookingCancelled()">
+    </app-instrument-booking-annotation>
+  } @else if (annotationMode === 'calculator') {
+    <app-calculator-annotation></app-calculator-annotation>
+  } @else if (annotationMode === 'molarity') {
+    <app-molarity-calculator-annotation></app-molarity-calculator-annotation>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" (click)="cancel()">
+    <i class="bi bi-x-circle me-1"></i>
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn"
+    [class.btn-primary]="!isStaffAnnotation"
+    [class.btn-warning]="isStaffAnnotation"
+    (click)="save()">
+    <i class="bi bi-check-circle me-1"></i>
+    Save
+  </button>
+</div>

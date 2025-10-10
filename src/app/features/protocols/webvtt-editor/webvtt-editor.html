@@ -1,0 +1,114 @@
+<div class="webvtt-editor">
+  @if (mediaUrl) {
+    <div class="media-player mb-3">
+      @if (mediaUrl.includes('audio') || mediaUrl.includes('.mp3') || mediaUrl.includes('.wav')) {
+        <audio
+          [src]="mediaUrl"
+          controls
+          class="w-100"
+          (timeupdate)="onTimeUpdate($event)"
+          (play)="onPlayStateChange($event)"
+          (pause)="onPlayStateChange($event)">
+        </audio>
+      } @else {
+        <video
+          [src]="mediaUrl"
+          controls
+          class="w-100"
+          style="max-height: 400px;"
+          (timeupdate)="onTimeUpdate($event)"
+          (play)="onPlayStateChange($event)"
+          (pause)="onPlayStateChange($event)">
+        </video>
+      }
+    </div>
+  }
+
+  @if (editable) {
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted">{{ cues().length }} captions</small>
+      <button class="btn btn-sm btn-primary" (click)="addCue()">
+        <i class="bi bi-plus-circle me-1"></i>
+        Add Caption
+      </button>
+    </div>
+  }
+
+  @if (cues().length === 0) {
+    <div class="alert alert-info mb-0">
+      <i class="bi bi-info-circle me-2"></i>
+      No captions available
+    </div>
+  } @else {
+    <div class="cues-list">
+      @for (cue of cues(); track cue.id) {
+        @if (editingCueId() === cue.id) {
+          <div class="cue-item editing p-2 mb-2 border rounded">
+            <div class="row g-2 mb-2">
+              <div class="col-md-6">
+                <label class="form-label small">Start Time</label>
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  [value]="formatTimestamp(cue.startTime)"
+                  (change)="updateCueTime(cue.id, 'startTime', $any($event.target).value)">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">End Time</label>
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  [value]="formatTimestamp(cue.endTime)"
+                  (change)="updateCueTime(cue.id, 'endTime', $any($event.target).value)">
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Text</label>
+              <textarea
+                class="form-control form-control-sm"
+                rows="3"
+                [value]="cue.text"
+                (input)="updateCueText(cue.id, $any($event.target).value)"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-success" (click)="saveCue(cue)">
+                <i class="bi bi-check-circle me-1"></i>Save
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()">
+                Cancel
+              </button>
+              <button class="btn btn-sm btn-outline-danger ms-auto" (click)="deleteCue(cue.id)">
+                <i class="bi bi-trash me-1"></i>Delete
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="cue-item p-2 mb-1" [class.active]="isActive(cue)" [class.border-start]="!editable" [class.border-3]="!editable">
+            @if (editable) {
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  (click)="seekTo(cue.startTime)"
+                  title="Jump to this caption">
+                  <i class="bi bi-play-circle me-1"></i>
+                  {{ formatTimestamp(cue.startTime) }} → {{ formatTimestamp(cue.endTime) }}
+                </button>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-secondary" (click)="editCue(cue.id)" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-outline-danger" (click)="deleteCue(cue.id)" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <small class="text-muted d-block mb-1">{{ formatTimestamp(cue.startTime) }} → {{ formatTimestamp(cue.endTime) }}</small>
+            }
+            <div class="cue-text">{{ cue.text }}</div>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,44 @@
+.sidebar-content {
+  background: var(--surface-primary);
+
+  &.collapsed {
+    .sidebar-logo {
+      margin: 0 auto;
+    }
+  }
+}
+
+.sidebar-header {
+  background: var(--surface-primary);
+}
+
+.sidebar-nav {
+  .nav-link {
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+
+    &:hover {
+      background: var(--surface-tertiary);
+      color: var(--brand-primary);
+    }
+
+    &.active {
+      background: var(--brand-primary);
+      color: white;
+
+      i {
+        color: white;
+      }
+    }
+
+    i {
+      color: var(--text-secondary);
+      transition: color 0.2s ease;
+    }
+  }
+}
+
+.sidebar-footer {
+  background: var(--surface-tertiary);
+}

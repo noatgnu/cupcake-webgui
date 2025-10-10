@@ -1,0 +1,102 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-person-lines-fill me-2"></i>
+    Manage Contacts
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="d-flex gap-2">
+      <div class="flex-grow-1">
+        <input
+          type="text"
+          class="form-control"
+          [(ngModel)]="searchQuery"
+          (keyup.enter)="searchContacts()"
+          placeholder="Search contacts...">
+      </div>
+      <button class="btn btn-outline-secondary" (click)="searchContacts()">
+        <i class="bi bi-search"></i>
+        Search
+      </button>
+      <button class="btn btn-primary" (click)="openContactModal('create')">
+        <i class="bi bi-plus-circle me-1"></i>
+        Add Contact
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center p-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else if (contacts().length === 0) {
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      No contacts found. Click "Add Contact" to create one.
+    </div>
+  } @else {
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Contact Details</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (contact of contacts(); track contact.id) {
+            <tr>
+              <td>
+                <strong>{{ contact.contactName }}</strong>
+              </td>
+              <td>
+                @if (contact.contactDetails && contact.contactDetails.length > 0) {
+                  <span class="badge bg-info">{{ contact.contactDetails.length }} details</span>
+                } @else {
+                  <span class="text-muted">No details</span>
+                }
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    (click)="openContactModal('view', contact)"
+                    title="View">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    (click)="openContactModal('edit', contact)"
+                    title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger"
+                    (click)="deleteContact(contact)"
+                    title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()">
+    Close
+  </button>
+</div>

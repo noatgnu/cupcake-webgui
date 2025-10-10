@@ -1,0 +1,408 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="mb-0">
+    <i class="bi bi-calculator-fill me-2"></i>Molarity Calculator
+  </h6>
+  <div class="btn-group btn-group-sm">
+    <button
+      type="button"
+      class="btn btn-outline-secondary dropdown-toggle"
+      data-bs-toggle="dropdown">
+      <i class="bi bi-gear"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><h6 class="dropdown-header">History</h6></li>
+      <li>
+        <button
+          class="dropdown-item"
+          (click)="exportHistory()"
+          [disabled]="dataLog().length === 0">
+          <i class="bi bi-download me-2"></i>Export History
+        </button>
+      </li>
+      <li>
+        <button
+          class="dropdown-item"
+          (click)="clearHistory()"
+          [disabled]="dataLog().length === 0">
+          <i class="bi bi-trash me-2"></i>Clear History
+        </button>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="mb-3">
+  <label class="form-label">Calculation Mode</label>
+  <select
+    class="form-select"
+    [(ngModel)]="$any(selectedForm)"
+    (ngModelChange)="clearForm()">
+    <option value="dynamic">Dynamic (Solve for any variable)</option>
+    <option value="massFromVolumeAndConcentration">Calculate Mass</option>
+    <option value="volumeFromMassAndConcentration">Calculate Volume</option>
+    <option value="concentrationFromMassAndVolume">Calculate Concentration</option>
+    <option value="volumeFromStockVolumeAndConcentration">Dilution (C1V1=C2V2)</option>
+  </select>
+</div>
+
+    @if (selectedForm() === 'dynamic') {
+      <div class="alert alert-info small mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Fill any 3 fields to calculate the 4th. ({{ filledFieldsCount() }}/4 filled)
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Concentration</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(concentration)"
+            placeholder="Enter concentration">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(concentrationUnit)">
+            @for (unit of molarityUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Volume</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(volume)"
+            placeholder="Enter volume">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(volumeUnit)">
+            @for (unit of volumeUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label small">Molecular Weight (g/mol)</label>
+        <input
+          type="number"
+          class="form-control"
+          [(ngModel)]="$any(molecularWeight)"
+          placeholder="Enter molecular weight">
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-8">
+          <label class="form-label small">Mass</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(weight)"
+            placeholder="Enter mass">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(weightUnit)">
+            @for (unit of massUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mb-2"
+        (click)="calculateDynamic()"
+        [disabled]="filledFieldsCount() < 3">
+        <i class="bi bi-calculator me-1"></i>Calculate
+      </button>
+    }
+
+    @if (selectedForm() === 'massFromVolumeAndConcentration') {
+      <div class="alert alert-info small mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Calculate mass from concentration, volume, and molecular weight
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Concentration</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(concentration)"
+            placeholder="Enter concentration">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(concentrationUnit)">
+            @for (unit of molarityUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Volume</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(volume)"
+            placeholder="Enter volume">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(volumeUnit)">
+            @for (unit of volumeUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small">Molecular Weight (g/mol)</label>
+        <input
+          type="number"
+          class="form-control"
+          [(ngModel)]="$any(molecularWeight)"
+          placeholder="Enter molecular weight">
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mb-2"
+        (click)="calculateMassFromVolumeAndConcentration()"
+        [disabled]="!concentration() || !volume() || !molecularWeight()">
+        <i class="bi bi-calculator me-1"></i>Calculate Mass
+      </button>
+    }
+
+    @if (selectedForm() === 'volumeFromMassAndConcentration') {
+      <div class="alert alert-info small mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Calculate volume from mass, concentration, and molecular weight
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Mass</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(weight)"
+            placeholder="Enter mass">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(weightUnit)">
+            @for (unit of massUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Concentration</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(concentration)"
+            placeholder="Enter concentration">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(concentrationUnit)">
+            @for (unit of molarityUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small">Molecular Weight (g/mol)</label>
+        <input
+          type="number"
+          class="form-control"
+          [(ngModel)]="$any(molecularWeight)"
+          placeholder="Enter molecular weight">
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mb-2"
+        (click)="calculateVolumeFromMassAndConcentration()"
+        [disabled]="!weight() || !concentration() || !molecularWeight()">
+        <i class="bi bi-calculator me-1"></i>Calculate Volume
+      </button>
+    }
+
+    @if (selectedForm() === 'concentrationFromMassAndVolume') {
+      <div class="alert alert-info small mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Calculate concentration from mass, volume, and molecular weight
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Mass</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(weight)"
+            placeholder="Enter mass">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(weightUnit)">
+            @for (unit of massUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Volume</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(volume)"
+            placeholder="Enter volume">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(volumeUnit)">
+            @for (unit of volumeUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small">Molecular Weight (g/mol)</label>
+        <input
+          type="number"
+          class="form-control"
+          [(ngModel)]="$any(molecularWeight)"
+          placeholder="Enter molecular weight">
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mb-2"
+        (click)="calculateConcentrationFromMassAndVolume()"
+        [disabled]="!weight() || !volume() || !molecularWeight()">
+        <i class="bi bi-calculator me-1"></i>Calculate Concentration
+      </button>
+    }
+
+    @if (selectedForm() === 'volumeFromStockVolumeAndConcentration') {
+      <div class="alert alert-info small mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Calculate final volume using C1V1 = C2V2 dilution formula
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Stock Concentration (C1)</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(stockConcentration)"
+            placeholder="Enter stock concentration">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(stockConcentrationUnit)">
+            @for (unit of molarityUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-8">
+          <label class="form-label small">Stock Volume (V1)</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(stockVolume)"
+            placeholder="Enter stock volume">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(stockVolumeUnit)">
+            @for (unit of volumeUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-8">
+          <label class="form-label small">Target Concentration (C2)</label>
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(targetConcentration)"
+            placeholder="Enter target concentration">
+        </div>
+        <div class="col-4">
+          <label class="form-label small">Unit</label>
+          <select class="form-select" [(ngModel)]="$any(targetConcentrationUnit)">
+            @for (unit of molarityUnits; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mb-2"
+        (click)="calculateVolumeFromStockVolumeAndConcentration()"
+        [disabled]="!stockConcentration() || !targetConcentration() || !stockVolume()">
+        <i class="bi bi-calculator me-1"></i>Calculate Final Volume (V2)
+      </button>
+    }
+
+    @if (visibleHistory().length > 0) {
+      <div class="mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">
+            <i class="bi bi-clock-history me-2"></i>History ({{ dataLog().length }})
+          </h6>
+        </div>
+        <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+          @for (entry of visibleHistory(); track trackByHistoryId($index, entry)) {
+            <div class="list-group-item list-group-item-action p-2">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <div class="small text-muted">{{ getOperationName(entry.operationType) }}</div>
+                  <div class="fw-bold">Result: {{ formatNumber(entry.result) }} {{ getResultUnit(entry) }}</div>
+                  <small class="text-muted">{{ formatTimestamp(entry.timestamp) }}</small>
+                </div>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  (click)="removeHistoryItem(entry)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }

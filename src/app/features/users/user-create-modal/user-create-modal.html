@@ -1,0 +1,143 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-person-plus me-2"></i>
+    Create User
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" [disabled]="saving"></button>
+</div>
+
+<div class="modal-body">
+  <form>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+        <input
+          type="text"
+          class="form-control"
+          id="username"
+          [(ngModel)]="username"
+          name="username"
+          [disabled]="saving"
+          required>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+        <input
+          type="email"
+          class="form-control"
+          id="email"
+          [(ngModel)]="email"
+          name="email"
+          [disabled]="saving"
+          required>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="firstName" class="form-label">First Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="firstName"
+          [(ngModel)]="firstName"
+          name="firstName"
+          [disabled]="saving">
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="lastName" class="form-label">Last Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="lastName"
+          [(ngModel)]="lastName"
+          name="lastName"
+          [disabled]="saving">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+        <input
+          type="password"
+          class="form-control"
+          id="password"
+          [(ngModel)]="password"
+          name="password"
+          [disabled]="saving"
+          required>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="passwordConfirm" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+        <input
+          type="password"
+          class="form-control"
+          id="passwordConfirm"
+          [(ngModel)]="passwordConfirm"
+          name="passwordConfirm"
+          [disabled]="saving"
+          required>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Permissions</label>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="isActive"
+          [(ngModel)]="isActive"
+          name="isActive"
+          [disabled]="saving">
+        <label class="form-check-label" for="isActive">
+          Active
+        </label>
+      </div>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="isStaff"
+          [(ngModel)]="isStaff"
+          name="isStaff"
+          [disabled]="saving">
+        <label class="form-check-label" for="isStaff">
+          Staff
+        </label>
+      </div>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="isSuperuser"
+          [(ngModel)]="isSuperuser"
+          name="isSuperuser"
+          [disabled]="saving">
+        <label class="form-check-label" for="isSuperuser">
+          Superuser
+        </label>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="saving">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="save()"
+    [disabled]="saving || !username.trim() || !email.trim() || !password || !passwordConfirm">
+    @if (saving) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    }
+    Create User
+  </button>
+</div>

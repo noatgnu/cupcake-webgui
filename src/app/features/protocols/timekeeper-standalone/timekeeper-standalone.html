@@ -1,0 +1,537 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <div class="timekeeper-header flex-shrink-0">
+    <div class="p-3 pb-2">
+      <h2 class="mb-0">
+        <i class="bi bi-stopwatch me-2"></i>Timers
+      </h2>
+    </div>
+
+    <div class="toolbar px-3 pb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="btn-group" role="group">
+          <button
+            type="button"
+            class="btn"
+            [class.btn-primary]="filterType() === 'all'"
+            [class.btn-outline-primary]="filterType() !== 'all'"
+            (click)="setFilter('all')">
+            All ({{ timekeepers().length }})
+          </button>
+          <button
+            type="button"
+            class="btn"
+            [class.btn-primary]="filterType() === 'standalone'"
+            [class.btn-outline-primary]="filterType() !== 'standalone'"
+            (click)="setFilter('standalone')">
+            <i class="bi bi-stopwatch me-1"></i>
+            Standalone ({{ standaloneCount() }})
+          </button>
+          <button
+            type="button"
+            class="btn"
+            [class.btn-primary]="filterType() === 'session'"
+            [class.btn-outline-primary]="filterType() !== 'session'"
+            (click)="setFilter('session')">
+            <i class="bi bi-play-circle me-1"></i>
+            Session ({{ sessionCount() }})
+          </button>
+        </div>
+        <button class="btn btn-primary" (click)="showCreateForm.set(true)">
+          <i class="bi bi-plus-circle me-2"></i>
+          New Timer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="timekeeper-content flex-grow-1 p-3" style="min-height: 0;">
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      <div class="timekeeper-layout d-flex gap-3 h-100">
+        <div class="timekeeper-panel-left">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Timers List
+              </h6>
+            </div>
+            <div class="card-body">
+              @if (filteredTimekeepers().length === 0) {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-stopwatch fs-2 mb-2 d-block"></i>
+                  @if (filterType() === 'all') {
+                    <small>No timers. Click "New Timer" to create one.</small>
+                  } @else {
+                    <small>No {{ filterType() }} timers found</small>
+                  }
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (tk of filteredTimekeepers(); track tk.id) {
+                    <div
+                      class="list-group-item timer-list-item"
+                      [class.active]="selectedTimer()?.id === tk.id"
+                      (click)="selectTimer(tk)"
+                      role="button">
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold mb-1">
+                            @if (tk.session || tk.step) {
+                              <i class="bi bi-play-circle me-2"></i>
+                            } @else {
+                              <i class="bi bi-stopwatch me-2"></i>
+                            }
+                            {{ tk.name || 'Timer #' + tk.id }}
+                          </div>
+                          @if (tk.sessionName) {
+                            <small class="text-muted d-block">
+                              <i class="bi bi-folder me-1"></i>{{ tk.sessionName }}
+                            </small>
+                          }
+                          @if (tk.stepDescription) {
+                            <small class="text-muted d-block">
+                              <i class="bi bi-list-ol me-1"></i>{{ tk.stepDescription.substring(0, 40) }}{{ tk.stepDescription.length > 40 ? '...' : '' }}
+                            </small>
+                          }
+                        </div>
+                      </div>
+
+                      @if (timer.timeKeeper[tk.id.toString()]) {
+                        <div class="timer-compact text-center mb-2">
+                          <div class="fw-bold timer-time">
+                            {{ timer.convertTime(timer.timeKeeper[tk.id.toString()].current) }}
+                          </div>
+                          <div class="progress mt-1" style="height: 4px;">
+                            <div
+                              class="progress-bar"
+                              [class.bg-info]="timer.getProgressType(tk.id) === 'info'"
+                              [class.bg-primary]="timer.getProgressType(tk.id) === 'primary'"
+                              [class.bg-warning]="timer.getProgressType(tk.id) === 'warning'"
+                              [class.bg-danger]="timer.getProgressType(tk.id) === 'danger'"
+                              [style.width.%]="timer.getProgressPercentage(tk.id)">
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            @if (totalPages() > 1) {
+              <div class="card-footer">
+                <nav aria-label="Timer pagination">
+                  <ul class="pagination pagination-sm mb-0 justify-content-center">
+                    <li class="page-item" [class.disabled]="currentPage() === 1">
+                      <button class="page-link" (click)="previousPage()" [disabled]="currentPage() === 1">
+                        <i class="bi bi-chevron-left"></i>
+                      </button>
+                    </li>
+                    @for (page of [].constructor(totalPages()); track $index) {
+                      <li class="page-item" [class.active]="currentPage() === $index + 1">
+                        <button class="page-link" (click)="goToPage($index + 1)">
+                          {{ $index + 1 }}
+                        </button>
+                      </li>
+                    }
+                    <li class="page-item" [class.disabled]="currentPage() === totalPages()">
+                      <button class="page-link" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+                        <i class="bi bi-chevron-right"></i>
+                      </button>
+                    </li>
+                  </ul>
+                </nav>
+                <div class="text-center mt-2">
+                  <small class="text-muted">
+                    Showing {{ (currentPage() - 1) * pageSize + 1 }}-{{ Math.min(currentPage() * pageSize, totalCount()) }} of {{ totalCount() }}
+                  </small>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="timekeeper-panel-right">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  @if (selectedTimer()) {
+                    <span>Timer Details</span>
+                  } @else {
+                    <span class="text-muted">Select a timer</span>
+                  }
+                </h6>
+                @if (selectedTimer()) {
+                  <button class="btn btn-sm btn-outline-secondary" (click)="selectedTimer.set(null)">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (!selectedTimer()) {
+                <div class="empty-state text-center text-muted">
+                  <i class="bi bi-stopwatch"></i>
+                  <h5>No Timer Selected</h5>
+                  <p>Select a timer from the list to view its details</p>
+                </div>
+              } @else if (loadingDetails()) {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading details...</span>
+                  </div>
+                </div>
+              } @else {
+              <div class="detail-content">
+                <div class="card mb-3">
+                  <div class="card-header">
+                    <h5 class="mb-0">
+                      @if (selectedTimer()?.session || selectedTimer()?.step) {
+                        <i class="bi bi-play-circle me-2"></i>
+                      } @else {
+                        <i class="bi bi-stopwatch me-2"></i>
+                      }
+                      {{ selectedTimer()?.name || 'Timer #' + selectedTimer()?.id }}
+                    </h5>
+                  </div>
+                  <div class="card-body">
+                    @if (timer.timeKeeper[selectedTimer()!.id.toString()]) {
+                      <div class="timer-display-large text-center mb-3 p-4 rounded">
+                        <div class="timer-time-display-large mb-2">
+                          {{ timer.convertTime(timer.timeKeeper[selectedTimer()!.id.toString()].current) }}
+                        </div>
+                        <small class="text-muted">remaining</small>
+
+                        <div class="progress mt-3" style="height: 12px;">
+                          <div
+                            class="progress-bar"
+                            [class.bg-info]="timer.getProgressType(selectedTimer()!.id) === 'info'"
+                            [class.bg-primary]="timer.getProgressType(selectedTimer()!.id) === 'primary'"
+                            [class.bg-warning]="timer.getProgressType(selectedTimer()!.id) === 'warning'"
+                            [class.bg-danger]="timer.getProgressType(selectedTimer()!.id) === 'danger'"
+                            [style.width.%]="timer.getProgressPercentage(selectedTimer()!.id)">
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="d-flex gap-2 justify-content-center mb-3">
+                        @if (timer.timeKeeper[selectedTimer()!.id.toString()].started) {
+                          <button class="btn btn-warning" (click)="pauseTimer(selectedTimer()!.id)" title="Pause">
+                            <i class="bi bi-pause-fill me-2"></i>Pause
+                          </button>
+                        } @else {
+                          <button class="btn btn-success" (click)="startTimer(selectedTimer()!.id)" title="Start">
+                            <i class="bi bi-play-fill me-2"></i>Start
+                          </button>
+                        }
+                        <button class="btn btn-outline-secondary" (click)="resetTimer(selectedTimer()!.id)" title="Reset">
+                          <i class="bi bi-arrow-counterclockwise me-2"></i>Reset
+                        </button>
+                        <button
+                          class="btn btn-outline-danger"
+                          (click)="deleteTimer(selectedTimer()!.id)"
+                          title="Delete Timer">
+                          <i class="bi bi-trash me-2"></i>Delete
+                        </button>
+                      </div>
+                    }
+
+                    <div class="border-top pt-3">
+                      <h6 class="text-muted mb-2">Basic Information</h6>
+                      <div class="row">
+                        @if (selectedTimer()?.name) {
+                          <div class="col-12 mb-2">
+                            <small class="text-muted">Name</small>
+                            <div>{{ selectedTimer()?.name }}</div>
+                          </div>
+                        }
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">ID</small>
+                          <div>#{{ selectedTimer()?.id }}</div>
+                        </div>
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Created</small>
+                          <div>{{ selectedTimer()?.startTime | date: 'short' }}</div>
+                        </div>
+                        @if (selectedTimer()?.currentDuration !== undefined && selectedTimer()?.currentDuration !== null) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Current Duration</small>
+                            <div>{{ formatDuration(selectedTimer()!.currentDuration) }}</div>
+                          </div>
+                        }
+                        @if (selectedTimer()?.originalDuration !== undefined && selectedTimer()?.originalDuration !== null) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Original Duration</small>
+                            <div>{{ formatDuration(selectedTimer()!.originalDuration) }}</div>
+                          </div>
+                        }
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Status</small>
+                          <div>
+                            @if (selectedTimer()?.started) {
+                              <span class="badge bg-success">Running</span>
+                            } @else {
+                              <span class="badge bg-secondary">Stopped</span>
+                            }
+                          </div>
+                        </div>
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Type</small>
+                          <div>
+                            @if (selectedTimer()?.session || selectedTimer()?.step) {
+                              <span class="badge bg-primary">Session Timer</span>
+                            } @else {
+                              <span class="badge bg-info">Standalone</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                @if (selectedTimer()?.events && selectedTimer()!.events!.length > 0) {
+                  <div class="card mb-3">
+                    <div class="card-header">
+                      <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Event History
+                      </h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Event Type</th>
+                              <th>Time</th>
+                              <th>Duration</th>
+                              <th>Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (event of selectedTimer()!.events; track event.id) {
+                              <tr>
+                                <td>
+                                  @if (event.eventType === 'started') {
+                                    <span class="badge bg-success">
+                                      <i class="bi bi-play-fill me-1"></i>Started
+                                    </span>
+                                  } @else if (event.eventType === 'stopped') {
+                                    <span class="badge bg-warning">
+                                      <i class="bi bi-pause-fill me-1"></i>Stopped
+                                    </span>
+                                  } @else if (event.eventType === 'reset') {
+                                    <span class="badge bg-secondary">
+                                      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                                    </span>
+                                  }
+                                </td>
+                                <td>
+                                  <small>{{ event.eventTime | date: 'short' }}</small>
+                                </td>
+                                <td>
+                                  @if (event.durationAtEvent !== undefined && event.durationAtEvent !== null) {
+                                    <small>{{ formatDuration(event.durationAtEvent) }}</small>
+                                  } @else {
+                                    <small class="text-muted">N/A</small>
+                                  }
+                                </td>
+                                <td>
+                                  @if (event.notes) {
+                                    <small>{{ event.notes }}</small>
+                                  } @else {
+                                    <small class="text-muted">-</small>
+                                  }
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                @if (selectedTimerSession()) {
+                  <div class="card mb-3">
+                    <div class="card-header">
+                      <h5 class="mb-0">
+                        <i class="bi bi-folder me-2"></i>Session Information
+                      </h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="mb-3">
+                        <h6 class="mb-1">{{ selectedTimerSession()?.name }}</h6>
+                        @if (selectedTimerSession()?.uniqueId) {
+                          <small class="text-muted">ID: {{ selectedTimerSession()?.uniqueId }}</small>
+                        }
+                      </div>
+                      <div class="row">
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Status</small>
+                          <div>
+                            @if (selectedTimerSession()?.enabled) {
+                              <span class="badge bg-success">Enabled</span>
+                            } @else {
+                              <span class="badge bg-secondary">Disabled</span>
+                            }
+                          </div>
+                        </div>
+                        @if (selectedTimerSession()?.startedAt) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Started At</small>
+                            <div>{{ selectedTimerSession()?.startedAt | date: 'short' }}</div>
+                          </div>
+                        }
+                        @if (selectedTimerSession()?.endedAt) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Ended At</small>
+                            <div>{{ selectedTimerSession()?.endedAt | date: 'short' }}</div>
+                          </div>
+                        }
+                        @if (selectedTimerSession()?.protocolCount) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Protocols</small>
+                            <div>{{ selectedTimerSession()?.protocolCount }}</div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                @if (selectedTimerStep()) {
+                  <div class="card mb-3">
+                    <div class="card-header">
+                      <h5 class="mb-0">
+                        <i class="bi bi-list-ol me-2"></i>Step Information
+                      </h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="mb-3">
+                        <h6 class="mb-1">Step #{{ selectedTimerStep()?.id }}</h6>
+                        @if (selectedTimerStep()?.stepId) {
+                          <small class="text-muted">Step ID: {{ selectedTimerStep()?.stepId }}</small>
+                        }
+                      </div>
+                      @if (selectedTimerStep()?.stepDescription) {
+                        <div class="mb-3">
+                          <small class="text-muted">Description</small>
+                          <p class="mb-0">{{ selectedTimerStep()?.stepDescription }}</p>
+                        </div>
+                      }
+                      @if (selectedTimerStep()?.sectionDescription) {
+                        <div class="mb-3">
+                          <small class="text-muted">Section</small>
+                          <p class="mb-0">{{ selectedTimerStep()?.sectionDescription }}</p>
+                        </div>
+                      }
+                      <div class="row">
+                        @if (selectedTimerStep()?.stepDuration) {
+                          <div class="col-6 mb-2">
+                            <small class="text-muted">Step Duration</small>
+                            <div>{{ formatDuration(selectedTimerStep()!.stepDuration) }}</div>
+                          </div>
+                        }
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Order</small>
+                          <div>{{ selectedTimerStep()?.order }}</div>
+                        </div>
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Has Previous</small>
+                          <div>
+                            @if (selectedTimerStep()?.hasPrevious) {
+                              <i class="bi bi-check-circle text-success"></i>
+                            } @else {
+                              <i class="bi bi-x-circle text-secondary"></i>
+                            }
+                          </div>
+                        </div>
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Has Next</small>
+                          <div>
+                            @if (selectedTimerStep()?.hasNext) {
+                              <i class="bi bi-check-circle text-success"></i>
+                            } @else {
+                              <i class="bi bi-x-circle text-secondary"></i>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      @if (selectedTimerStep()?.protocol) {
+                        <div class="mt-3 pt-3 border-top">
+                          <small class="text-muted">Protocol ID</small>
+                          <div>{{ selectedTimerStep()?.protocol }}</div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (!selectedTimer()?.session && !selectedTimer()?.step) {
+                  <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    This is a standalone timer not associated with any session or protocol step.
+                  </div>
+                }
+              </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<div class="modal fade" [class.show]="showCreateForm()" [style.display]="showCreateForm() ? 'block' : 'none'" tabindex="-1" role="dialog" (click)="cancelCreate()">
+  <div class="modal-dialog modal-dialog-centered" role="document" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-plus-circle me-2"></i>Create New Timer
+        </h5>
+        <button type="button" class="btn-close" (click)="cancelCreate()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="timerName" class="form-label">Timer Name</label>
+          <input
+            type="text"
+            class="form-control"
+            id="timerName"
+            [(ngModel)]="newTimerName"
+            placeholder="e.g., Incubation Timer, Break Timer">
+        </div>
+        <div class="mb-3">
+          <label for="timerDuration" class="form-label">Duration (seconds)</label>
+          <input
+            type="number"
+            class="form-control"
+            id="timerDuration"
+            [(ngModel)]="newTimerDuration"
+            min="1">
+          <small class="form-text text-muted">Current: {{ formatDuration(newTimerDuration) }}</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="cancelCreate()">
+          Cancel
+        </button>
+        <button class="btn btn-primary" (click)="createTimer()">
+          <i class="bi bi-check-circle me-2"></i>Create Timer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+@if (showCreateForm()) {
+  <div class="modal-backdrop fade show"></div>
+}

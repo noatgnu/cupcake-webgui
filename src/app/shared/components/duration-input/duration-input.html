@@ -1,0 +1,56 @@
+<div class="duration-input d-flex gap-2 align-items-center flex-nowrap">
+  <div class="input-group input-group-sm flex-shrink-0" style="width: auto;">
+    <input
+      type="number"
+      class="form-control"
+      [(ngModel)]="days"
+      (ngModelChange)="onValueChange()"
+      [disabled]="disabled"
+      min="0"
+      placeholder="0"
+      style="width: 50px;">
+    <span class="input-group-text">d</span>
+  </div>
+
+  <div class="input-group input-group-sm flex-shrink-0" style="width: auto;">
+    <input
+      type="number"
+      class="form-control"
+      [(ngModel)]="hours"
+      (ngModelChange)="onValueChange()"
+      [disabled]="disabled"
+      min="0"
+      max="23"
+      placeholder="0"
+      style="width: 50px;">
+    <span class="input-group-text">h</span>
+  </div>
+
+  <div class="input-group input-group-sm flex-shrink-0" style="width: auto;">
+    <input
+      type="number"
+      class="form-control"
+      [(ngModel)]="minutes"
+      (ngModelChange)="onValueChange()"
+      [disabled]="disabled"
+      min="0"
+      max="59"
+      placeholder="0"
+      style="width: 50px;">
+    <span class="input-group-text">m</span>
+  </div>
+
+  <div class="input-group input-group-sm flex-shrink-0" style="width: auto;">
+    <input
+      type="number"
+      class="form-control"
+      [(ngModel)]="seconds"
+      (ngModelChange)="onValueChange()"
+      [disabled]="disabled"
+      min="0"
+      max="59"
+      placeholder="0"
+      style="width: 50px;">
+    <span class="input-group-text">s</span>
+  </div>
+</div>

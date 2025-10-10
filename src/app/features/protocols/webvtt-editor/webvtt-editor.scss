@@ -1,0 +1,32 @@
+.webvtt-editor {
+  .cues-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .cue-item {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    border-color: transparent;
+
+    &.active {
+      border-color: var(--bs-primary) !important;
+      background-color: rgba(var(--bs-primary-rgb), 0.05);
+
+      .cue-text {
+        font-weight: 600;
+        color: var(--bs-primary);
+      }
+    }
+
+    &.editing {
+      border-color: var(--bs-warning) !important;
+      background-color: rgba(var(--bs-warning-rgb), 0.05);
+    }
+
+    .cue-text {
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+  }
+}

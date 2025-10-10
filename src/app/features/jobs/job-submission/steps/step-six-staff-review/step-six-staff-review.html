@@ -1,0 +1,32 @@
+<div class="step-content">
+  <h4 class="mb-4">
+    <i class="bi bi-shield-lock text-warning me-2"></i>Staff Review
+  </h4>
+
+  <div class="alert alert-warning">
+    <i class="bi bi-shield-check me-2"></i>
+    <strong>Staff-Only Metadata Review</strong>
+    <p class="mb-0 small mt-2">
+      This section is only accessible to staff members with permission to edit staff-only metadata.
+      You can view all columns and edit staff-only fields. Use the filter below to toggle between user-visible and staff-only columns.
+    </p>
+  </div>
+
+  @if (state.metadataTableId()) {
+    <app-metadata-table-editor
+      [tableId]="state.metadataTableId()!"
+      [showStaffOnlyFilter]="true"
+      [canEditStaffOnly]="true">
+    </app-metadata-table-editor>
+  }
+
+  <div class="d-flex justify-content-between mt-4 pt-4 border-top">
+    <button
+      type="button"
+      class="btn btn-outline-secondary"
+      (click)="onPrevious()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to User View
+    </button>
+  </div>
+</div>

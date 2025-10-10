@@ -1,0 +1,168 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.storage-header {
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.storage-layout {
+  height: 100%;
+  min-height: 0;
+
+  .storage-panel-left,
+  .storage-panel-right {
+    min-width: 0;
+    height: 100%;
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+
+      .card-header {
+        flex-shrink: 0;
+      }
+
+      .card-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        min-height: 0;
+        max-height: 100%;
+      }
+
+      .card-footer {
+        flex-shrink: 0;
+      }
+    }
+  }
+
+  .storage-panel-left {
+    flex: 0 0 350px;
+  }
+
+  .storage-panel-right {
+    flex: 1 1 auto;
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--bs-secondary-color);
+
+  i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  h3, h5 {
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    margin-bottom: 0;
+  }
+}
+
+.empty-state-small {
+  i {
+    opacity: 0.5;
+  }
+}
+
+.breadcrumb-sm {
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+
+  .breadcrumb-item {
+    a {
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+.list-group-item {
+  .btn-link {
+    color: inherit;
+
+    &:hover {
+      background-color: var(--bs-secondary-bg);
+    }
+
+    &.active {
+      background-color: var(--bs-primary);
+      color: white;
+    }
+  }
+}
+
+.storage-thumbnail,
+.reagent-thumbnail {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+.reagent-placeholder {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--bs-secondary);
+
+  i {
+    font-size: 1.25rem;
+  }
+}
+
+.storage-path-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--bs-secondary-bg);
+  border-radius: 0.25rem;
+  border-left: 3px solid var(--bs-primary);
+
+  small {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .bi-chevron-right {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 768px) {
+  .storage-layout {
+    flex-direction: column !important;
+
+    .storage-panel-left,
+    .storage-panel-right {
+      flex: 1 1 auto;
+      min-height: 300px;
+    }
+  }
+}

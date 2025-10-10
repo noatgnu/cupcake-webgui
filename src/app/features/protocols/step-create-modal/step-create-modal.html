@@ -1,0 +1,123 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-plus-circle me-2"></i>
+    Create New Step
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="stepForm">
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <label class="form-label mb-0">
+          Step Description <span class="text-danger">*</span>
+        </label>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          (click)="toggleTemplateHelp()">
+          <i class="bi bi-question-circle me-1"></i>
+          Template Help
+        </button>
+      </div>
+
+      @if (showTemplateHelp) {
+        <div class="alert alert-info small mb-2">
+          <h6 class="alert-heading">Reagent Template Syntax</h6>
+          <p class="mb-2"><strong>Quick Insert:</strong> Type <kbd>space</kbd> followed by <kbd>%</kbd> to show available reagent variables.</p>
+          <p class="mb-2">Or manually type these templates:</p>
+          <ul class="mb-2">
+            <li><code>%ID.name%</code> - Reagent name</li>
+            <li><code>%ID.quantity%</code> - Base quantity</li>
+            <li><code>%ID.scaled_quantity%</code> - Scaled quantity (if reagent is scalable)</li>
+            <li><code>%ID.unit%</code> - Unit</li>
+          </ul>
+          <p class="mb-0">Replace <code>ID</code> with the step reagent ID. Templates will be replaced with actual values when viewing the step.</p>
+        </div>
+      }
+
+      <div class="position-relative">
+        <quill-editor
+          formControlName="stepDescription"
+          [modules]="quillConfig"
+          placeholder="Enter step description"
+          (onEditorCreated)="onEditorCreated($event)"
+          (onContentChanged)="onContentChanged($event)"
+          [class.is-invalid]="stepForm.get('stepDescription')?.invalid && stepForm.get('stepDescription')?.touched">
+        </quill-editor>
+
+        <div #dropdownMenu class="template-dropdown card shadow" style="display: none; z-index: 1050;">
+          <div class="card-header py-2">
+            <small>Available Variables</small>
+          </div>
+          <div class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+            @if (reagents.length === 0) {
+              <div class="list-group-item text-center text-muted py-2">
+                <small>No reagents available</small>
+              </div>
+            }
+            @for (reagent of reagents; track reagent.id) {
+              <div class="list-group-item py-2">
+                <div class="fw-medium mb-1">{{reagent.reagentName}}</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary"
+                          (click)="insertReagentTemplate(reagent.id, 'quantity')">
+                    {{reagent.quantity}} <i class="bi bi-123 ms-1"></i>
+                  </button>
+
+                  @if (reagent.scalable) {
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            (click)="insertReagentTemplate(reagent.id, 'scaled_quantity')">
+                      {{reagent.scaledQuantity || (reagent.quantity * reagent.scalableFactor)}} <i class="bi bi-calculator ms-1"></i>
+                    </button>
+                  }
+
+                  <button type="button" class="btn btn-sm btn-outline-warning"
+                          (click)="insertReagentTemplate(reagent.id, 'unit')">
+                    {{reagent.reagentUnit}} <i class="bi bi-rulers ms-1"></i>
+                  </button>
+
+                  <button type="button" class="btn btn-sm btn-outline-info"
+                          (click)="insertReagentTemplate(reagent.id, 'name')">
+                    Name <i class="bi bi-tag ms-1"></i>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+      @if (stepForm.get('stepDescription')?.invalid && stepForm.get('stepDescription')?.touched) {
+        <div class="invalid-feedback d-block">
+          Step description is required
+        </div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Duration</label>
+      <app-duration-input formControlName="stepDuration"></app-duration-input>
+      <div class="form-text">
+        Optional: Estimated time to complete this step
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="createStep()"
+    [disabled]="!stepForm.valid || saving">
+    @if (saving) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+    }
+    <i class="bi bi-plus-lg me-1"></i>
+    Create Step
+  </button>
+</div>

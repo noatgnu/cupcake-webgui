@@ -1,0 +1,231 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <h4 class="navbar-brand m-0 fw-bold">
+        <i class="bi bi-person-circle me-2"></i>User Profile
+      </h4>
+    </div>
+  </nav>
+
+  <div class="flex-grow-1 p-4 overflow-auto">
+    <div class="row">
+      <div class="col-lg-8 mx-auto">
+        <div class="card">
+          <div class="card-body">
+          @if (currentUser(); as user) {
+            <div class="row mb-4">
+              <div class="col-md-12">
+                <h5 class="border-bottom pb-2 mb-3">Account Information</h5>
+                <dl class="row">
+                  <dt class="col-sm-3">Username</dt>
+                  <dd class="col-sm-9">{{ user.username }}</dd>
+
+                  <dt class="col-sm-3">Display Name</dt>
+                  <dd class="col-sm-9">{{ getUserDisplayName() || 'Not set' }}</dd>
+
+                  <dt class="col-sm-3">Account Status</dt>
+                  <dd class="col-sm-9">
+                    @if (user.isActive) {
+                      <span class="badge bg-success">Active</span>
+                    } @else {
+                      <span class="badge bg-secondary">Inactive</span>
+                    }
+                    @if (user.isStaff) {
+                      <span class="badge bg-warning ms-2">Staff</span>
+                    }
+                    @if (user.isSuperuser) {
+                      <span class="badge bg-danger ms-2">Superuser</span>
+                    }
+                  </dd>
+
+                  <dt class="col-sm-3">Member Since</dt>
+                  <dd class="col-sm-9">{{ formatDate(user.dateJoined) }}</dd>
+
+                  <dt class="col-sm-3">Last Login</dt>
+                  <dd class="col-sm-9">{{ formatDate(user.lastLogin) }}</dd>
+                </dl>
+              </div>
+            </div>
+
+            <div class="row mb-4">
+              <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                  <h5 class="mb-0">Personal Information</h5>
+                  @if (!editMode()) {
+                    <button class="btn btn-sm btn-primary" (click)="toggleEditMode()">
+                      <i class="bi bi-pencil me-1"></i>Edit
+                    </button>
+                  }
+                </div>
+
+                @if (editMode()) {
+                  <form (ngSubmit)="saveProfile()">
+                    <div class="mb-3">
+                      <label for="firstName" class="form-label">First Name</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="firstName"
+                        [(ngModel)]="firstName"
+                        name="firstName"
+                        [disabled]="saving()">
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="lastName" class="form-label">Last Name</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="lastName"
+                        [(ngModel)]="lastName"
+                        name="lastName"
+                        [disabled]="saving()">
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                      <input
+                        type="email"
+                        class="form-control"
+                        id="email"
+                        [(ngModel)]="email"
+                        name="email"
+                        [disabled]="saving()"
+                        required>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="profileCurrentPassword" class="form-label">Current Password <span class="text-danger">*</span></label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="profileCurrentPassword"
+                        [(ngModel)]="currentPassword"
+                        name="profileCurrentPassword"
+                        [disabled]="saving()"
+                        required>
+                      <div class="form-text">Required to verify your identity</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                      <button
+                        type="submit"
+                        class="btn btn-primary"
+                        [disabled]="saving() || !email.trim() || !currentPassword">
+                        @if (saving()) {
+                          <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Save Changes
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        (click)="toggleEditMode()"
+                        [disabled]="saving()">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                } @else {
+                  <dl class="row">
+                    <dt class="col-sm-3">First Name</dt>
+                    <dd class="col-sm-9">{{ user.firstName || 'Not set' }}</dd>
+
+                    <dt class="col-sm-3">Last Name</dt>
+                    <dd class="col-sm-9">{{ user.lastName || 'Not set' }}</dd>
+
+                    <dt class="col-sm-3">Email</dt>
+                    <dd class="col-sm-9">{{ user.email }}</dd>
+                  </dl>
+                }
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                  <h5 class="mb-0">Security</h5>
+                  @if (!changePasswordMode()) {
+                    <button class="btn btn-sm btn-warning" (click)="toggleChangePasswordMode()">
+                      <i class="bi bi-key me-1"></i>Change Password
+                    </button>
+                  }
+                </div>
+
+                @if (changePasswordMode()) {
+                  <form (ngSubmit)="changePassword()">
+                    <div class="mb-3">
+                      <label for="currentPassword" class="form-label">Current Password <span class="text-danger">*</span></label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="currentPassword"
+                        [(ngModel)]="currentPassword"
+                        name="currentPassword"
+                        [disabled]="changingPassword()"
+                        required>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="newPassword" class="form-label">New Password <span class="text-danger">*</span></label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="newPassword"
+                        [(ngModel)]="newPassword"
+                        name="newPassword"
+                        [disabled]="changingPassword()"
+                        required>
+                      <div class="form-text">Password must be at least 8 characters</div>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="confirmPassword" class="form-label">Confirm New Password <span class="text-danger">*</span></label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="confirmPassword"
+                        [(ngModel)]="confirmPassword"
+                        name="confirmPassword"
+                        [disabled]="changingPassword()"
+                        required>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                      <button
+                        type="submit"
+                        class="btn btn-warning"
+                        [disabled]="changingPassword() || !currentPassword || !newPassword || !confirmPassword">
+                        @if (changingPassword()) {
+                          <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Change Password
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        (click)="toggleChangePasswordMode()"
+                        [disabled]="changingPassword()">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                } @else {
+                  <p class="text-muted mb-0">Click "Change Password" to update your password</p>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="text-center p-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

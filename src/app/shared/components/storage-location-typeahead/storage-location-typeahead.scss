@@ -1,0 +1,25 @@
+.storage-location-typeahead {
+  .dropdown-menu {
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1050;
+  }
+
+  .location-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(var(--cupcake-primary-rgb), 0.08);
+    }
+
+    &:active {
+      background-color: rgba(var(--cupcake-primary-rgb), 0.15);
+    }
+  }
+
+  .breadcrumb-path {
+    line-height: 1.4;
+    word-break: break-word;
+  }
+}

@@ -1,0 +1,172 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="mb-0">
+    <i class="bi bi-calculator me-2"></i>
+    {{ calculatorMode() === 'scientific' ? 'Scientific Calculator' : 'Calculator' }}
+  </h6>
+  <div class="btn-group btn-group-sm">
+    <button
+      type="button"
+      class="btn btn-outline-secondary dropdown-toggle"
+      data-bs-toggle="dropdown">
+      <i class="bi bi-gear"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><h6 class="dropdown-header">Calculator Mode</h6></li>
+      <li>
+        <button
+          class="dropdown-item"
+          [class.active]="calculatorMode() === 'standard'"
+          (click)="setCalculatorMode('standard')">
+          <i class="bi bi-calculator me-2"></i>Standard
+        </button>
+      </li>
+      <li>
+        <button
+          class="dropdown-item"
+          [class.active]="calculatorMode() === 'scientific'"
+          (click)="setCalculatorMode('scientific')">
+          <i class="bi bi-calculator-fill me-2"></i>Scientific
+        </button>
+      </li>
+      @if (calculatorMode() === 'scientific') {
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <button
+            class="dropdown-item"
+            (click)="toggleAngleMode()">
+            <i class="bi bi-circle-half me-2"></i>{{ angleMode() === 'deg' ? 'Degrees' : 'Radians' }}
+          </button>
+        </li>
+      }
+      <li><hr class="dropdown-divider"></li>
+      <li><h6 class="dropdown-header">History</h6></li>
+      <li>
+        <button
+          class="dropdown-item"
+          (click)="exportHistory()"
+          [disabled]="dataLog().length === 0">
+          <i class="bi bi-download me-2"></i>Export History
+        </button>
+      </li>
+      <li>
+        <button
+          class="dropdown-item"
+          (click)="clearHistory()"
+          [disabled]="dataLog().length === 0">
+          <i class="bi bi-trash me-2"></i>Clear History
+        </button>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="calculator-display mb-3">
+  @if (displayExpression()) {
+    <div class="text-muted small mb-1">{{ displayExpression() }}</div>
+  }
+  <div class="fs-3 text-end font-monospace">
+    {{ currentDisplay() }}
+  </div>
+  @if (hasMemory()) {
+    <div class="text-warning small">
+      <i class="bi bi-bookmark-fill"></i> M: {{ formatNumber(memoryValue()) }}
+    </div>
+  }
+</div>
+
+<div class="calculator-buttons">
+  <button class="btn btn-outline-secondary" (click)="memoryOperation('MC')" [disabled]="!hasMemory()">MC</button>
+  <button class="btn btn-outline-secondary" (click)="memoryOperation('MR')" [disabled]="!hasMemory()">MR</button>
+  <button class="btn btn-outline-secondary" (click)="memoryOperation('M+')">M+</button>
+  <button class="btn btn-outline-secondary" (click)="memoryOperation('M-')">M-</button>
+
+  <button class="btn btn-outline-secondary" (click)="memoryOperation('MS')">MS</button>
+  <button class="btn btn-outline-info" (click)="scientificOperation('log2')" [disabled]="executionMode() === 'second'">log₂</button>
+  <button class="btn btn-outline-info" (click)="scientificOperation('log10')" [disabled]="executionMode() === 'second'">log</button>
+  <button class="btn btn-outline-info" (click)="scientificOperation('sqrt')" [disabled]="executionMode() === 'second'">√</button>
+
+  @if (calculatorMode() === 'scientific') {
+    <button class="btn btn-outline-primary" (click)="scientificOperation('sin')" [disabled]="executionMode() === 'second'">sin</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('cos')" [disabled]="executionMode() === 'second'">cos</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('tan')" [disabled]="executionMode() === 'second'">tan</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('ln')" [disabled]="executionMode() === 'second'">ln</button>
+
+    <button class="btn btn-outline-primary" (click)="scientificOperation('asin')" [disabled]="executionMode() === 'second'">sin⁻¹</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('acos')" [disabled]="executionMode() === 'second'">cos⁻¹</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('atan')" [disabled]="executionMode() === 'second'">tan⁻¹</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('exp')" [disabled]="executionMode() === 'second'">eˣ</button>
+
+    <button class="btn btn-outline-primary" (click)="insertConstant('pi')" [disabled]="executionMode() === 'second'">π</button>
+    <button class="btn btn-outline-primary" (click)="scientificOperation('factorial')" [disabled]="executionMode() === 'second'">x!</button>
+    <button class="btn btn-outline-info" (click)="scientificOperation('abs')" [disabled]="executionMode() === 'second'">|x|</button>
+    <button class="btn btn-outline-info" (click)="scientificOperation('reciprocal')" [disabled]="executionMode() === 'second'">1/x</button>
+  } @else {
+    <button class="btn btn-outline-info" (click)="scientificOperation('abs')" [disabled]="executionMode() === 'second'">|x|</button>
+    <button class="btn btn-outline-info" (click)="scientificOperation('reciprocal')" [disabled]="executionMode() === 'second'">1/x</button>
+    <button class="btn btn-outline-info" (click)="formOperation('^')">xʸ</button>
+    <button class="btn btn-outline-info" (click)="scientificOperation('square')" [disabled]="executionMode() === 'second'">x²</button>
+  }
+
+  <button class="btn btn-danger" (click)="clearAll()">C</button>
+  <button class="btn btn-warning" (click)="clearEntry()">CE</button>
+  <button class="btn btn-secondary" (click)="formDelete()"><i class="bi bi-backspace"></i></button>
+  <button class="btn btn-primary" (click)="formOperation('/')">÷</button>
+
+  <button class="btn btn-light" (click)="formNumber(7)">7</button>
+  <button class="btn btn-light" (click)="formNumber(8)">8</button>
+  <button class="btn btn-light" (click)="formNumber(9)">9</button>
+  <button class="btn btn-primary" (click)="formOperation('*')">×</button>
+
+  <button class="btn btn-light" (click)="formNumber(4)">4</button>
+  <button class="btn btn-light" (click)="formNumber(5)">5</button>
+  <button class="btn btn-light" (click)="formNumber(6)">6</button>
+  <button class="btn btn-primary" (click)="formOperation('-')">−</button>
+
+  <button class="btn btn-light" (click)="formNumber(1)">1</button>
+  <button class="btn btn-light" (click)="formNumber(2)">2</button>
+  <button class="btn btn-light" (click)="formNumber(3)">3</button>
+  <button class="btn btn-primary" (click)="formOperation('+')">+</button>
+
+  <button class="btn btn-light btn-span-2" (click)="formNumber(0)">0</button>
+  <button class="btn btn-light" (click)="formDecimal()">.</button>
+  <button class="btn btn-success" (click)="formOperation('=')">=</button>
+
+  <button class="btn btn-outline-info" (click)="formOperation('^')">xʸ</button>
+  <button class="btn btn-outline-info" (click)="scientificOperation('square')" [disabled]="executionMode() === 'second'">x²</button>
+  <button class="btn btn-outline-info" (click)="scientificOperation('cube')" [disabled]="executionMode() === 'second'">x³</button>
+  <button class="btn btn-outline-info" (click)="insertConstant('e')" [disabled]="executionMode() === 'second'">e</button>
+</div>
+
+@if (visibleHistory().length > 0) {
+  <div class="mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0">
+        <i class="bi bi-clock-history me-2"></i>History ({{ dataLog().length }})
+      </h6>
+    </div>
+    <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+      @for (entry of visibleHistory(); track trackByHistoryId($index, entry)) {
+        <div class="list-group-item list-group-item-action p-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1" (click)="revertValueTo(entry)" style="cursor: pointer;">
+              <div class="font-monospace small">
+                @if (entry.inputPromptSecondValue !== 0) {
+                  {{ formatNumber(entry.inputPromptFirstValue) }} {{ entry.operation }} {{ formatNumber(entry.inputPromptSecondValue) }}
+                } @else {
+                  {{ entry.operation }}({{ formatNumber(entry.inputPromptFirstValue) }})
+                }
+              </div>
+              <div class="fw-bold">= {{ formatNumber(entry.result) }}</div>
+              <small class="text-muted">{{ formatTimestamp(entry.timestamp) }}</small>
+            </div>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              (click)="removeHistoryItem(entry)">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}

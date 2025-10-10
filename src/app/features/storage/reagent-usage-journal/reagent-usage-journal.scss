@@ -1,0 +1,50 @@
+.reagent-usage-journal {
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--bs-border-color);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 1.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .timeline-marker {
+        position: absolute;
+        left: -30px;
+        top: 8px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid var(--bs-border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+
+        i {
+          font-size: 1rem;
+        }
+      }
+
+      .timeline-content {
+        .quantity {
+          font-size: 1.1rem;
+        }
+      }
+    }
+  }
+}

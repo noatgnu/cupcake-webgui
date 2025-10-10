@@ -1,0 +1,161 @@
+<div class="card">
+  <div class="card-header">
+    <h6 class="mb-0">
+      <i class="bi bi-record-circle me-2"></i>
+      Record Media
+    </h6>
+  </div>
+  <div class="card-body">
+    @if (!recordedBlob()) {
+      <div class="mb-3">
+        <label class="form-label">Recording Type</label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" name="recordingType" id="typeAudio" value="audio" [(ngModel)]="recordingType" [disabled]="recording()">
+          <label class="btn btn-outline-primary" for="typeAudio">
+            <i class="bi bi-mic me-1"></i>Audio
+          </label>
+
+          <input type="radio" class="btn-check" name="recordingType" id="typeVideo" value="video" [(ngModel)]="recordingType" [disabled]="recording()">
+          <label class="btn btn-outline-primary" for="typeVideo">
+            <i class="bi bi-camera-video me-1"></i>Video
+          </label>
+
+          <input type="radio" class="btn-check" name="recordingType" id="typeScreen" value="screen" [(ngModel)]="recordingType" [disabled]="recording()">
+          <label class="btn btn-outline-primary" for="typeScreen">
+            <i class="bi bi-display me-1"></i>Screen
+          </label>
+        </div>
+      </div>
+
+      @if (recordingType() === 'video' || recordingType() === 'screen') {
+        <div class="mb-3">
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="enableMicrophone"
+              [(ngModel)]="enableMicrophone"
+              [disabled]="recording()">
+            <label class="form-check-label" for="enableMicrophone">
+              <i class="bi bi-mic me-1"></i>
+              Enable Microphone
+            </label>
+          </div>
+        </div>
+      }
+
+      @if (recordingType() === 'audio' || enableMicrophone()) {
+        <div class="mb-3">
+          <label for="audioDevice" class="form-label">
+            <i class="bi bi-mic me-1"></i>Microphone
+          </label>
+          <select
+            class="form-select"
+            id="audioDevice"
+            [(ngModel)]="selectedAudioDevice"
+            [disabled]="recording() || audioDevices().length === 0">
+            @if (audioDevices().length === 0) {
+              <option value="">No microphones detected</option>
+            } @else {
+              @for (device of audioDevices(); track device.deviceId) {
+                <option [value]="device.deviceId">{{ device.label || 'Microphone ' + ($index + 1) }}</option>
+              }
+            }
+          </select>
+        </div>
+      }
+
+      @if (recordingType() === 'video') {
+        <div class="mb-3">
+          <label for="videoDevice" class="form-label">
+            <i class="bi bi-camera-video me-1"></i>Camera
+          </label>
+          <select
+            class="form-select"
+            id="videoDevice"
+            [(ngModel)]="selectedVideoDevice"
+            [disabled]="recording() || videoDevices().length === 0">
+            @if (videoDevices().length === 0) {
+              <option value="">No cameras detected</option>
+            } @else {
+              @for (device of videoDevices(); track device.deviceId) {
+                <option [value]="device.deviceId">{{ device.label || 'Camera ' + ($index + 1) }}</option>
+              }
+            }
+          </select>
+        </div>
+      }
+
+      @if (recording()) {
+        <div class="alert alert-danger mb-3">
+          <div class="d-flex align-items-center mb-2">
+            <div class="spinner-grow spinner-grow-sm text-danger me-2" role="status">
+              <span class="visually-hidden">Recording...</span>
+            </div>
+            <div class="flex-grow-1">
+              <strong>Recording in progress...</strong>
+              <div class="text-muted small">Duration: {{ formatDuration(recordingDuration()) }}</div>
+            </div>
+          </div>
+          @if (recordingType() === 'audio' && visualizerStream()) {
+            <div class="mt-2 d-flex justify-content-center">
+              <app-audio-visualizer
+                [audioStream]="visualizerStream()"
+                [width]="500"
+                [height]="80"
+                [barColor]="'#dc3545'">
+              </app-audio-visualizer>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="d-flex gap-2">
+        @if (!recording()) {
+          <button
+            class="btn btn-danger flex-grow-1"
+            (click)="startRecording()"
+            [disabled]="recordingType() === 'audio' && audioDevices().length === 0 || recordingType() === 'video' && (audioDevices().length === 0 || videoDevices().length === 0)">
+            <i class="bi bi-record-circle me-2"></i>
+            Start Recording
+          </button>
+        } @else {
+          <button class="btn btn-primary flex-grow-1" (click)="stopRecording()">
+            <i class="bi bi-stop-circle me-2"></i>
+            Stop Recording
+          </button>
+        }
+        <button class="btn btn-outline-secondary" (click)="cancel()" [disabled]="recording()">
+          Cancel
+        </button>
+      </div>
+    } @else {
+      <div class="mb-3">
+        <label class="form-label">Preview</label>
+        @if (recordingType() === 'audio') {
+          <audio [src]="previewUrl()!" controls class="w-100"></audio>
+        } @else {
+          <video [src]="previewUrl()!" controls class="w-100" style="max-height: 400px;"></video>
+        }
+      </div>
+
+      <div class="alert alert-success mb-3">
+        <i class="bi bi-check-circle me-2"></i>
+        Recording complete ({{ formatDuration(recordingDuration()) }})
+        <div class="small text-muted mt-1">
+          Click "Save" in the modal to add this recording to your annotation
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-warning flex-grow-1" (click)="discardRecording()">
+          <i class="bi bi-arrow-counterclockwise me-2"></i>
+          Re-record
+        </button>
+        <button class="btn btn-outline-secondary" (click)="cancel()">
+          Cancel
+        </button>
+      </div>
+    }
+  </div>
+</div>
