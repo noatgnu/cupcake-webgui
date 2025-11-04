@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Initial Setup Required</title>
+  <link href="management-panel.css" rel="stylesheet">
+</head>
+<body>
+  <div class="management-container">
+    <div class="content">
+      <div class="header-section">
+        <h2>Initial Setup Required</h2>
+        <p>The following initialization commands need to be run:</p>
+      </div>
+
+      <div class="commands-table">
+        <div id="schemas-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Schema Synchronization <span id="schemas-count" class="count-badge">0</span></div>
+            <div class="command-description">Load initial database schemas for metadata management</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-schemas-btn" class="btn btn-primary">Run sync_schemas</button>
+            <div id="schemas-status" class="status-indicator"></div>
+          </div>
+          <div id="schemas-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="templates-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Column Templates <span id="templates-count" class="count-badge">0</span></div>
+            <div class="command-description">Load default metadata column templates</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-templates-btn" class="btn btn-primary">Run load_column_templates</button>
+            <div id="templates-status" class="status-indicator"></div>
+          </div>
+          <div id="templates-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="ms-mod-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">MS Modifications</div>
+            <div class="command-description">Load mass spectrometry modifications data</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-ms-mod-btn" class="btn btn-primary">Run load_ms_mod</button>
+            <div id="ms-mod-status" class="status-indicator"></div>
+          </div>
+          <div id="ms-mod-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="ms-term-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">MS Terms</div>
+            <div class="command-description">Load mass spectrometry terms data</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-ms-term-btn" class="btn btn-primary">Run load_ms_term</button>
+            <div id="ms-term-status" class="status-indicator"></div>
+          </div>
+          <div id="ms-term-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="species-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Species Data</div>
+            <div class="command-description">Load species and organism information</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-species-btn" class="btn btn-primary">Run load_species</button>
+            <div id="species-status" class="status-indicator"></div>
+          </div>
+          <div id="species-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="subcellular-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Subcellular Locations</div>
+            <div class="command-description">Load subcellular location data</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-subcellular-btn" class="btn btn-primary">Run load_subcellular_location</button>
+            <div id="subcellular-status" class="status-indicator"></div>
+          </div>
+          <div id="subcellular-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="tissue-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Tissue Data</div>
+            <div class="command-description">Load tissue and anatomical information</div>
+          </div>
+          <div class="command-actions">
+            <button id="run-tissue-btn" class="btn btn-primary">Run load_tissue</button>
+            <div id="tissue-status" class="status-indicator"></div>
+          </div>
+          <div id="tissue-progress" class="progress-message" style="display: none;"></div>
+        </div>
+
+        <div id="ontologies-section" class="command-row" style="display: none;">
+          <div class="command-info">
+            <div class="command-name">Ontologies <span id="ontologies-count" class="count-badge">0</span></div>
+            <div class="command-description">
+              Load ontology data (MONDO, UBERON, NCBI, ChEBI, PSI-MS, Cell Ontology)
+              <div id="ontologies-breakdown" class="count-breakdown" style="display: none;"></div>
+            </div>
+          </div>
+          <div class="command-actions">
+            <button id="run-ontologies-btn" class="btn btn-primary">Run load_ontologies --no-limit</button>
+            <div id="ontologies-status" class="status-indicator"></div>
+          </div>
+          <div id="ontologies-progress" class="progress-message" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="footer-actions">
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    console.log('Management panel script starting...');
+
+    let needsSchemas = false;
+    let needsColumnTemplates = false;
+    let completedTasks = 0;
+    let totalTasks = 0;
+    let commandHistory = {};
+
+    // Set up event listeners using the secure API
+    if (window.managementAPI) {
+      console.log('Setting up secure Management API listeners...');
+
+      // Listen for setup data
+      window.managementAPI.onSetupPanel((event, data) => {
+        console.log('Received setup data:', data);
+        needsSchemas = data.needsSchemas;
+        needsColumnTemplates = data.needsColumnTemplates;
+        commandHistory = data.commandHistory || {};
+
+        setupPanel();
+
+        // Update counts if provided
+        if (data.counts) {
+          updateCounts(data.counts);
+        }
+      });
+
+      // Listen for command progress updates
+      window.managementAPI.onCommandProgress((event, command, status, message) => {
+        console.log('Command progress:', command, status, message);
+        updateCommandStatus(command, status, message);
+      });
+
+      // Listen for live command output
+      window.managementAPI.onCommandOutput((event, command, output, type) => {
+        console.log('Command output:', command, output, type);
+        updateCommandOutput(command, output, type);
+      });
+
+      // Set up button event listeners
+      document.getElementById('run-schemas-btn').addEventListener('click', () => {
+        console.log('Running sync_schemas...');
+        window.managementAPI.runSyncSchemas();
+        document.getElementById('run-schemas-btn').disabled = true;
+      });
+
+      document.getElementById('run-templates-btn').addEventListener('click', () => {
+        console.log('Running load_column_templates...');
+        window.managementAPI.runLoadColumnTemplates();
+        document.getElementById('run-templates-btn').disabled = true;
+      });
+
+      document.getElementById('run-ms-mod-btn').addEventListener('click', () => {
+        console.log('Running load_ms_mod...');
+        window.managementAPI.runLoadMsMod();
+        document.getElementById('run-ms-mod-btn').disabled = true;
+      });
+
+      document.getElementById('run-ms-term-btn').addEventListener('click', () => {
+        console.log('Running load_ms_term...');
+        window.managementAPI.runLoadMsTerm();
+        document.getElementById('run-ms-term-btn').disabled = true;
+      });
+
+      document.getElementById('run-species-btn').addEventListener('click', () => {
+        console.log('Running load_species...');
+        window.managementAPI.runLoadSpecies();
+        document.getElementById('run-species-btn').disabled = true;
+      });
+
+      document.getElementById('run-subcellular-btn').addEventListener('click', () => {
+        console.log('Running load_subcellular_location...');
+        window.managementAPI.runLoadSubcellularLocation();
+        document.getElementById('run-subcellular-btn').disabled = true;
+      });
+
+      document.getElementById('run-tissue-btn').addEventListener('click', () => {
+        console.log('Running load_tissue...');
+        window.managementAPI.runLoadTissue();
+        document.getElementById('run-tissue-btn').disabled = true;
+      });
+
+      document.getElementById('run-ontologies-btn').addEventListener('click', () => {
+        console.log('Running load_ontologies --no-limit...');
+        window.managementAPI.runLoadOntologies();
+        document.getElementById('run-ontologies-btn').disabled = true;
+      });
+
+
+      console.log('Management API listeners set up successfully');
+    } else {
+      console.warn('Management API not available');
+    }
+
+    function setupPanel() {
+      // Always show all management options regardless of setup status
+      document.getElementById('schemas-section').style.display = 'block';
+      document.getElementById('templates-section').style.display = 'block';
+      document.getElementById('ms-mod-section').style.display = 'block';
+      document.getElementById('ms-term-section').style.display = 'block';
+      document.getElementById('species-section').style.display = 'block';
+      document.getElementById('subcellular-section').style.display = 'block';
+      document.getElementById('tissue-section').style.display = 'block';
+      document.getElementById('ontologies-section').style.display = 'block';
+
+      totalTasks = 8; // All management commands are available
+
+      // Display command history for each command
+      displayCommandHistory();
+    }
+
+    function displayCommandHistory() {
+      const commands = [
+        'sync-schemas', 'load-column-templates', 'load-ms-mod', 'load-ms-term',
+        'load-species', 'load-subcellular-location', 'load-tissue', 'load-ontologies'
+      ];
+
+      commands.forEach(command => {
+        const history = commandHistory[command];
+        if (history) {
+          const statusElement = document.getElementById(getStatusElementId(command));
+          const progressElement = document.getElementById(getProgressElementId(command));
+
+          if (statusElement && progressElement) {
+            const lastRun = new Date(history.lastRun);
+            const timeAgo = getTimeAgo(lastRun);
+
+            statusElement.className = 'status-indicator';
+            if (history.success) {
+              statusElement.classList.add('completed');
+              statusElement.innerHTML = '<i class="bi bi-check-circle"></i> Last run successful';
+            } else {
+              statusElement.classList.add('error');
+              statusElement.innerHTML = '<i class="bi bi-x-circle"></i> Last run failed';
+            }
+
+            progressElement.style.display = 'block';
+            progressElement.textContent = `Last run: ${timeAgo} - ${history.message}`;
+          }
+        }
+      });
+    }
+
+    function getStatusElementId(command) {
+      const mapping = {
+        'sync-schemas': 'schemas-status',
+        'load-column-templates': 'templates-status',
+        'load-ms-mod': 'ms-mod-status',
+        'load-ms-term': 'ms-term-status',
+        'load-species': 'species-status',
+        'load-subcellular-location': 'subcellular-status',
+        'load-tissue': 'tissue-status',
+        'load-ontologies': 'ontologies-status'
+      };
+      return mapping[command];
+    }
+
+    function getProgressElementId(command) {
+      const mapping = {
+        'sync-schemas': 'schemas-progress',
+        'load-column-templates': 'templates-progress',
+        'load-ms-mod': 'ms-mod-progress',
+        'load-ms-term': 'ms-term-progress',
+        'load-species': 'species-progress',
+        'load-subcellular-location': 'subcellular-progress',
+        'load-tissue': 'tissue-progress',
+        'load-ontologies': 'ontologies-progress'
+      };
+      return mapping[command];
+    }
+
+    function getTimeAgo(date) {
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    }
+
+    function updateCommandStatus(command, status, message) {
+      let statusElement, progressElement, buttonElement;
+
+      if (command === 'sync-schemas') {
+        statusElement = document.getElementById('schemas-status');
+        progressElement = document.getElementById('schemas-progress');
+        buttonElement = document.getElementById('run-schemas-btn');
+      } else if (command === 'load-column-templates') {
+        statusElement = document.getElementById('templates-status');
+        progressElement = document.getElementById('templates-progress');
+        buttonElement = document.getElementById('run-templates-btn');
+      } else if (command === 'load-ms-mod') {
+        statusElement = document.getElementById('ms-mod-status');
+        progressElement = document.getElementById('ms-mod-progress');
+        buttonElement = document.getElementById('run-ms-mod-btn');
+      } else if (command === 'load-ms-term') {
+        statusElement = document.getElementById('ms-term-status');
+        progressElement = document.getElementById('ms-term-progress');
+        buttonElement = document.getElementById('run-ms-term-btn');
+      } else if (command === 'load-species') {
+        statusElement = document.getElementById('species-status');
+        progressElement = document.getElementById('species-progress');
+        buttonElement = document.getElementById('run-species-btn');
+      } else if (command === 'load-subcellular-location') {
+        statusElement = document.getElementById('subcellular-status');
+        progressElement = document.getElementById('subcellular-progress');
+        buttonElement = document.getElementById('run-subcellular-btn');
+      } else if (command === 'load-tissue') {
+        statusElement = document.getElementById('tissue-status');
+        progressElement = document.getElementById('tissue-progress');
+        buttonElement = document.getElementById('run-tissue-btn');
+      } else if (command === 'load-ontologies') {
+        statusElement = document.getElementById('ontologies-status');
+        progressElement = document.getElementById('ontologies-progress');
+        buttonElement = document.getElementById('run-ontologies-btn');
+      }
+
+      if (statusElement && progressElement) {
+        progressElement.style.display = 'block';
+        progressElement.textContent = message;
+
+        statusElement.className = 'status-indicator';
+
+        if (status === 'running') {
+          statusElement.classList.add('running');
+          statusElement.innerHTML = '<i class="bi bi-hourglass-split"></i> Running...';
+        } else if (status === 'completed') {
+          statusElement.classList.add('completed');
+          statusElement.innerHTML = '<i class="bi bi-check-circle"></i> Completed';
+          completedTasks++;
+
+          if (completedTasks === totalTasks) {
+            // All tasks completed
+          }
+        } else if (status === 'error') {
+          statusElement.classList.add('error');
+          statusElement.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+          if (buttonElement) {
+            buttonElement.disabled = false;
+          }
+        }
+      }
+    }
+
+    function updateCommandOutput(command, output, type) {
+      let progressElement = null;
+
+      if (command === 'sync-schemas') {
+        progressElement = document.getElementById('schemas-progress');
+      } else if (command === 'load-column-templates') {
+        progressElement = document.getElementById('templates-progress');
+      } else if (command === 'load-ms-mod') {
+        progressElement = document.getElementById('ms-mod-progress');
+      } else if (command === 'load-ms-term') {
+        progressElement = document.getElementById('ms-term-progress');
+      } else if (command === 'load-species') {
+        progressElement = document.getElementById('species-progress');
+      } else if (command === 'load-subcellular-location') {
+        progressElement = document.getElementById('subcellular-progress');
+      } else if (command === 'load-tissue') {
+        progressElement = document.getElementById('tissue-progress');
+      } else if (command === 'load-ontologies') {
+        progressElement = document.getElementById('ontologies-progress');
+      }
+
+      if (progressElement && output.trim()) {
+        progressElement.style.display = 'block';
+        progressElement.textContent = output.trim();
+        progressElement.className = 'progress-message';
+
+        // Add type-specific styling
+        if (type === 'error') {
+          progressElement.style.color = '#dc3545';
+        } else if (type === 'success') {
+          progressElement.style.color = '#198754';
+        } else {
+          progressElement.style.color = '';
+        }
+      }
+    }
+
+    function updateCounts(counts) {
+      console.log('Updating counts:', counts);
+
+      // Update schema count
+      if (counts.schemas !== undefined) {
+        const schemasCountEl = document.getElementById('schemas-count');
+        if (schemasCountEl) {
+          schemasCountEl.textContent = counts.schemas.toLocaleString();
+        }
+      }
+
+      // Update column templates count
+      if (counts.templates !== undefined) {
+        const templatesCountEl = document.getElementById('templates-count');
+        if (templatesCountEl) {
+          templatesCountEl.textContent = counts.templates.toLocaleString();
+        }
+      }
+
+      // Update ontologies count
+      if (counts.ontologies) {
+        const ontologiesCountEl = document.getElementById('ontologies-count');
+        const ontologiesBreakdownEl = document.getElementById('ontologies-breakdown');
+
+        if (ontologiesCountEl) {
+          ontologiesCountEl.textContent = counts.ontologies.total.toLocaleString();
+        }
+
+        if (ontologiesBreakdownEl && counts.ontologies.total > 0) {
+          const breakdown = [
+            `MONDO: ${counts.ontologies.mondo.toLocaleString()}`,
+            `UBERON: ${counts.ontologies.uberon.toLocaleString()}`,
+            `NCBI: ${counts.ontologies.ncbi.toLocaleString()}`,
+            `ChEBI: ${counts.ontologies.chebi.toLocaleString()}`,
+            `PSI-MS: ${counts.ontologies.psims.toLocaleString()}`,
+            `Cell: ${counts.ontologies.cell.toLocaleString()}`
+          ].join(' | ');
+
+          ontologiesBreakdownEl.textContent = breakdown;
+          ontologiesBreakdownEl.style.display = 'block';
+        }
+      }
+    }
+  </script>
+</body>
+</html>

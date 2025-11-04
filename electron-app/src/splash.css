@@ -1,0 +1,677 @@
+/* Import Bootstrap CSS - works in both dev and production */
+@import url('./css/bootstrap.min.css');
+
+/* Bootstrap Icons */
+@font-face {
+  font-family: "bootstrap-icons";
+  src: url("./fonts/bootstrap-icons.woff2") format("woff2"),
+       url("./fonts/bootstrap-icons.woff") format("woff");
+}
+
+.bi::before {
+  font-family: "bootstrap-icons" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  vertical-align: -.125em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #f0f0f0;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-app-region: drag;
+}
+
+/* Basic Theme (Default/Current) */
+body.theme-basic {
+    background: #f0f0f0;
+}
+
+body.theme-basic .logo {
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+body.theme-basic .subtitle {
+    color: #666;
+    font-size: 14px;
+}
+
+body.theme-basic .progress-fill {
+    background: #007bff;
+}
+
+body.theme-basic .progress-bar {
+    background: rgba(0, 123, 255, 0.1);
+}
+
+body.theme-basic .progress-text {
+    color: #666;
+}
+
+body.theme-basic .continue-btn {
+    background: #007bff;
+}
+
+body.theme-basic .continue-btn:hover {
+    background: #0056b3;
+}
+
+/* Default Theme */
+body.theme-default {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+body.theme-default .logo {
+    font-size: 28px;
+    font-weight: 700;
+    color: #4a5568;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.theme-default .subtitle {
+    color: #718096;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+body.theme-default .progress-fill {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+body.theme-default .progress-text {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body.theme-default .continue-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    transition: all 0.3s ease;
+}
+
+body.theme-default .continue-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+/* Sci-Fi Theme */
+body.theme-scifi {
+    background: #0a0a0a;
+    position: relative;
+}
+
+body.theme-scifi::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 60%, rgba(0, 255, 0, 0.1) 0%, transparent 50%);
+    z-index: -1;
+}
+
+body.theme-scifi .logo {
+    font-size: 28px;
+    font-weight: 700;
+    color: #00ffff;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    animation: scifiGlow 2s ease-in-out infinite alternate;
+    font-family: 'Courier New', monospace;
+}
+
+@keyframes scifiGlow {
+    from { text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4); }
+    to { text-shadow: 0 0 20px rgba(0, 255, 255, 1), 0 0 30px rgba(0, 255, 255, 0.6); }
+}
+
+body.theme-scifi .subtitle {
+    color: #88cccc;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+body.theme-scifi .progress-bar {
+    background: rgba(0, 255, 255, 0.2);
+}
+
+body.theme-scifi .progress-fill {
+    background: #00ffff;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+}
+
+body.theme-scifi .progress-text {
+    color: #88cccc;
+}
+
+body.theme-scifi .continue-btn {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.2) 0%, rgba(0, 136, 204, 0.3) 100%);
+    border: 2px solid #00ffff;
+    color: #00ffff;
+    border-radius: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+body.theme-scifi .continue-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.3) 0%, rgba(0, 136, 204, 0.4) 100%);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+}
+
+/* Matrix Theme */
+body.theme-matrix {
+    background: #000;
+    position: relative;
+    overflow: hidden;
+}
+
+body.theme-matrix::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        linear-gradient(90deg, transparent 98%, rgba(0, 255, 0, 0.1) 100%),
+        linear-gradient(180deg, transparent 98%, rgba(0, 255, 0, 0.1) 100%);
+    background-size: 20px 20px;
+    animation: matrixGrid 20s linear infinite;
+    z-index: -1;
+}
+
+@keyframes matrixGrid {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(20px); }
+}
+
+body.theme-matrix .logo {
+    font-size: 28px;
+    font-weight: 700;
+    color: #00ff00;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+    animation: matrixFlicker 3s ease-in-out infinite;
+    font-family: 'Courier New', monospace;
+}
+
+@keyframes matrixFlicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+    51% { opacity: 1; }
+    52% { opacity: 0.9; }
+    53% { opacity: 1; }
+}
+
+body.theme-matrix .subtitle {
+    color: #88ff88;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+body.theme-matrix .progress-bar {
+    background: rgba(0, 255, 0, 0.1);
+}
+
+body.theme-matrix .progress-fill {
+    background: #00ff00;
+}
+
+body.theme-matrix .progress-text {
+    color: #88ff88;
+}
+
+body.theme-matrix .continue-btn {
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.1) 0%, rgba(0, 204, 0, 0.2) 100%);
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    border-radius: 5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+body.theme-matrix .continue-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.2) 0%, rgba(0, 204, 0, 0.3) 100%);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.8);
+}
+
+/* Space Theme */
+body.theme-space {
+    background: #000011;
+    position: relative;
+    overflow: hidden;
+}
+
+body.theme-space::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, transparent 0%, rgba(25, 25, 112, 0.2) 100%);
+    z-index: -2;
+}
+
+body.theme-space::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(2px 2px at 20px 30px, #fff, transparent),
+        radial-gradient(2px 2px at 40px 70px, #fff, transparent),
+        radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+        radial-gradient(1px 1px at 130px 80px, #fff, transparent),
+        radial-gradient(2px 2px at 160px 30px, #fff, transparent);
+    background-repeat: repeat;
+    background-size: 200px 100px;
+    animation: spaceStars 50s linear infinite;
+    opacity: 0.8;
+    z-index: -1;
+}
+
+@keyframes spaceStars {
+    from { transform: translateX(0); }
+    to { transform: translateX(-200px); }
+}
+
+body.theme-space .logo {
+    font-size: 32px;
+    font-weight: 800;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 8px;
+    animation: spaceGradient 4s ease infinite;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes spaceGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+body.theme-space .subtitle {
+    color: #e6e6fa;
+    font-size: 16px;
+    font-weight: 500;
+    text-shadow: 0 0 10px rgba(230, 230, 250, 0.5);
+}
+
+body.theme-space .progress-bar {
+    background: rgba(138, 43, 226, 0.2);
+}
+
+body.theme-space .progress-fill {
+    background: linear-gradient(90deg, #8a2be2, #6a5acd);
+}
+
+body.theme-space .progress-text {
+    color: #e6e6fa;
+}
+
+body.theme-space .continue-btn {
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.8) 0%, rgba(75, 0, 130, 0.9) 100%);
+    border: 2px solid rgba(138, 43, 226, 0.8);
+    color: #ffffff;
+    border-radius: 25px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    box-shadow:
+        0 0 20px rgba(138, 43, 226, 0.6),
+        inset 0 0 20px rgba(138, 43, 226, 0.2);
+    transition: all 0.3s ease;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+body.theme-space .continue-btn:hover {
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.9) 0%, rgba(75, 0, 130, 1) 100%);
+    box-shadow:
+        0 0 30px rgba(138, 43, 226, 0.8),
+        inset 0 0 30px rgba(138, 43, 226, 0.3);
+    transform: translateY(-3px);
+}
+
+/* Common styles for all themes */
+.splash-container {
+    padding: 60px 40px;
+    width: 100%;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.titlebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    -webkit-app-region: drag;
+    z-index: 1000;
+}
+
+.window-controls {
+    display: flex;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+}
+
+.window-control {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.window-control:hover {
+    opacity: 0.8;
+}
+
+/* macOS style controls */
+.titlebar.macos {
+    justify-content: flex-start;
+}
+
+.titlebar.macos .window-control {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.titlebar.macos .minimize {
+    background: #ffbd44;
+}
+
+.titlebar.macos .close {
+    background: #ff5f57;
+}
+
+/* Windows style controls */
+.titlebar.windows {
+    justify-content: flex-end;
+}
+
+.titlebar.windows .window-control {
+    width: 46px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.titlebar.windows .window-control:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar.windows .close:hover {
+    background: #e81123 !important;
+}
+
+/* Linux style controls */
+.titlebar.linux {
+    justify-content: flex-end;
+}
+
+.titlebar.linux .window-control {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.titlebar.linux .window-control:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 60px;
+    flex-shrink: 0;
+}
+
+.logo {
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    font-size: 14px;
+}
+
+.progress-section {
+    margin-bottom: 40px;
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 400px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 14px;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.log-section {
+    display: none;
+    flex-grow: 1;
+    width: 100%;
+    max-width: 600px;
+    margin-bottom: 20px;
+}
+
+.log-header {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.log-output {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-app-region: no-drag;
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+.log-line {
+    margin-bottom: 4px;
+    word-wrap: break-word;
+}
+
+.log-line.error {
+    color: #ff6b6b;
+}
+
+.log-line.warning {
+    color: #feca57;
+}
+
+.log-line.success {
+    color: #48cab2;
+}
+
+.log-line.info {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Theme-specific log output styles */
+body.theme-basic .log-output {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.theme-basic .log-line.info {
+    color: #333;
+}
+
+body.theme-basic .log-header {
+    color: #333;
+}
+
+body.theme-default .log-output {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+body.theme-default .log-header {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body.theme-scifi .log-output {
+    background: rgba(0, 255, 255, 0.05);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+body.theme-scifi .log-header {
+    color: #88cccc;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+body.theme-matrix .log-output {
+    background: rgba(0, 255, 0, 0.05);
+    border: 1px solid rgba(0, 255, 0, 0.2);
+}
+
+body.theme-matrix .log-header {
+    color: #88ff88;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+body.theme-space .log-output {
+    background: rgba(138, 43, 226, 0.1);
+    border: 1px solid rgba(138, 43, 226, 0.3);
+}
+
+body.theme-space .log-header {
+    color: #e6e6fa;
+}
+
+/* Scrollbar styles for all themes */
+.log-output::-webkit-scrollbar {
+    width: 6px;
+}
+
+.log-output::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.log-output::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.log-output::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.continue-btn {
+    padding: 12px 24px;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: none;
+    margin-top: 40px;
+}
+
+.continue-btn.show {
+    display: block;
+}
+/* Text selection and scrolling fix */
+.selectable, .scrollable { -webkit-app-region: no-drag; user-select: text; -webkit-user-select: text; cursor: text; }

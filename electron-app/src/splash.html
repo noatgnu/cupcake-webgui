@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupcake Vanilla - Starting</title>
+
+    <!-- Import splash CSS - use production version for built app -->
+    <link href="splash-prod.css" rel="stylesheet">
+</head>
+<body>
+    <div class="splash-container">
+        <div class="header">
+            <div class="logo">Cupcake Vanilla</div>
+            <div class="subtitle">Starting backend services...</div>
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div id="progress-text" class="progress-text">Starting...</div>
+        </div>
+
+        <div class="log-section">
+            <div class="log-header">Process Logs</div>
+            <div id="log-output" class="log-output"></div>
+        </div>
+
+        <button id="continue-btn" class="continue-btn">Continue to Application</button>
+    </div>
+
+    <script>
+        console.log('Splash screen script starting...');
+
+        const themes = ['basic', 'default', 'scifi', 'matrix', 'space'];
+        const selectedTheme = themes[Math.floor(Math.random() * themes.length)];
+        document.body.className = `theme-${selectedTheme}`;
+        console.log(`Selected theme: ${selectedTheme}`);
+
+
+        let totalServices = 8;
+        let readyServices = 0;
+        let completedServices = new Set();
+        let allServicesReady = false;
+
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        const continueBtn = document.getElementById('continue-btn');
+        const logOutput = document.getElementById('log-output');
+
+        function updateProgress() {
+            const progress = Math.round((readyServices / totalServices) * 100);
+            progressFill.style.width = progress + '%';
+
+            if (readyServices === 0) {
+                progressText.textContent = '0% - Starting...';
+            } else if (readyServices === totalServices) {
+                progressText.textContent = '100% - Ready';
+                allServicesReady = true;
+                // Hide logs and show continue button when all services are ready
+                const logSection = document.querySelector('.log-section');
+                if (logSection) {
+                    logSection.style.display = 'none';
+                }
+                continueBtn.style.display = 'block';
+
+                // Auto-close after a short delay to give user time to see completion
+                setTimeout(() => {
+                    if (window.splashElectronAPI) {
+                        window.splashElectronAPI.continueToApp();
+                    }
+                }, 2000);
+            } else {
+                progressText.textContent = `${progress}% - ${readyServices}/${totalServices} services ready`;
+            }
+        }
+
+        function addLogMessage(message, type = 'info') {
+            // Only show log section if all services are not ready yet
+            if (!allServicesReady) {
+                document.querySelector('.log-section').style.display = 'block';
+            }
+            const logLine = document.createElement('div');
+            logLine.className = `log-line ${type}`;
+            logLine.textContent = message;
+            logOutput.appendChild(logLine);
+
+            logOutput.scrollTop = logOutput.scrollHeight;
+
+            if (logOutput.children.length > 1000) {
+                logOutput.removeChild(logOutput.firstChild);
+            }
+        }
+
+        function updateServiceStatus(service, status, message) {
+            const timestamp = new Date().toLocaleTimeString();
+
+            if (status === 'starting') {
+                addLogMessage(`[${timestamp}] [${service.toUpperCase()}] Starting...`, 'info');
+            } else if (status === 'ready' || status === 'error') {
+                if (!completedServices.has(service)) {
+                    completedServices.add(service);
+                    readyServices++;
+
+                    if (status === 'ready') {
+                        addLogMessage(`[${timestamp}] [${service.toUpperCase()}] Ready`, 'success');
+                    } else {
+                        addLogMessage(`[${timestamp}] [${service.toUpperCase()}] ${message}`, 'warning');
+                    }
+                    updateProgress();
+                } else {
+                    if (status === 'ready') {
+                        addLogMessage(`[${timestamp}] [${service.toUpperCase()}] Ready (already counted)`, 'info');
+                    } else {
+                        addLogMessage(`[${timestamp}] [${service.toUpperCase()}] ${message} (already counted)`, 'info');
+                    }
+                }
+            }
+        }
+
+        // Set up event listeners using the secure API
+        if (window.splashElectronAPI) {
+            console.log('Setting up secure Electron API listeners...');
+
+            // Backend status updates
+            window.splashElectronAPI.onBackendStatus((event, data) => {
+                console.log('Received backend status:', data);
+                const { service, status, message } = data;
+                updateServiceStatus(service, status, message);
+            });
+
+            // Backend log messages
+            window.splashElectronAPI.onBackendLog((event, data) => {
+                console.log('Received backend log:', data);
+                const { message, type = 'info' } = data;
+                const timestamp = new Date().toLocaleTimeString();
+                addLogMessage(`[${timestamp}] ${message}`, type);
+            });
+
+            // Handle continue button
+            continueBtn.addEventListener('click', () => {
+                window.splashElectronAPI.continueToApp();
+            });
+
+
+            console.log('Electron API listeners set up successfully');
+        } else {
+            console.warn('Electron API not available - running in fallback mode');
+            // Fallback for when Electron API is not available
+            continueBtn.addEventListener('click', () => {
+                console.log('Continue clicked (fallback mode)');
+                alert('Continue button clicked - Electron API not available');
+            });
+        }
+
+        // Initialize
+        updateProgress();
+        addLogMessage('Starting Cupcake Vanilla backend services...', 'info');
+
+        // Verify theme is applied
+        console.log('Theme applied:', document.body.className);
+    </script>
+</body>
+</html>

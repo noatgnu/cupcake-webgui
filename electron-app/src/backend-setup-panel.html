@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backend Setup</title>
+  <link href="backend-setup-panel.css" rel="stylesheet">
+</head>
+<body>
+  <div class="setup-container">
+    <div class="header-section">
+      <h4>Backend Setup & Downloads</h4>
+      <p class="text-muted">Manage backend installation</p>
+    </div>
+
+    <div class="setup-sections">
+      <!-- Backend Section -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center">
+            <i class="bi bi-server me-2 text-primary"></i>
+            Backend
+          </h5>
+          <p class="card-text small text-muted">Download or update the Cupcake Vanilla backend</p>
+
+          <div id="backend-status" class="alert alert-secondary small mb-3">
+            <div class="d-flex justify-content-between">
+              <span>Status: <span id="backend-status-text">Checking...</span></span>
+              <span id="backend-version" class="text-muted"></span>
+            </div>
+            <div class="mt-1 small">
+              <span class="text-muted">Location:</span>
+              <code id="backend-path" class="small"></code>
+            </div>
+          </div>
+
+          <div class="btn-group w-100" role="group">
+            <button id="download-portable-btn" class="btn btn-sm btn-primary">
+              <i class="bi bi-download me-1"></i>
+              Download Portable
+            </button>
+            <button id="download-source-btn" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-git me-1"></i>
+              Clone Source
+            </button>
+          </div>
+          <small class="text-muted d-block" style="margin-top: 0.375rem; line-height: 1.3;">
+            Portable: Python included • Source: Manual setup
+          </small>
+        </div>
+      </div>
+
+      <!-- Valkey Section -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center">
+            <i class="bi bi-database me-2 text-danger"></i>
+            Valkey/Redis
+          </h5>
+          <p class="card-text small text-muted">Download Valkey binaries for caching and queues</p>
+
+          <div id="valkey-status" class="alert alert-secondary small mb-3">
+            <div class="d-flex justify-content-between">
+              <span>Status: <span id="valkey-status-text">Checking...</span></span>
+              <span id="valkey-version" class="text-muted"></span>
+            </div>
+            <div class="mt-1 small">
+              <span class="text-muted">Location:</span>
+              <code id="valkey-path" class="small"></code>
+            </div>
+          </div>
+
+          <button id="download-valkey-btn" class="btn btn-sm btn-danger">
+            <i class="bi bi-download me-1"></i>
+            Download Valkey/Redis
+          </button>
+          <small class="text-muted d-block" style="margin-top: 0.375rem; line-height: 1.3;">
+            Linux: Valkey 8.1.3 | Windows: Redis 5.0.14.1
+          </small>
+        </div>
+      </div>
+
+      <!-- Python Environment Section -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center">
+            <i class="bi bi-python me-2 text-success"></i>
+            Python Environment
+          </h5>
+          <p class="card-text small text-muted">Current Python configuration</p>
+
+          <div id="python-status" class="alert alert-secondary small mb-3">
+            <div class="d-flex justify-content-between">
+              <span>Python: <span id="python-version"></span></span>
+            </div>
+            <div class="mt-1 small">
+              <span class="text-muted">Path:</span>
+              <code id="python-path" class="small"></code>
+            </div>
+          </div>
+
+          <button id="change-python-btn" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-gear me-1"></i>
+            Change Python
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between mt-3 pt-3 border-top">
+      <button id="refresh-btn" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-clockwise me-1"></i>
+        Refresh Status
+      </button>
+      <button id="close-btn" class="btn btn-sm btn-secondary">
+        Close
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const backendStatusText = document.getElementById('backend-status-text');
+    const backendVersion = document.getElementById('backend-version');
+    const backendPath = document.getElementById('backend-path');
+    const backendStatus = document.getElementById('backend-status');
+
+    const valkeyStatusText = document.getElementById('valkey-status-text');
+    const valkeyVersion = document.getElementById('valkey-version');
+    const valkeyPath = document.getElementById('valkey-path');
+    const valkeyStatus = document.getElementById('valkey-status');
+
+    const pythonVersion = document.getElementById('python-version');
+    const pythonPath = document.getElementById('python-path');
+
+    const downloadPortableBtn = document.getElementById('download-portable-btn');
+    const downloadSourceBtn = document.getElementById('download-source-btn');
+    const downloadValkeyBtn = document.getElementById('download-valkey-btn');
+    const changePythonBtn = document.getElementById('change-python-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const closeBtn = document.getElementById('close-btn');
+
+    if (window.backendSetupAPI) {
+      // Load initial status
+      window.backendSetupAPI.getStatus().then(status => {
+        updateStatus(status);
+      });
+
+      // Status updates
+      window.backendSetupAPI.onStatusUpdate((status) => {
+        updateStatus(status);
+      });
+
+      // Button handlers
+      downloadPortableBtn.addEventListener('click', () => {
+        window.backendSetupAPI.downloadPortable();
+      });
+
+      downloadSourceBtn.addEventListener('click', () => {
+        window.backendSetupAPI.downloadSource();
+      });
+
+      downloadValkeyBtn.addEventListener('click', () => {
+        window.backendSetupAPI.downloadValkey();
+      });
+
+      changePythonBtn.addEventListener('click', () => {
+        window.backendSetupAPI.changePython();
+      });
+
+      refreshBtn.addEventListener('click', () => {
+        window.backendSetupAPI.refresh();
+      });
+
+      closeBtn.addEventListener('click', () => {
+        window.close();
+      });
+    }
+
+    function updateStatus(status) {
+      // Backend status
+      backendPath.textContent = status.backend.path;
+      if (status.backend.exists) {
+        backendStatusText.textContent = status.backend.isPortable ? 'Installed (Portable)' : 'Installed (Source)';
+        backendStatus.className = 'alert alert-success small mb-3';
+        if (status.backend.version) {
+          backendVersion.textContent = `v${status.backend.version}`;
+        }
+      } else {
+        backendStatusText.textContent = 'Not Installed';
+        backendStatus.className = 'alert alert-warning small mb-3';
+      }
+
+      // Valkey status
+      valkeyPath.textContent = status.valkey.path;
+      if (status.valkey.exists) {
+        valkeyStatusText.textContent = 'Installed';
+        valkeyStatus.className = 'alert alert-success small mb-3';
+        if (status.valkey.version) {
+          valkeyVersion.textContent = status.valkey.version;
+        }
+      } else {
+        valkeyStatusText.textContent = 'Not Installed';
+        valkeyStatus.className = 'alert alert-warning small mb-3';
+      }
+
+      // Python status
+      if (status.python.version) {
+        pythonVersion.textContent = status.python.version;
+        pythonPath.textContent = status.python.path;
+      } else {
+        pythonVersion.textContent = 'Not configured';
+        pythonPath.textContent = 'N/A';
+      }
+    }
+  </script>
+</body>
+</html>

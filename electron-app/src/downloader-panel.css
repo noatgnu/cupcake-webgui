@@ -1,0 +1,114 @@
+/* Import Bootstrap CSS - works in both dev and production */
+@import url('./css/bootstrap.min.css');
+
+/* Bootstrap Icons */
+@font-face {
+  font-family: "bootstrap-icons";
+  src: url("./fonts/bootstrap-icons.woff2") format("woff2"),
+       url("./fonts/bootstrap-icons.woff") format("woff");
+}
+
+.bi::before {
+  font-family: "bootstrap-icons" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  vertical-align: -.125em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: #fff;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.downloader-container {
+  width: 100%;
+  height: 100vh;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.downloader-header {
+  background: #f8f9fa;
+  color: #333;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #dee2e6;
+  -webkit-app-region: drag;
+  cursor: move;
+}
+
+.downloader-header h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.download-icon {
+  font-size: 2rem;
+  color: #6c757d;
+}
+
+.progress-bar {
+  position: relative;
+  overflow: visible;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.status-message {
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.status-message::-webkit-scrollbar {
+  width: 6px;
+}
+
+.status-message::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.status-message::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.status-message::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}/* Text selection and scrolling fix */
+.selectable, .scrollable { -webkit-app-region: no-drag; user-select: text; -webkit-user-select: text; cursor: text; }

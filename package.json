@@ -6,7 +6,13 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "electron:dev:server": "cd electron-app && npm run dev:server",
+    "electron:dev:built": "ng build --configuration=electron && cd electron-app && npm run dev:built",
+    "electron:build": "cd electron-app && npm run build",
+    "electron:build:win": "cd electron-app && npm run build:win",
+    "electron:build:mac": "cd electron-app && npm run build:mac",
+    "electron:build:linux": "cd electron-app && npm run build:linux"
   },
   "prettier": {
     "printWidth": 100,
@@ -33,11 +39,11 @@
     "@ericblade/quagga2": "^1.8.4",
     "@ng-bootstrap/ng-bootstrap": "^19.0.1",
     "@noatgnu/cupcake-core": "^1.2.17",
-    "@noatgnu/cupcake-macaron": "^1.2.54",
+    "@noatgnu/cupcake-macaron": "^1.2.55",
     "@noatgnu/cupcake-mint-chocolate": "^1.2.4",
     "@noatgnu/cupcake-red-velvet": "^1.2.43",
     "@noatgnu/cupcake-salted-caramel": "^1.2.2",
-    "@noatgnu/cupcake-vanilla": "^1.2.15",
+    "@noatgnu/cupcake-vanilla": "^1.2.19",
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.6",
     "bootstrap-icons": "^1.13.1",

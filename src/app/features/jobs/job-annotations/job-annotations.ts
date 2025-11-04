@@ -11,9 +11,12 @@ import {
   InstrumentUsageService,
   InstrumentUsage,
   InstrumentUsageCreateRequest,
-  CCMNotificationWebSocketService
+  InstrumentUsageJobAnnotationService,
+  CCMNotificationWebSocketService,
+  InstrumentService
 } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType } from '@noatgnu/cupcake-core';
+import { MetadataTable, MetadataColumn } from '@noatgnu/cupcake-vanilla';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AddAnnotationModal } from './add-annotation-modal/add-annotation-modal';
 import { WebvttEditor } from '../../protocols/webvtt-editor/webvtt-editor';
@@ -29,6 +32,8 @@ export class JobAnnotations implements OnInit, OnDestroy {
   private annotationService = inject(InstrumentJobAnnotationService);
   private chunkedUploadService = inject(AnnotationChunkedUploadService);
   private instrumentUsageService = inject(InstrumentUsageService);
+  private usageAnnotationLinkService = inject(InstrumentUsageJobAnnotationService);
+  private instrumentService = inject(InstrumentService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
@@ -37,7 +42,11 @@ export class JobAnnotations implements OnInit, OnDestroy {
   private transcriptionSubscription?: Subscription;
 
   bookingDataCache = signal<Map<number, InstrumentUsage>>(new Map());
+  metadataTableCache = signal<Map<number, MetadataTable>>(new Map());
   mediaCurrentTimes = signal<Map<number, number>>(new Map());
+  transcribingAnnotations = signal<Set<number>>(new Set());
+  loadingBookings = signal<Set<number>>(new Set());
+  loadingInstrumentMetadata = signal<Set<number>>(new Set());
 
   @Input() jobId!: number;
   @Input() canEditStaffOnly = false;
@@ -167,6 +176,10 @@ export class JobAnnotations implements OnInit, OnDestroy {
       this.loadAnnotations();
     }
 
+    this.wsService.transcriptionStarted$.subscribe(event => {
+      this.handleTranscriptionStarted(event.annotation_id);
+    });
+
     this.transcriptionSubscription = this.wsService.transcriptionCompleted$.subscribe(event => {
       this.handleTranscriptionCompleted(event.annotation_id);
     });
@@ -178,11 +191,26 @@ export class JobAnnotations implements OnInit, OnDestroy {
     }
   }
 
+  private handleTranscriptionStarted(annotationId: number): void {
+    const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
+    const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
+
+    if (userAnnotation || staffAnnotation) {
+      const transcribing = this.transcribingAnnotations();
+      transcribing.add(annotationId);
+      this.transcribingAnnotations.set(new Set(transcribing));
+      this.toastService.info('Transcription started');
+    }
+  }
+
   private handleTranscriptionCompleted(annotationId: number): void {
     const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
     const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
 
     if (userAnnotation || staffAnnotation) {
+      const transcribing = this.transcribingAnnotations();
+      transcribing.delete(annotationId);
+      this.transcribingAnnotations.set(new Set(transcribing));
       this.toastService.success('Transcription completed');
       this.loadAnnotations();
     }
@@ -366,7 +394,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
         const request: InstrumentJobAnnotationCreateRequest = {
           instrumentJob: this.jobId,
           annotationData: {
-            annotation: `Instrument booking: ${usage.instrumentName || 'Unknown'}`,
+            annotation: `Instrument booking for ${usage.instrumentName || 'instrument'}`,
             annotationType: AnnotationType.Booking
           },
           role: 'staff',
@@ -375,14 +403,23 @@ export class JobAnnotations implements OnInit, OnDestroy {
 
         this.annotationService.createInstrumentJobAnnotation(request).subscribe({
           next: (annotation) => {
-            this.bookingDataCache.update(cache => {
-              const newCache = new Map(cache);
-              newCache.set(usage.id, usage);
-              return newCache;
+            this.usageAnnotationLinkService.linkJobAnnotationToBooking(annotation.id!, usage.id).subscribe({
+              next: () => {
+                this.bookingDataCache.update(cache => {
+                  const newCache = new Map(cache);
+                  newCache.set(annotation.id!, usage);
+                  return newCache;
+                });
+                this.toastService.success('Instrument booked and linked to job');
+                this.loading.set(false);
+                this.loadAnnotations();
+              },
+              error: (err) => {
+                console.error('Error linking booking to annotation:', err);
+                this.toastService.error('Failed to link booking to annotation');
+                this.loading.set(false);
+              }
             });
-            this.toastService.success('Instrument booked and linked to job');
-            this.loading.set(false);
-            this.loadAnnotations();
           },
           error: (err) => {
             console.error('Error creating job annotation for booking:', err);
@@ -566,6 +603,121 @@ export class JobAnnotations implements OnInit, OnDestroy {
     return annotation.annotationType === 'audio' || annotation.annotationType === 'video';
   }
 
+  isTranscribing(annotation: InstrumentJobAnnotation): boolean {
+    return this.transcribingAnnotations().has(annotation.annotation);
+  }
+
+  getBookingData(annotation: InstrumentJobAnnotation): InstrumentUsage | null {
+    if (!annotation.id) return null;
+
+    const cachedBooking = this.bookingDataCache().get(annotation.id);
+    if (cachedBooking) {
+      return cachedBooking;
+    }
+
+    if (!this.loadingBookings().has(annotation.id)) {
+      setTimeout(() => this.loadBookingDataForAnnotation(annotation.id), 0);
+    }
+    return null;
+  }
+
+  private loadBookingDataForAnnotation(annotationId: number): void {
+    this.loadingBookings.update(loading => {
+      const newSet = new Set(loading);
+      newSet.add(annotationId);
+      return newSet;
+    });
+
+    this.usageAnnotationLinkService.getByInstrumentJobAnnotation(annotationId).subscribe({
+      next: (response) => {
+        if (response.results && response.results.length > 0) {
+          const link = response.results[0];
+          this.instrumentUsageService.getInstrumentUsageRecord(link.instrumentUsage).subscribe({
+            next: (usage) => {
+              this.bookingDataCache.update(cache => {
+                const newCache = new Map(cache);
+                newCache.set(annotationId, usage);
+                return newCache;
+              });
+
+              this.loadingBookings.update(loading => {
+                const newSet = new Set(loading);
+                newSet.delete(annotationId);
+                return newSet;
+              });
+
+              if (usage.instrument) {
+                this.loadInstrumentData(usage.instrument);
+              }
+            },
+            error: (err) => {
+              console.error(`Error loading booking data for usage ${link.instrumentUsage}:`, err);
+              this.loadingBookings.update(loading => {
+                const newSet = new Set(loading);
+                newSet.delete(annotationId);
+                return newSet;
+              });
+            }
+          });
+        } else {
+          this.loadingBookings.update(loading => {
+            const newSet = new Set(loading);
+            newSet.delete(annotationId);
+            return newSet;
+          });
+        }
+      },
+      error: (err) => {
+        console.error(`Error loading booking link for annotation ${annotationId}:`, err);
+        this.loadingBookings.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(annotationId);
+          return newSet;
+        });
+      }
+    });
+  }
+
+  private loadInstrumentData(instrumentId: number): void {
+    if (this.metadataTableCache().has(instrumentId) || this.loadingInstrumentMetadata().has(instrumentId)) {
+      return;
+    }
+
+    this.loadingInstrumentMetadata.update(loading => {
+      const newSet = new Set(loading);
+      newSet.add(instrumentId);
+      return newSet;
+    });
+
+    this.instrumentService.getInstrumentMetadata(instrumentId).subscribe({
+      next: (metadataTable) => {
+        this.metadataTableCache.update(cache => {
+          const newCache = new Map(cache);
+          newCache.set(instrumentId, metadataTable);
+          return newCache;
+        });
+
+        this.loadingInstrumentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(instrumentId);
+          return newSet;
+        });
+      },
+      error: (err) => {
+        console.error(`Error loading instrument metadata ${instrumentId}:`, err);
+        this.loadingInstrumentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(instrumentId);
+          return newSet;
+        });
+      }
+    });
+  }
+
+  getMetadataForInstrument(instrumentId: number): MetadataTable | null {
+    return this.metadataTableCache().get(instrumentId) || null;
+  }
+
   onMediaTimeUpdate(annotationId: number, event: Event): void {
     const media = event.target as HTMLMediaElement;
     const times = this.mediaCurrentTimes();
@@ -578,14 +730,55 @@ export class JobAnnotations implements OnInit, OnDestroy {
   }
 
   onTranscriptionChanged(annotationId: number, transcription: string): void {
-    this.annotationService.updateInstrumentJobAnnotation(annotationId, { transcription }).subscribe({
-      next: () => {
+    this.annotationService.updateInstrumentJobAnnotation(annotationId, {
+      annotationData: { transcription }
+    }).subscribe({
+      next: (updatedAnnotation) => {
         this.toastService.success('Transcription updated successfully');
-        this.loadAnnotations();
+        const userAnnotations = this.userAnnotations();
+        const staffAnnotations = this.staffAnnotations();
+
+        const userIndex = userAnnotations.findIndex(a => a.id === annotationId);
+        if (userIndex !== -1) {
+          const updated = [...userAnnotations];
+          updated[userIndex] = updatedAnnotation;
+          this.userAnnotations.set(updated);
+        }
+
+        const staffIndex = staffAnnotations.findIndex(a => a.id === annotationId);
+        if (staffIndex !== -1) {
+          const updated = [...staffAnnotations];
+          updated[staffIndex] = updatedAnnotation;
+          this.staffAnnotations.set(updated);
+        }
       },
       error: (err) => {
         console.error('Error updating transcription:', err);
         this.toastService.error(err.error?.error || 'Failed to update transcription');
+      }
+    });
+  }
+
+  downloadAnnotation(annotation: InstrumentJobAnnotation): void {
+    if (!annotation.id) {
+      this.toastService.error('Invalid annotation');
+      return;
+    }
+
+    this.annotationService.getInstrumentJobAnnotation(annotation.id).subscribe({
+      next: (freshAnnotation) => {
+        if (freshAnnotation.fileUrl) {
+          const link = document.createElement('a');
+          link.href = freshAnnotation.fileUrl;
+          link.download = freshAnnotation.annotationName || 'file';
+          link.click();
+        } else {
+          this.toastService.error('No file URL available');
+        }
+      },
+      error: (err) => {
+        console.error('Error fetching fresh download URL:', err);
+        this.toastService.error('Failed to download file');
       }
     });
   }

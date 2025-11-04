@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Python Installation</title>
+  <link href="python-selection-panel.css" rel="stylesheet">
+</head>
+<body>
+  <div class="selection-container">
+    <div class="header-section">
+      <h4>Select Python Installation</h4>
+      <p class="text-muted">Choose Python 3.11 or higher for Cupcake Vanilla</p>
+    </div>
+
+    <div class="content-section">
+      <div class="alert alert-primary mb-3">
+        <div class="d-flex align-items-start">
+          <i class="bi bi-download me-2" style="font-size: 1.2rem;"></i>
+          <div style="flex: 1;">
+            <strong>Recommended: Portable Backend</strong>
+            <p class="mb-2" style="font-size: 0.75rem; margin-top: 0.25rem;">
+              Download backend with bundled Python environment (no manual setup required)
+            </p>
+            <button id="download-portable-btn" class="btn btn-sm btn-success">
+              <i class="bi bi-cloud-download me-1"></i>
+              Download Portable Backend
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider-text">
+        <span>OR</span>
+      </div>
+
+      <div class="form-group">
+        <label for="python-select" class="form-label">Use Existing Python Installation:</label>
+        <select id="python-select" class="form-select">
+          <option value="">Detecting...</option>
+        </select>
+        <small id="python-info" class="text-muted"></small>
+      </div>
+
+      <div class="alert alert-info" id="no-python-alert" style="display: none;">
+        <i class="bi bi-info-circle me-2"></i>
+        No suitable Python 3.11+ installations found automatically.
+      </div>
+    </div>
+
+    <div class="button-section">
+      <button id="browse-btn" class="btn btn-secondary">
+        <i class="bi bi-folder2-open me-1"></i>
+        Browse for Python...
+      </button>
+      <div class="ms-auto d-flex gap-2">
+        <button id="cancel-btn" class="btn btn-outline-secondary">Cancel</button>
+        <button id="continue-btn" class="btn btn-primary" disabled>Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pythonSelect = document.getElementById('python-select');
+    const pythonInfo = document.getElementById('python-info');
+    const noPythonAlert = document.getElementById('no-python-alert');
+    const downloadPortableBtn = document.getElementById('download-portable-btn');
+    const browseBtn = document.getElementById('browse-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const continueBtn = document.getElementById('continue-btn');
+
+    let pythonCandidates = [];
+
+    if (window.pythonSelectionAPI) {
+      // Load Python candidates
+      window.pythonSelectionAPI.getPythonCandidates().then(candidates => {
+        pythonCandidates = candidates;
+        updatePythonSelect();
+      });
+
+      // Handle selection change
+      pythonSelect.addEventListener('change', () => {
+        const selectedIndex = parseInt(pythonSelect.value);
+        if (selectedIndex >= 0 && selectedIndex < pythonCandidates.length) {
+          const python = pythonCandidates[selectedIndex];
+          pythonInfo.textContent = `Path: ${python.command}`;
+          continueBtn.disabled = false;
+        } else {
+          pythonInfo.textContent = '';
+          continueBtn.disabled = true;
+        }
+      });
+
+      // Handle download portable button
+      downloadPortableBtn.addEventListener('click', () => {
+        window.pythonSelectionAPI.downloadPortable();
+      });
+
+      // Handle browse button
+      browseBtn.addEventListener('click', () => {
+        window.pythonSelectionAPI.browsePython();
+      });
+
+      // Handle cancel button
+      cancelBtn.addEventListener('click', () => {
+        window.pythonSelectionAPI.cancel();
+      });
+
+      // Handle continue button
+      continueBtn.addEventListener('click', () => {
+        const selectedIndex = parseInt(pythonSelect.value);
+        if (selectedIndex >= 0 && selectedIndex < pythonCandidates.length) {
+          const python = pythonCandidates[selectedIndex];
+          window.pythonSelectionAPI.selectPython(python.command);
+        }
+      });
+
+      // Handle custom Python selection from browse
+      window.pythonSelectionAPI.onCustomPython((pythonPath, version, isValid) => {
+        if (isValid) {
+          // Add custom selection to the list
+          const customPython = {
+            command: pythonPath,
+            version: version
+          };
+          pythonCandidates.push(customPython);
+          updatePythonSelect();
+
+          // Select the newly added option
+          pythonSelect.value = (pythonCandidates.length - 1).toString();
+          pythonSelect.dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    function updatePythonSelect() {
+      pythonSelect.innerHTML = '';
+
+      if (pythonCandidates.length === 0) {
+        pythonSelect.innerHTML = '<option value="">No Python 3.11+ found</option>';
+        noPythonAlert.style.display = 'block';
+        continueBtn.disabled = true;
+      } else {
+        noPythonAlert.style.display = 'none';
+
+        // Add placeholder
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = 'Select a Python installation...';
+        placeholderOption.disabled = true;
+        placeholderOption.selected = true;
+        pythonSelect.appendChild(placeholderOption);
+
+        // Add Python options
+        pythonCandidates.forEach((python, index) => {
+          const option = document.createElement('option');
+          option.value = index.toString();
+          option.textContent = `${python.version}`;
+          pythonSelect.appendChild(option);
+        });
+
+        continueBtn.disabled = true;
+      }
+    }
+  </script>
+</body>
+</html>

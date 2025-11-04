@@ -106,7 +106,6 @@
               ngbDropdownToggle
               title="Import">
               <i class="bi bi-upload"></i>
-              <span class="d-none d-lg-inline ms-1">Import</span>
             </button>
             <div class="dropdown-menu" ngbDropdownMenu>
               <button class="dropdown-item" (click)="triggerSdrfFileInput()">
@@ -128,7 +127,6 @@
               ngbDropdownToggle
               title="Export">
               <i class="bi bi-download"></i>
-              <span class="d-none d-lg-inline ms-1">Export</span>
             </button>
             <div class="dropdown-menu" ngbDropdownMenu>
               <button class="dropdown-item" (click)="exportToSdrf('sdrf')">
@@ -149,7 +147,6 @@
             (click)="openValidationModal()"
             title="Validate SDRF">
             <i class="bi bi-check-circle"></i>
-            <span class="d-none d-lg-inline ms-1">Validate SDRF</span>
           </button>
         }
 
@@ -161,20 +158,28 @@
             (click)="openSearchReplaceModal()"
             title="Search & Replace">
             <i class="bi bi-search"></i>
-            <span class="d-none d-lg-inline ms-1">Search & Replace</span>
           </button>
         }
 
-        <!-- Add Column Button -->
+        <!-- Add Dropdown -->
         @if (table()!.canEdit && !readonlyMode) {
-          <button
-            type="button"
-            class="btn btn-success btn-sm"
-            (click)="openAddColumnModal()"
-            title="Add Column">
-            <i class="bi bi-plus-circle"></i>
-            <span class="d-none d-lg-inline ms-1">Add Column</span>
-          </button>
+          <div class="btn-group" ngbDropdown>
+            <button
+              type="button"
+              class="btn btn-success btn-sm dropdown-toggle"
+              ngbDropdownToggle
+              title="Add">
+              <i class="bi bi-plus-circle"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" ngbDropdownMenu>
+              <button class="dropdown-item" (click)="openAddColumnModal()">
+                <i class="bi bi-table me-2"></i>Add Column
+              </button>
+              <button class="dropdown-item" (click)="createPool()">
+                <i class="bi bi-layers me-2"></i>Add Managed Pool
+              </button>
+            </div>
+          </div>
         }
           </div>
         </div>
@@ -185,21 +190,11 @@
     <!-- Sample Pool Table Section -->
     @if (hasPools() && userColumns().length > 0) {
       <div class="card mb-4">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header">
           <h6 class="mb-0">
             <i class="bi bi-layers me-2"></i>Sample Pool Table
             <span class="badge bg-warning ms-2">{{ sortedPools().length }} pools</span>
           </h6>
-          @if (table()!.canEdit && !readonlyMode) {
-            <button
-              type="button"
-              class="btn btn-success btn-sm"
-              (click)="createPool()"
-              title="Create Sample Pool">
-              <i class="bi bi-plus-circle"></i>
-              <span class="d-none d-lg-inline ms-1">Create Pool</span>
-            </button>
-          }
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
@@ -210,9 +205,9 @@
                     <i class="bi bi-layers me-1"></i>Pool
                   </th>
                   @for (column of userColumns(); track column.id) {
-                    <th scope="col" [class]="getColumnHeaderClass(column)" [title]="column.name" style="min-width: 150px;">
+                    <th scope="col" [class]="getColumnHeaderClass(column)" [title]="column.displayName || column.name" style="min-width: 150px;">
                       <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold">{{ column.name }}</span>
+                        <span class="fw-semibold">{{ column.displayName || column.name }}</span>
                       </div>
                     </th>
                   }
@@ -320,7 +315,7 @@
               }
               <th scope="col" class="text-center" style="width: 80px;">Sample</th>
               @for (column of userColumns(); track column.id) {
-                <th scope="col" [class]="getColumnHeaderClass(column)" [title]="column.name + (column.type ? ' (' + column.type + ')' : '')">
+                <th scope="col" [class]="getColumnHeaderClass(column)" [title]="(column.displayName || column.name) + (column.type ? ' (' + column.type + ')' : '')">
                   <div class="d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center">
                       <div class="d-flex align-items-center gap-2">
@@ -330,7 +325,7 @@
                                  (change)="column.id && toggleColumnSelection(column.id)"
                                  (click)="$event.stopPropagation()">
                         }
-                        <span class="fw-semibold">{{ column.name }}</span>
+                        <span class="fw-semibold">{{ column.displayName || column.name }}</span>
                         @if (column.staffOnly) {
                           <span class="badge bg-warning text-dark" title="Staff Only Column">
                             <i class="bi bi-shield-lock"></i>

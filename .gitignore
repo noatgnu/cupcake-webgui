@@ -41,3 +41,8 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Electron
+/electron-app/node_modules
+/electron-app/dist
+/electron-app/web-dist

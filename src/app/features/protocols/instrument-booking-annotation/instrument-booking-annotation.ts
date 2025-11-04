@@ -241,7 +241,7 @@ export class InstrumentBookingAnnotation implements OnInit {
       instrument: instrumentId,
       timeStarted: new Date(startTime).toISOString(),
       timeEnded: new Date(endTime).toISOString(),
-      description: this.bookingDescription() || 'Instrument booking for protocol session'
+      description: this.bookingDescription() || ''
     };
   }
 

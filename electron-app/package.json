@@ -1,0 +1,120 @@
+{
+  "name": "cupcake-electron",
+  "version": "1.0.0",
+  "description": "Cupcake Electron Desktop Application",
+  "main": "dist/main.js",
+  "scripts": {
+    "compile": "tsc && cp src/*.html dist/ && cp src/*.css dist/ && mkdir -p dist/fonts && cp -r node_modules/bootstrap-icons/font/fonts/* dist/fonts/ 2>/dev/null || true && mkdir -p dist/css && cp node_modules/bootstrap/dist/css/bootstrap.min.css dist/css/ 2>/dev/null || true",
+    "compile:watch": "tsc --watch & cp src/*.html dist/ & cp src/*.css dist/",
+    "dev:server": "node scripts/dev-simple.js",
+    "dev:built": "npm run compile && electron . --dev",
+    "build:web": "cd .. && ng build --configuration=electron",
+    "build": "npm run compile && npm run build:web && electron-builder",
+    "build:win": "npm run compile && npm run build:web && electron-builder --win",
+    "build:mac": "npm run compile && npm run build:web && electron-builder --mac",
+    "build:linux": "npm run compile && npm run build:web && electron-builder --linux",
+    "pack": "npm run compile && npm run build:web && electron-builder --dir"
+  },
+  "keywords": [
+    "cupcake",
+    "metadata",
+    "electron",
+    "desktop"
+  ],
+  "author": "Cupcake Team",
+  "license": "MIT",
+  "dependencies": {
+    "bootstrap": "^5.3.0",
+    "bootstrap-icons": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/electron": "^1.4.38",
+    "@types/node": "^24.5.2",
+    "concurrently": "^9.2.1",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "wait-on": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.cupcake.app",
+    "productName": "Cupcake",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "web-dist/**/*",
+      "!dist/**/*.map",
+      "!node_modules/**/*",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "asarUnpack": [
+      "node_modules/7zip-bin/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/cupcake",
+        "to": "web-dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asar": true,
+    "compression": "maximum",
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
+    "mac": {
+      "compression": "maximum",
+      "category": "public.app-category.productivity",
+      "icon": "../public/cupcake_logo.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "win": {
+      "icon": "../public/cupcake_logo.png",
+      "compression": "maximum",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "../public/cupcake_logo.png",
+      "compression": "maximum",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64"]
+        }
+      ]
+    }
+  }
+}

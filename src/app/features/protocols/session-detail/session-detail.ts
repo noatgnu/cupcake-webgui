@@ -5,8 +5,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
-import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction } from '@noatgnu/cupcake-macaron';
+import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType } from '@noatgnu/cupcake-core';
+import { MetadataTable, MetadataColumn } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
 import { TimerService } from '../../../shared/services/timer';
@@ -41,7 +42,9 @@ export class SessionDetail implements OnInit, OnDestroy {
   private stepReagentService = inject(StepReagentService);
   private stepAnnotationService = inject(StepAnnotationService);
   private instrumentUsageService = inject(InstrumentUsageService);
+  private instrumentService = inject(InstrumentService);
   private reagentActionService = inject(ReagentActionService);
+  private reagentService = inject(ReagentService);
   private timeKeeperService = inject(TimeKeeperService);
   private annotationUploadService = inject(AnnotationChunkedUploadService);
   private toastService = inject(ToastService);
@@ -71,7 +74,13 @@ export class SessionDetail implements OnInit, OnDestroy {
   hideScratched = signal(false);
   annotationDisplayMode = signal<'single' | 'list'>('list');
   bookingDataCache = signal<Map<number, InstrumentUsage>>(new Map());
+  metadataTableCache = signal<Map<number, MetadataTable>>(new Map());
+  reagentMetadataCache = signal<Map<number, MetadataTable>>(new Map());
   mediaCurrentTimes = signal<Map<number, number>>(new Map());
+  transcribingAnnotations = signal<Set<number>>(new Set());
+  loadingBookings = signal<Set<number>>(new Set());
+  loadingInstrumentMetadata = signal<Set<number>>(new Set());
+  loadingReagentMetadata = signal<Set<number>>(new Set());
 
   loading = signal(false);
   loadingSections = signal(false);
@@ -219,6 +228,11 @@ export class SessionDetail implements OnInit, OnDestroy {
         const statusMap = new Map(this.transcriptionStatus());
         statusMap.set(event.annotation_id, 'started');
         this.transcriptionStatus.set(statusMap);
+
+        const transcribing = this.transcribingAnnotations();
+        transcribing.add(event.annotation_id);
+        this.transcribingAnnotations.set(new Set(transcribing));
+
         this.toastService.info(`Transcription started for annotation`);
       });
 
@@ -228,6 +242,10 @@ export class SessionDetail implements OnInit, OnDestroy {
         const statusMap = new Map(this.transcriptionStatus());
         statusMap.set(event.annotation_id, 'completed');
         this.transcriptionStatus.set(statusMap);
+
+        const transcribing = this.transcribingAnnotations();
+        transcribing.delete(event.annotation_id);
+        this.transcribingAnnotations.set(new Set(transcribing));
 
         const message = event.has_translation
           ? `Transcription and translation completed`
@@ -243,6 +261,11 @@ export class SessionDetail implements OnInit, OnDestroy {
         const statusMap = new Map(this.transcriptionStatus());
         statusMap.set(event.annotation_id, 'failed');
         this.transcriptionStatus.set(statusMap);
+
+        const transcribing = this.transcribingAnnotations();
+        transcribing.delete(event.annotation_id);
+        this.transcribingAnnotations.set(new Set(transcribing));
+
         this.toastService.error(`Transcription failed: ${event.error}`);
       });
   }
@@ -489,6 +512,12 @@ export class SessionDetail implements OnInit, OnDestroy {
         const actionsMap = new Map(this.reagentActions());
         actionsMap.set(stepId, response.results);
         this.reagentActions.set(actionsMap);
+
+        response.results.forEach(action => {
+          if (action.reagent) {
+            this.loadStoredReagentMetadata(action.reagent);
+          }
+        });
       },
       error: (err) => {
         console.error('Error loading reagent actions:', err);
@@ -1099,8 +1128,15 @@ export class SessionDetail implements OnInit, OnDestroy {
         transcription: content
       }
     }).subscribe({
-      next: () => {
+      next: (updatedAnnotation) => {
         this.toastService.success('Transcription updated');
+        const annotations = this.stepAnnotations();
+        const index = annotations.findIndex(a => a.id === currentAnn.id);
+        if (index !== -1) {
+          const updated = [...annotations];
+          updated[index] = updatedAnnotation;
+          this.stepAnnotations.set(updated);
+        }
       },
       error: (err) => {
         console.error('Error updating transcription:', err);
@@ -1118,8 +1154,15 @@ export class SessionDetail implements OnInit, OnDestroy {
         translation: content
       }
     }).subscribe({
-      next: () => {
+      next: (updatedAnnotation) => {
         this.toastService.success('Translation updated');
+        const annotations = this.stepAnnotations();
+        const index = annotations.findIndex(a => a.id === currentAnn.id);
+        if (index !== -1) {
+          const updated = [...annotations];
+          updated[index] = updatedAnnotation;
+          this.stepAnnotations.set(updated);
+        }
       },
       error: (err) => {
         console.error('Error updating translation:', err);
@@ -1159,13 +1202,27 @@ export class SessionDetail implements OnInit, OnDestroy {
   }
 
   getBookingData(bookingId: number): InstrumentUsage | null {
-    return this.bookingDataCache().get(bookingId) || null;
+    const cached = this.bookingDataCache().get(bookingId);
+    if (cached) {
+      return cached;
+    }
+
+    if (!this.loadingBookings().has(bookingId)) {
+      setTimeout(() => this.loadBookingData(bookingId), 0);
+    }
+    return null;
   }
 
   loadBookingData(bookingId: number): void {
-    if (this.bookingDataCache().has(bookingId)) {
+    if (this.bookingDataCache().has(bookingId) || this.loadingBookings().has(bookingId)) {
       return;
     }
+
+    this.loadingBookings.update(loading => {
+      const newSet = new Set(loading);
+      newSet.add(bookingId);
+      return newSet;
+    });
 
     this.instrumentUsageService.getInstrumentUsageRecord(bookingId).subscribe({
       next: (booking) => {
@@ -1174,11 +1231,106 @@ export class SessionDetail implements OnInit, OnDestroy {
           newCache.set(bookingId, booking);
           return newCache;
         });
+
+        this.loadingBookings.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(bookingId);
+          return newSet;
+        });
+
+        if (booking.instrument) {
+          this.loadInstrumentData(booking.instrument);
+        }
       },
       error: (err) => {
         console.error(`Error loading booking ${bookingId}:`, err);
+        this.loadingBookings.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(bookingId);
+          return newSet;
+        });
       }
     });
+  }
+
+  private loadInstrumentData(instrumentId: number): void {
+    if (this.metadataTableCache().has(instrumentId) || this.loadingInstrumentMetadata().has(instrumentId)) {
+      return;
+    }
+
+    this.loadingInstrumentMetadata.update(loading => {
+      const newSet = new Set(loading);
+      newSet.add(instrumentId);
+      return newSet;
+    });
+
+    this.instrumentService.getInstrumentMetadata(instrumentId).subscribe({
+      next: (metadataTable) => {
+        this.metadataTableCache.update(cache => {
+          const newCache = new Map(cache);
+          newCache.set(instrumentId, metadataTable);
+          return newCache;
+        });
+
+        this.loadingInstrumentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(instrumentId);
+          return newSet;
+        });
+      },
+      error: (err) => {
+        console.error(`Error loading instrument metadata ${instrumentId}:`, err);
+        this.loadingInstrumentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(instrumentId);
+          return newSet;
+        });
+      }
+    });
+  }
+
+  getMetadataForInstrument(instrumentId: number): MetadataTable | null {
+    return this.metadataTableCache().get(instrumentId) || null;
+  }
+
+  private loadStoredReagentMetadata(storedReagentId: number): void {
+    if (this.reagentMetadataCache().has(storedReagentId) || this.loadingReagentMetadata().has(storedReagentId)) {
+      return;
+    }
+
+    this.loadingReagentMetadata.update(loading => {
+      const newSet = new Set(loading);
+      newSet.add(storedReagentId);
+      return newSet;
+    });
+
+    this.reagentService.getStoredReagentMetadata(storedReagentId).subscribe({
+      next: (metadataTable) => {
+        this.reagentMetadataCache.update(cache => {
+          const newCache = new Map(cache);
+          newCache.set(storedReagentId, metadataTable);
+          return newCache;
+        });
+
+        this.loadingReagentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(storedReagentId);
+          return newSet;
+        });
+      },
+      error: (err) => {
+        console.error(`Error loading stored reagent metadata ${storedReagentId}:`, err);
+        this.loadingReagentMetadata.update(loading => {
+          const newSet = new Set(loading);
+          newSet.delete(storedReagentId);
+          return newSet;
+        });
+      }
+    });
+  }
+
+  getMetadataForStoredReagent(storedReagentId: number): MetadataTable | null {
+    return this.reagentMetadataCache().get(storedReagentId) || null;
   }
 
   toggleHistoryEntryScratched(annotation: StepAnnotation, entryId: string): void {
@@ -1300,6 +1452,35 @@ export class SessionDetail implements OnInit, OnDestroy {
 
   getMediaCurrentTime(annotationId: number): number {
     return this.mediaCurrentTimes().get(annotationId) || 0;
+  }
+
+  downloadAnnotation(annotation: StepAnnotation): void {
+    if (!annotation.id) {
+      this.toastService.error('Invalid annotation');
+      return;
+    }
+
+    this.stepAnnotationService.getStepAnnotation(annotation.id).subscribe({
+      next: (freshAnnotation) => {
+        if (freshAnnotation.fileUrl) {
+          const link = document.createElement('a');
+          link.href = freshAnnotation.fileUrl;
+          link.download = freshAnnotation.annotationName || 'file';
+          link.click();
+        } else {
+          this.toastService.error('No file URL available');
+        }
+      },
+      error: (err) => {
+        console.error('Error fetching fresh download URL:', err);
+        this.toastService.error('Failed to download file');
+      }
+    });
+  }
+
+  isTranscribing(annotation: StepAnnotation): boolean {
+    if (!annotation.annotation) return false;
+    return this.transcribingAnnotations().has(annotation.annotation);
   }
 
   ngOnDestroy(): void {

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Panel - Live Backend Output</title>
+  <link href="debug-panel.css" rel="stylesheet">
+</head>
+<body>
+  <div class="debug-container">
+    <div class="debug-header">
+      <div class="header-left">
+        <h2><i class="bi bi-bug"></i> Debug Panel</h2>
+        <div class="connection-status">
+          <span id="connection-indicator" class="status-dot disconnected"></span>
+          <span id="connection-text">Disconnected</span>
+        </div>
+      </div>
+      <div class="header-controls">
+        <button id="clear-btn" class="btn btn-secondary btn-sm">
+          <i class="bi bi-trash"></i> Clear
+        </button>
+        <button id="scroll-toggle" class="btn btn-secondary btn-sm active">
+          <i class="bi bi-arrow-down-circle"></i> Auto-scroll
+        </button>
+        <button id="pause-btn" class="btn btn-secondary btn-sm">
+          <i class="bi bi-pause"></i> Pause
+        </button>
+      </div>
+    </div>
+
+    <div class="debug-tabs">
+      <button class="tab-btn active" data-tab="backend">
+        <i class="bi bi-server"></i> Backend Output
+      </button>
+      <button class="tab-btn" data-tab="workers">
+        <i class="bi bi-cpu"></i> Worker Output
+      </button>
+      <button class="tab-btn" data-tab="all">
+        <i class="bi bi-list-ul"></i> All Output
+      </button>
+    </div>
+
+    <div class="debug-content">
+      <div id="backend-tab" class="tab-content active">
+        <div class="output-header">
+          <span class="output-title">Backend Server Output</span>
+          <span id="backend-lines" class="line-count">0 lines</span>
+        </div>
+        <div id="backend-output" class="output-terminal"></div>
+      </div>
+
+      <div id="workers-tab" class="tab-content">
+        <div class="output-header">
+          <span class="output-title">Worker Process Output</span>
+          <span id="workers-lines" class="line-count">0 lines</span>
+        </div>
+        <div id="workers-output" class="output-terminal"></div>
+      </div>
+
+      <div id="all-tab" class="tab-content">
+        <div class="output-header">
+          <span class="output-title">Combined Output</span>
+          <span id="all-lines" class="line-count">0 lines</span>
+        </div>
+        <div id="all-output" class="output-terminal"></div>
+      </div>
+    </div>
+
+    <div class="debug-footer">
+      <div class="stats">
+        <span>Backend: <span id="backend-count">0</span> lines</span>
+        <span>Workers: <span id="workers-count">0</span> lines</span>
+        <span>Total: <span id="total-count">0</span> lines</span>
+      </div>
+      <div class="footer-controls">
+        <button id="export-btn" class="btn btn-outline btn-sm">
+          <i class="bi bi-download"></i> Export Logs
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log('Debug panel script starting...');
+
+    let isPaused = false;
+    let autoScroll = true;
+    let backendLines = 0;
+    let workersLines = 0;
+    let totalLines = 0;
+
+    // Set up event listeners using the secure API
+    if (window.debugAPI) {
+      console.log('Setting up secure Debug API listeners...');
+
+      // Listen for backend output
+      window.debugAPI.onBackendOutput((event, data) => {
+        if (!isPaused) {
+          appendOutput('backend', data);
+          appendOutput('all', `[BACKEND] ${data}`);
+          backendLines++;
+          totalLines++;
+          updateStats();
+        }
+      });
+
+      // Listen for worker output
+      window.debugAPI.onWorkerOutput((event, data) => {
+        if (!isPaused) {
+          appendOutput('workers', data);
+          appendOutput('all', `[WORKER] ${data}`);
+          workersLines++;
+          totalLines++;
+          updateStats();
+        }
+      });
+
+      // Listen for connection status updates
+      window.debugAPI.onConnectionStatus((event, status) => {
+        updateConnectionStatus(status);
+      });
+
+      console.log('Debug API listeners set up successfully');
+    } else {
+      console.warn('Debug API not available');
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        switchTab(tab);
+      });
+    });
+
+    // Control buttons
+    document.getElementById('clear-btn').addEventListener('click', clearAll);
+    document.getElementById('scroll-toggle').addEventListener('click', toggleAutoScroll);
+    document.getElementById('pause-btn').addEventListener('click', togglePause);
+    document.getElementById('export-btn').addEventListener('click', exportLogs);
+
+    function appendOutput(type, message) {
+      const outputElement = document.getElementById(`${type}-output`);
+      const timestamp = new Date().toISOString().substring(11, 23);
+
+      const line = document.createElement('div');
+      line.className = 'output-line';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'timestamp';
+      timeSpan.textContent = timestamp;
+
+      const messageSpan = document.createElement('span');
+      messageSpan.className = 'message';
+      messageSpan.textContent = message;
+
+      // Color code based on message type
+      if (message.includes('ERROR') || message.includes('error')) {
+        line.classList.add('error');
+      } else if (message.includes('WARNING') || message.includes('warning')) {
+        line.classList.add('warning');
+      } else if (message.includes('INFO') || message.includes('ready')) {
+        line.classList.add('info');
+      }
+
+      line.appendChild(timeSpan);
+      line.appendChild(messageSpan);
+      outputElement.appendChild(line);
+
+      // Auto-scroll if enabled
+      if (autoScroll) {
+        outputElement.scrollTop = outputElement.scrollHeight;
+      }
+
+      // Limit output to prevent memory issues (keep last 1000 lines)
+      while (outputElement.children.length > 1000) {
+        outputElement.removeChild(outputElement.firstChild);
+      }
+    }
+
+    function switchTab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `${tab}-tab`);
+      });
+    }
+
+    function clearAll() {
+      document.querySelectorAll('.output-terminal').forEach(terminal => {
+        terminal.innerHTML = '';
+      });
+      backendLines = 0;
+      workersLines = 0;
+      totalLines = 0;
+      updateStats();
+    }
+
+    function toggleAutoScroll() {
+      autoScroll = !autoScroll;
+      const btn = document.getElementById('scroll-toggle');
+      btn.classList.toggle('active', autoScroll);
+      btn.innerHTML = autoScroll
+        ? '<i class="bi bi-arrow-down-circle"></i> Auto-scroll'
+        : '<i class="bi bi-arrow-down-circle-fill"></i> Manual';
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      const btn = document.getElementById('pause-btn');
+      btn.classList.toggle('active', isPaused);
+      btn.innerHTML = isPaused
+        ? '<i class="bi bi-play"></i> Resume'
+        : '<i class="bi bi-pause"></i> Pause';
+    }
+
+    function updateStats() {
+      document.getElementById('backend-count').textContent = backendLines;
+      document.getElementById('workers-count').textContent = workersLines;
+      document.getElementById('total-count').textContent = totalLines;
+      document.getElementById('backend-lines').textContent = `${backendLines} lines`;
+      document.getElementById('workers-lines').textContent = `${workersLines} lines`;
+      document.getElementById('all-lines').textContent = `${totalLines} lines`;
+    }
+
+    function updateConnectionStatus(status) {
+      const indicator = document.getElementById('connection-indicator');
+      const text = document.getElementById('connection-text');
+
+      indicator.className = `status-dot ${status}`;
+      text.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+
+    function exportLogs() {
+      const activeTab = document.querySelector('.tab-content.active');
+      const lines = activeTab.querySelectorAll('.output-line');
+
+      let content = '';
+      lines.forEach(line => {
+        const timestamp = line.querySelector('.timestamp').textContent;
+        const message = line.querySelector('.message').textContent;
+        content += `${timestamp} ${message}\n`;
+      });
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `debug-logs-${new Date().toISOString().split('T')[0]}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Start receiving output
+    if (window.debugAPI) {
+      window.debugAPI.startDebugOutput();
+    }
+  </script>
+</body>
+</html>

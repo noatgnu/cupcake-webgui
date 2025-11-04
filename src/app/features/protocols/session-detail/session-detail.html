@@ -311,6 +311,22 @@
                                   <i class="bi bi-clock me-1"></i>
                                   {{ action.createdAt | date: 'short' }}
                                 </div>
+                                @if (getMetadataForStoredReagent(action.reagent); as metadataTable) {
+                                  @if (metadataTable.columns && metadataTable.columns.length > 0) {
+                                    <div class="mt-2 pt-2 border-top">
+                                      <h6 class="text-muted mb-2 small">Metadata</h6>
+                                      <div class="d-flex flex-wrap gap-2">
+                                        @for (column of metadataTable.columns; track column.id) {
+                                          @if (!column.hidden) {
+                                            <span class="badge bg-primary" [title]="column.displayName || column.name">
+                                              {{ column.displayName || column.name }}: {{ column.value || 'N/A' }}
+                                            </span>
+                                          }
+                                        }
+                                      </div>
+                                    </div>
+                                  }
+                                }
                               </div>
                               <div class="d-flex flex-column gap-1">
                                 @if (action.isDeletable) {
@@ -425,54 +441,51 @@
                         }
                         @if (currentAnnotation(); as annotation) {
                           <div class="annotation-item border-bottom pb-4 mb-4">
-                            <div class="d-flex align-items-center mb-3">
-                              <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
-                              <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                              <div class="d-flex align-items-center gap-2">
+                                <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
+                                <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                                @if (isTranscribing(annotation)) {
+                                  <span class="badge bg-info">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    Transcribing...
+                                  </span>
+                                }
+                              </div>
+                              @if (annotation.fileUrl) {
+                                <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
+                                  <i class="bi bi-download"></i>
+                                </button>
+                              }
                             </div>
                             <div class="annotation-content" [class.scratched-content]="annotation.scratched">
                               @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
-                                <div class="mb-3">
-                                  <div class="text-center mb-2">
-                                    <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
-                                  </div>
-                                  <div>
-                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'image'" class="btn btn-outline-primary btn-sm" title="Download">
-                                      <i class="bi bi-download me-1"></i>Download
-                                    </a>
-                                  </div>
+                                <div class="mb-3 text-center">
+                                  <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
                                 </div>
                               }
                               @if (annotation.annotationType === AnnotationType.Video && annotation.fileUrl) {
                                 <div class="mb-3">
-                                  <video controls class="w-100 rounded mb-2" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                  <video controls class="w-100 rounded" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
                                     <source [src]="annotation.fileUrl">
                                     Your browser does not support the video tag.
                                   </video>
-                                  <div>
-                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'video'" class="btn btn-outline-primary btn-sm" title="Download">
-                                      <i class="bi bi-download me-1"></i>Download
-                                    </a>
-                                  </div>
                                 </div>
                               }
                               @if (annotation.annotationType === AnnotationType.Audio && annotation.fileUrl) {
                                 <div class="mb-3">
-                                  <audio controls class="w-100 mb-2" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                  <audio controls class="w-100" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
                                     <source [src]="annotation.fileUrl">
                                     Your browser does not support the audio tag.
                                   </audio>
-                                  <div>
-                                    <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'audio'" class="btn btn-outline-primary btn-sm" title="Download">
-                                      <i class="bi bi-download me-1"></i>Download
-                                    </a>
-                                  </div>
                                 </div>
                               }
                               @if (annotation.annotationType === AnnotationType.File && annotation.fileUrl) {
                                 <div class="mb-3">
-                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'file'" class="btn btn-outline-primary btn-sm" title="Download">
-                                    <i class="bi bi-download me-1"></i>Download File
-                                  </a>
+                                  <div class="alert alert-info mb-0">
+                                    <i class="bi bi-file-earmark me-2"></i>
+                                    File attachment: {{ annotation.annotationName || 'Unnamed file' }}
+                                  </div>
                                 </div>
                               }
                               @if (annotation.annotationType === AnnotationType.Calculator && annotation.annotationText) {
@@ -525,41 +538,70 @@
                                 @let bookingId = annotation.instrumentUsageIds[0];
                                 @let bookingData = getBookingData(bookingId);
                                 @if (bookingData) {
-                                  <div class="annotation-text border rounded p-3 bg-light mb-3">
-                                    <h6 class="text-muted mb-2">
-                                      <i class="bi bi-calendar-check me-1"></i>
-                                      Instrument Booking
-                                    </h6>
-                                    <div class="mb-2">
-                                      <strong>{{ bookingData.instrumentName || 'Unknown Instrument' }}</strong>
-                                    </div>
-                                    <div class="mb-2">
-                                      <i class="bi bi-clock me-1"></i>
-                                      <strong>Time:</strong>
-                                      <div class="ms-3">
-                                        <div>Start: {{ bookingData.timeStarted | date:'medium' }}</div>
-                                        <div>End: {{ bookingData.timeEnded | date:'medium' }}</div>
+                                  <div class="d-flex align-items-start gap-3 p-2 border-start border-3 border-primary">
+                                    <i class="bi bi-calendar-check text-primary fs-4"></i>
+                                    <div class="flex-grow-1">
+                                      <div class="fw-semibold">{{ bookingData.instrumentName || 'Unknown Instrument' }}</div>
+                                      <div class="small text-muted">
+                                        @if (bookingData.timeStarted && bookingData.timeEnded) {
+                                          <div>
+                                            <i class="bi bi-clock me-1"></i>
+                                            {{ bookingData.timeStarted | date: 'short' }} - {{ bookingData.timeEnded | date: 'short' }}
+                                            @if (bookingData.usageHours) {
+                                              <span class="ms-2">({{ bookingData.usageHours }}h)</span>
+                                            }
+                                          </div>
+                                        } @else if (bookingData.timeStarted) {
+                                          <div>
+                                            <i class="bi bi-clock me-1"></i>
+                                            Started: {{ bookingData.timeStarted | date: 'short' }}
+                                          </div>
+                                        }
+                                        @if (bookingData.description) {
+                                          <div class="mt-1">{{ bookingData.description }}</div>
+                                        }
                                       </div>
-                                    </div>
-                                    <div class="mb-2">
-                                      <i class="bi bi-check-circle me-1"></i>
-                                      <strong>Status:</strong>
-                                      @if (bookingData.approved) {
-                                        <span class="badge bg-success ms-1">Approved</span>
-                                      } @else {
-                                        <span class="badge bg-warning text-dark ms-1">Pending Approval</span>
+                                      <div class="mt-1">
+                                        @if (bookingData.approved) {
+                                          <span class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>Approved
+                                            @if (bookingData.approvedByUsername) {
+                                              by {{ bookingData.approvedByUsername }}
+                                            }
+                                          </span>
+                                        } @else {
+                                          <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-clock-history me-1"></i>Pending Approval
+                                          </span>
+                                        }
+                                        @if (bookingData.maintenance) {
+                                          <span class="badge bg-secondary ms-1">
+                                            <i class="bi bi-tools me-1"></i>Maintenance
+                                          </span>
+                                        }
+                                      </div>
+                                      @if (getMetadataForInstrument(bookingData.instrument); as metadataTable) {
+                                        @if (metadataTable.columns && metadataTable.columns.length > 0) {
+                                          <div class="mt-2 pt-2 border-top">
+                                            <h6 class="text-muted mb-2 small">Metadata</h6>
+                                            <div class="d-flex flex-wrap gap-2">
+                                              @for (column of metadataTable.columns; track column.id) {
+                                                @if (!column.hidden) {
+                                                  <span class="badge bg-primary" [title]="column.name">
+                                                    {{ column.value || 'N/A' }}
+                                                  </span>
+                                                }
+                                              }
+                                            </div>
+                                          </div>
+                                        }
                                       }
                                     </div>
-                                    @if (bookingData.description) {
-                                      <div class="mt-2 pt-2 border-top">
-                                        <small class="text-muted fst-italic">{{ bookingData.description }}</small>
-                                      </div>
-                                    }
                                   </div>
                                 } @else {
-                                  <div class="text-muted small">
-                                    <i class="bi bi-hourglass-split me-1"></i>
-                                    Loading booking details...
+                                  <div class="p-2 border-start border-3 border-secondary">
+                                    <i class="bi bi-hourglass-split text-muted me-2"></i>
+                                    <span class="text-muted">Loading booking details...</span>
                                   </div>
                                 }
                               }
@@ -627,54 +669,51 @@
                       } @else {
                         @for (annotation of currentStepAnnotations(); track annotation.id) {
                         <div class="annotation-item border-bottom pb-4 mb-4">
-                          <div class="d-flex align-items-center mb-3">
-                            <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
-                            <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                          <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                              <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
+                              <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
+                              @if (isTranscribing(annotation)) {
+                                <span class="badge bg-info">
+                                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                  Transcribing...
+                                </span>
+                              }
+                            </div>
+                            @if (annotation.fileUrl) {
+                              <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
+                                <i class="bi bi-download"></i>
+                              </button>
+                            }
                           </div>
                           <div class="annotation-content" [class.scratched-content]="annotation.scratched">
                             @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
-                              <div class="mb-3">
-                                <div class="text-center mb-2">
-                                  <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
-                                </div>
-                                <div>
-                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'image'" class="btn btn-outline-primary btn-sm" title="Download">
-                                    <i class="bi bi-download me-1"></i>Download
-                                  </a>
-                                </div>
+                              <div class="mb-3 text-center">
+                                <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
                               </div>
                             }
                             @if (annotation.annotationType === AnnotationType.Video && annotation.fileUrl) {
                               <div class="mb-3">
-                                <video controls class="w-100 rounded mb-2" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                <video controls class="w-100 rounded" style="max-height: 400px;" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
                                   <source [src]="annotation.fileUrl">
                                   Your browser does not support the video tag.
                                 </video>
-                                <div>
-                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'video'" class="btn btn-outline-primary btn-sm" title="Download">
-                                    <i class="bi bi-download me-1"></i>Download
-                                  </a>
-                                </div>
                               </div>
                             }
                             @if (annotation.annotationType === AnnotationType.Audio && annotation.fileUrl) {
                               <div class="mb-3">
-                                <audio controls class="w-100 mb-2" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
+                                <audio controls class="w-100" controlsList="nodownload" (timeupdate)="onMediaTimeUpdate(annotation.id, $event)">
                                   <source [src]="annotation.fileUrl">
                                   Your browser does not support the audio tag.
                                 </audio>
-                                <div>
-                                  <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'audio'" class="btn btn-outline-primary btn-sm" title="Download">
-                                    <i class="bi bi-download me-1"></i>Download
-                                  </a>
-                                </div>
                               </div>
                             }
                             @if (annotation.annotationType === AnnotationType.File && annotation.fileUrl) {
                               <div class="mb-3">
-                                <a [href]="annotation.fileUrl" [download]="annotation.annotationName || 'file'" class="btn btn-outline-primary btn-sm" title="Download">
-                                  <i class="bi bi-download me-1"></i>Download File
-                                </a>
+                                <div class="alert alert-info mb-0">
+                                  <i class="bi bi-file-earmark me-2"></i>
+                                  File attachment: {{ annotation.annotationName || 'Unnamed file' }}
+                                </div>
                               </div>
                             }
                             @if (annotation.annotationType === AnnotationType.Calculator && annotation.annotationText) {
@@ -727,41 +766,70 @@
                               @let bookingId = annotation.instrumentUsageIds[0];
                               @let bookingData = getBookingData(bookingId);
                               @if (bookingData) {
-                                <div class="annotation-text border rounded p-3 bg-light mb-3">
-                                  <h6 class="text-muted mb-2">
-                                    <i class="bi bi-calendar-check me-1"></i>
-                                    Instrument Booking
-                                  </h6>
-                                  <div class="mb-2">
-                                    <strong>{{ bookingData.instrumentName || 'Unknown Instrument' }}</strong>
-                                  </div>
-                                  <div class="mb-2">
-                                    <i class="bi bi-clock me-1"></i>
-                                    <strong>Time:</strong>
-                                    <div class="ms-3">
-                                      <div>Start: {{ bookingData.timeStarted | date:'medium' }}</div>
-                                      <div>End: {{ bookingData.timeEnded | date:'medium' }}</div>
+                                <div class="d-flex align-items-start gap-3 p-2 border-start border-3 border-primary">
+                                  <i class="bi bi-calendar-check text-primary fs-4"></i>
+                                  <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ bookingData.instrumentName || 'Unknown Instrument' }}</div>
+                                    <div class="small text-muted">
+                                      @if (bookingData.timeStarted && bookingData.timeEnded) {
+                                        <div>
+                                          <i class="bi bi-clock me-1"></i>
+                                          {{ bookingData.timeStarted | date: 'short' }} - {{ bookingData.timeEnded | date: 'short' }}
+                                          @if (bookingData.usageHours) {
+                                            <span class="ms-2">({{ bookingData.usageHours }}h)</span>
+                                          }
+                                        </div>
+                                      } @else if (bookingData.timeStarted) {
+                                        <div>
+                                          <i class="bi bi-clock me-1"></i>
+                                          Started: {{ bookingData.timeStarted | date: 'short' }}
+                                        </div>
+                                      }
+                                      @if (bookingData.description) {
+                                        <div class="mt-1">{{ bookingData.description }}</div>
+                                      }
                                     </div>
-                                  </div>
-                                  <div class="mb-2">
-                                    <i class="bi bi-check-circle me-1"></i>
-                                    <strong>Status:</strong>
-                                    @if (bookingData.approved) {
-                                      <span class="badge bg-success ms-1">Approved</span>
-                                    } @else {
-                                      <span class="badge bg-warning text-dark ms-1">Pending Approval</span>
+                                    <div class="mt-1">
+                                      @if (bookingData.approved) {
+                                        <span class="badge bg-success">
+                                          <i class="bi bi-check-circle me-1"></i>Approved
+                                          @if (bookingData.approvedByUsername) {
+                                            by {{ bookingData.approvedByUsername }}
+                                          }
+                                        </span>
+                                      } @else {
+                                        <span class="badge bg-warning text-dark">
+                                          <i class="bi bi-clock-history me-1"></i>Pending Approval
+                                        </span>
+                                      }
+                                      @if (bookingData.maintenance) {
+                                        <span class="badge bg-secondary ms-1">
+                                          <i class="bi bi-tools me-1"></i>Maintenance
+                                        </span>
+                                      }
+                                    </div>
+                                    @if (getMetadataForInstrument(bookingData.instrument); as metadataTable) {
+                                      @if (metadataTable.columns && metadataTable.columns.length > 0) {
+                                        <div class="mt-2 pt-2 border-top">
+                                          <h6 class="text-muted mb-2 small">Metadata</h6>
+                                          <div class="d-flex flex-wrap gap-2">
+                                            @for (column of metadataTable.columns; track column.id) {
+                                              @if (!column.hidden) {
+                                                <span class="badge bg-primary" [title]="column.name">
+                                                  {{ column.value || 'N/A' }}
+                                                </span>
+                                              }
+                                            }
+                                          </div>
+                                        </div>
+                                      }
                                     }
                                   </div>
-                                  @if (bookingData.description) {
-                                    <div class="mt-2 pt-2 border-top">
-                                      <small class="text-muted fst-italic">{{ bookingData.description }}</small>
-                                    </div>
-                                  }
                                 </div>
                               } @else {
-                                <div class="text-muted small">
-                                  <i class="bi bi-hourglass-split me-1"></i>
-                                  Loading booking details...
+                                <div class="p-2 border-start border-3 border-secondary">
+                                  <i class="bi bi-hourglass-split text-muted me-2"></i>
+                                  <span class="text-muted">Loading booking details...</span>
                                 </div>
                               }
                             }

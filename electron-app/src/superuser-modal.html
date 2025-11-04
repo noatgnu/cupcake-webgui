@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Superuser</title>
+  <link href="superuser-modal.css" rel="stylesheet">
+</head>
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h5 class="modal-title">Create Superuser</h5>
+    </div>
+    <div class="modal-body">
+      <p class="description">No Django superuser found. Please create one to access the application.</p>
+
+      <form id="superuserForm" class="form">
+        <div class="form-row">
+          <label for="username" class="form-label">Username:</label>
+          <input type="text" class="form-control" id="username" name="username" required autocomplete="username">
+        </div>
+
+        <div class="form-row">
+          <label for="email" class="form-label">Email:</label>
+          <input type="email" class="form-control" id="email" name="email" required autocomplete="email">
+        </div>
+
+        <div class="form-row">
+          <label for="password" class="form-label">Password:</label>
+          <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password">
+        </div>
+
+        <div class="form-row">
+          <label for="confirmPassword" class="form-label">Confirm Password:</label>
+          <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required autocomplete="new-password">
+        </div>
+
+        <div class="alert alert-danger d-none" id="errorMessage" role="alert">
+          <span id="errorText"></span>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="cancel()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Superuser</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Use secure electronAPI instead of require('electron')
+    document.getElementById('superuserForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (!username || !email || !password || !confirmPassword) {
+        showError('All fields are required.');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showError('Passwords do not match.');
+        return;
+      }
+
+      if (password.length < 8) {
+        showError('Password must be at least 8 characters long.');
+        return;
+      }
+
+      // Use secure API instead of direct ipcRenderer
+      if (window.superuserAPI) {
+        window.superuserAPI.createSuperuser({ username, email, password });
+      } else {
+        showError('Electron API not available');
+      }
+    });
+
+    function showError(message) {
+      const errorElement = document.getElementById('errorMessage');
+      const errorText = document.getElementById('errorText');
+      errorText.textContent = message;
+      errorElement.classList.remove('d-none');
+    }
+
+    function cancel() {
+      if (window.superuserAPI) {
+        window.superuserAPI.cancelSuperuser();
+      } else {
+        console.log('Cancel clicked (fallback mode)');
+      }
+    }
+
+    function closeModal() {
+      if (window.superuserAPI) {
+        window.superuserAPI.closeSuperuserWindow();
+      } else {
+        console.log('Close clicked (fallback mode)');
+      }
+    }
+
+    // Set up secure event listener
+    if (window.superuserAPI) {
+      window.superuserAPI.onSuperuserCreated((event, success, message) => {
+        if (success) {
+          alert('Superuser created successfully!');
+          window.superuserAPI.closeSuperuserWindow();
+        } else {
+          showError('Failed to create superuser: ' + message);
+        }
+      });
+    } else {
+      console.warn('Superuser API not available in superuser modal');
+    }
+  </script>
+</body>
+</html>

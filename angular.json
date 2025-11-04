@@ -61,6 +61,23 @@
                   "with": "src/environments/environment.development.ts"
                 }
               ]
+            },
+            "electron": {
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": true
+              },
+              "extractLicenses": true,
+              "sourceMap": false,
+              "namedChunks": false,
+              "baseHref": "./",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.electron.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
