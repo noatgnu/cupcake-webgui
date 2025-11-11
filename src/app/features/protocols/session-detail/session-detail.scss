@@ -155,3 +155,43 @@
     pointer-events: none;
   }
 }
+
+.webrtc-floating-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  width: 500px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 8rem);
+  z-index: 1050;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+
+  @keyframes slideIn {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  app-session-webrtc-panel {
+    display: block;
+    height: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .webrtc-floating-container {
+    width: calc(100vw - 2rem);
+    bottom: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    max-height: calc(100vh - 6rem);
+  }
+}
