@@ -52,6 +52,17 @@
                 }
               </div>
             }
+            @if (session()) {
+              <button
+                class="btn btn-sm"
+                [class.btn-success]="showWebRTC()"
+                [class.btn-outline-secondary]="!showWebRTC()"
+                (click)="toggleWebRTC()"
+                title="Toggle Live Session">
+                <i class="bi bi-camera-video me-1"></i>
+                Live Session
+              </button>
+            }
           </div>
         }
       </div>
@@ -257,6 +268,23 @@
                                     }
                                   </div>
                                 }
+                                @if (getActionsForStepReagent(reagent); as actions) {
+                                  @if (actions.length > 0) {
+                                    <div class="mt-2">
+                                      <div class="small text-muted">
+                                        Booked:
+                                        @for (action of actions; track action.id; let isLast = $last) {
+                                          <a [routerLink]="['/storage']" [queryParams]="{reagentId: action.reagent}" class="text-decoration-none">
+                                            {{ action.quantity }} {{ reagent.reagentUnit || '' }}
+                                          </a>
+                                          @if (!isLast) {
+                                            ,
+                                          }
+                                        }
+                                      </div>
+                                    </div>
+                                  }
+                                }
                               </div>
                               <button
                                 type="button"
@@ -265,88 +293,6 @@
                                 title="Book this reagent">
                                 <i class="bi bi-bookmark-plus me-1"></i>Book
                               </button>
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    </div>
-                  }
-
-                  @if (currentStepReagentActions().length > 0) {
-                    <div class="step-reagent-actions mb-4">
-                      <h5 class="text-muted mb-3">
-                        <i class="bi bi-bookmark-check me-2"></i>
-                        Reagent Bookings
-                      </h5>
-                      <div class="list-group">
-                        @for (action of currentStepReagentActions(); track action.id) {
-                          <div class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                              <div class="flex-grow-1">
-                                <div class="d-flex align-items-center mb-1">
-                                  <h6 class="mb-0 me-2">{{ action.reagentName || 'Unknown' }}</h6>
-                                  <span class="badge bg-info">{{ action.actionTypeDisplay || action.actionType }}</span>
-                                  @if (action.isWithinDeletionWindow) {
-                                    <span class="badge bg-warning text-dark ms-1" title="Can be deleted within the configured time window">
-                                      <i class="bi bi-clock-history me-1"></i>Deletion Window
-                                    </span>
-                                  }
-                                </div>
-                                <div class="text-muted small">
-                                  Quantity: <strong>{{ action.quantity }}</strong>
-                                </div>
-                                @if (action.notes) {
-                                  <div class="small mt-1">
-                                    <i class="bi bi-journal-text me-1"></i>
-                                    {{ action.notes }}
-                                  </div>
-                                }
-                                @if (action.userUsername) {
-                                  <div class="small text-muted mt-1">
-                                    <i class="bi bi-person me-1"></i>
-                                    {{ action.userUsername }}
-                                  </div>
-                                }
-                                <div class="small text-muted">
-                                  <i class="bi bi-clock me-1"></i>
-                                  {{ action.createdAt | date: 'short' }}
-                                </div>
-                                @if (getMetadataForStoredReagent(action.reagent); as metadataTable) {
-                                  @if (metadataTable.columns && metadataTable.columns.length > 0) {
-                                    <div class="mt-2 pt-2 border-top">
-                                      <h6 class="text-muted mb-2 small">Metadata</h6>
-                                      <div class="d-flex flex-wrap gap-2">
-                                        @for (column of metadataTable.columns; track column.id) {
-                                          @if (!column.hidden) {
-                                            <span class="badge bg-primary" [title]="column.displayName || column.name">
-                                              {{ column.displayName || column.name }}: {{ column.value || 'N/A' }}
-                                            </span>
-                                          }
-                                        }
-                                      </div>
-                                    </div>
-                                  }
-                                }
-                              </div>
-                              <div class="d-flex flex-column gap-1">
-                                @if (action.isDeletable) {
-                                  <button
-                                    type="button"
-                                    class="btn btn-sm btn-outline-danger"
-                                    (click)="deleteReagentAction(action)"
-                                    title="Delete booking (within deletion window)">
-                                    <i class="bi bi-trash"></i>
-                                  </button>
-                                } @else {
-                                  <button
-                                    type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    disabled
-                                    title="Cannot delete (outside deletion window)">
-                                    <i class="bi bi-lock"></i>
-                                  </button>
-                                }
-                              </div>
                             </div>
                           </div>
                         }
@@ -446,10 +392,17 @@
                                 <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
                                 <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
                                 @if (isTranscribing(annotation)) {
-                                  <span class="badge bg-info">
-                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                    Transcribing...
-                                  </span>
+                                  @if (getTranscriptionProgress(annotation); as progress) {
+                                    <span class="badge bg-info" [title]="progress.description">
+                                      <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                      Transcribing... {{ progress.percentage }}%
+                                    </span>
+                                  } @else {
+                                    <span class="badge bg-info">
+                                      <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                      Transcribing...
+                                    </span>
+                                  }
                                 }
                               </div>
                               @if (annotation.fileUrl) {
@@ -674,10 +627,17 @@
                               <i class="{{ getAnnotationTypeIcon(annotation.annotationType) }} me-2"></i>
                               <span class="fw-semibold">{{ getAnnotationTypeLabel(annotation.annotationType) }}</span>
                               @if (isTranscribing(annotation)) {
-                                <span class="badge bg-info">
-                                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                  Transcribing...
-                                </span>
+                                @if (getTranscriptionProgress(annotation); as progress) {
+                                  <span class="badge bg-info" [title]="progress.description">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    Transcribing... {{ progress.percentage }}%
+                                  </span>
+                                } @else {
+                                  <span class="badge bg-info">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    Transcribing...
+                                  </span>
+                                }
                               }
                             </div>
                             @if (annotation.fileUrl) {
@@ -1012,4 +972,14 @@
       </div>
     }
   </div>
+
+  @if (session() && showWebRTC()) {
+    <div class="webrtc-floating-container">
+      <app-session-webrtc-panel
+        [ccrvSessionId]="session()!.id"
+        [role]="webrtcRole()"
+        (closePanel)="toggleWebRTC()">
+      </app-session-webrtc-panel>
+    </div>
+  }
 </div>

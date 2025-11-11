@@ -15,8 +15,8 @@ import {
   CCMNotificationWebSocketService,
   InstrumentService
 } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType } from '@noatgnu/cupcake-core';
-import { MetadataTable, MetadataColumn } from '@noatgnu/cupcake-vanilla';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType } from '@noatgnu/cupcake-core';
+import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AddAnnotationModal } from './add-annotation-modal/add-annotation-modal';
 import { WebvttEditor } from '../../protocols/webvtt-editor/webvtt-editor';
@@ -38,13 +38,16 @@ export class JobAnnotations implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
   private wsService = inject(CCMNotificationWebSocketService);
+  private ccvWsService = inject(CCVWebSocketService);
 
   private transcriptionSubscription?: Subscription;
+  private asyncTaskSubscription?: Subscription;
 
   bookingDataCache = signal<Map<number, InstrumentUsage>>(new Map());
   metadataTableCache = signal<Map<number, MetadataTable>>(new Map());
   mediaCurrentTimes = signal<Map<number, number>>(new Map());
   transcribingAnnotations = signal<Set<number>>(new Set());
+  transcriptionProgress = signal<Map<number, { percentage: number; description: string }>>(new Map());
   loadingBookings = signal<Set<number>>(new Set());
   loadingInstrumentMetadata = signal<Set<number>>(new Set());
 
@@ -183,11 +186,18 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.transcriptionSubscription = this.wsService.transcriptionCompleted$.subscribe(event => {
       this.handleTranscriptionCompleted(event.annotation_id);
     });
+
+    this.asyncTaskSubscription = this.ccvWsService.filterMessages('async_task.update').subscribe(message => {
+      this.handleAsyncTaskUpdate(message);
+    });
   }
 
   ngOnDestroy(): void {
     if (this.transcriptionSubscription) {
       this.transcriptionSubscription.unsubscribe();
+    }
+    if (this.asyncTaskSubscription) {
+      this.asyncTaskSubscription.unsubscribe();
     }
   }
 
@@ -204,15 +214,79 @@ export class JobAnnotations implements OnInit, OnDestroy {
   }
 
   private handleTranscriptionCompleted(annotationId: number): void {
+    console.log('JobAnnotations: handleTranscriptionCompleted called for annotation:', annotationId);
+    const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
+    const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
+    const annotation = userAnnotation || staffAnnotation;
+
+    console.log('JobAnnotations: Found annotation:', annotation?.id, 'User:', !!userAnnotation, 'Staff:', !!staffAnnotation);
+
+    if (annotation && annotation.id) {
+      const transcribing = this.transcribingAnnotations();
+      console.log('JobAnnotations: Current transcribing set before delete:', Array.from(transcribing));
+      transcribing.delete(annotationId);
+      this.transcribingAnnotations.set(new Set(transcribing));
+      console.log('JobAnnotations: Current transcribing set after delete:', Array.from(transcribing));
+
+      const progress = this.transcriptionProgress();
+      progress.delete(annotationId);
+      this.transcriptionProgress.set(new Map(progress));
+
+      this.toastService.success('Transcription completed');
+
+      this.annotationService.getInstrumentJobAnnotation(annotation.id).subscribe({
+        next: (updatedAnnotation) => {
+          console.log('JobAnnotations: Received updated annotation:', updatedAnnotation.id);
+          if (userAnnotation) {
+            this.userAnnotations.update(annotations =>
+              annotations.map(a => a.id === annotation.id ? updatedAnnotation : a)
+            );
+            console.log('JobAnnotations: Updated user annotations');
+          } else if (staffAnnotation) {
+            this.staffAnnotations.update(annotations =>
+              annotations.map(a => a.id === annotation.id ? updatedAnnotation : a)
+            );
+            console.log('JobAnnotations: Updated staff annotations');
+          }
+        },
+        error: (err) => {
+          console.error('JobAnnotations: Error fetching updated annotation after transcription:', err);
+        }
+      });
+    } else {
+      console.log('JobAnnotations: No annotation found to update for ID:', annotationId);
+    }
+  }
+
+  private handleAsyncTaskUpdate(message: any): void {
+    console.log('JobAnnotations: handleAsyncTaskUpdate received message:', message);
+    const task = message as AsyncTaskStatus;
+
+    if (!task || !task.result || !task.result.annotation_id) {
+      console.log('JobAnnotations: No annotation_id in task result');
+      return;
+    }
+
+    if (task.taskType !== TaskType.TRANSCRIBE_AUDIO && task.taskType !== TaskType.TRANSCRIBE_VIDEO) {
+      console.log('JobAnnotations: Task is not transcription type:', task.taskType);
+      return;
+    }
+
+    const annotationId = task.result.annotation_id;
+    console.log('JobAnnotations: Processing transcription update for annotation:', annotationId);
     const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
     const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
 
     if (userAnnotation || staffAnnotation) {
-      const transcribing = this.transcribingAnnotations();
-      transcribing.delete(annotationId);
-      this.transcribingAnnotations.set(new Set(transcribing));
-      this.toastService.success('Transcription completed');
-      this.loadAnnotations();
+      const progress = this.transcriptionProgress();
+      progress.set(annotationId, {
+        percentage: task.progressPercentage || 0,
+        description: task.progressDescription || ''
+      });
+      this.transcriptionProgress.set(new Map(progress));
+      console.log('JobAnnotations: Updated transcription progress:', annotationId, task.progressPercentage);
+    } else {
+      console.log('JobAnnotations: Annotation not found in current lists');
     }
   }
 
@@ -345,7 +419,13 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.annotationService.createInstrumentJobAnnotation(request).subscribe({
       next: (annotation) => {
         this.toastService.success('Text annotation added successfully');
-        this.loadAnnotations();
+        if (isStaffAnnotation) {
+          this.staffAnnotations.update(annotations => [...annotations, annotation]);
+          this.staffTotalCount.update(count => count + 1);
+        } else {
+          this.userAnnotations.update(annotations => [...annotations, annotation]);
+          this.userTotalCount.update(count => count + 1);
+        }
       },
       error: (err) => {
         console.error('Error creating text annotation:', err);
@@ -375,9 +455,13 @@ export class JobAnnotations implements OnInit, OnDestroy {
         role: isStaffAnnotation ? 'staff' : 'user'
       }
     ).subscribe({
-      next: () => {
+      next: (result) => {
         this.toastService.success('File uploaded successfully');
-        this.loadAnnotations();
+        if (isStaffAnnotation) {
+          this.loadStaffAnnotations();
+        } else {
+          this.loadUserAnnotations();
+        }
       },
       error: (err) => {
         console.error('Error uploading file:', err);
@@ -411,8 +495,9 @@ export class JobAnnotations implements OnInit, OnDestroy {
                   return newCache;
                 });
                 this.toastService.success('Instrument booked and linked to job');
+                this.staffAnnotations.update(annotations => [...annotations, annotation]);
+                this.staffTotalCount.update(count => count + 1);
                 this.loading.set(false);
-                this.loadAnnotations();
               },
               error: (err) => {
                 console.error('Error linking booking to annotation:', err);
@@ -450,7 +535,13 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.annotationService.createInstrumentJobAnnotation(request).subscribe({
       next: (annotation) => {
         this.toastService.success('Calculator annotation added successfully');
-        this.loadAnnotations();
+        if (isStaffAnnotation) {
+          this.staffAnnotations.update(annotations => [...annotations, annotation]);
+          this.staffTotalCount.update(count => count + 1);
+        } else {
+          this.userAnnotations.update(annotations => [...annotations, annotation]);
+          this.userTotalCount.update(count => count + 1);
+        }
       },
       error: (err) => {
         console.error('Error creating calculator annotation:', err);
@@ -473,7 +564,13 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.annotationService.createInstrumentJobAnnotation(request).subscribe({
       next: (annotation) => {
         this.toastService.success('Molarity calculator annotation added successfully');
-        this.loadAnnotations();
+        if (isStaffAnnotation) {
+          this.staffAnnotations.update(annotations => [...annotations, annotation]);
+          this.staffTotalCount.update(count => count + 1);
+        } else {
+          this.userAnnotations.update(annotations => [...annotations, annotation]);
+          this.userTotalCount.update(count => count + 1);
+        }
       },
       error: (err) => {
         console.error('Error creating molarity annotation:', err);
@@ -500,7 +597,16 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.annotationService.updateInstrumentJobAnnotation(annotation.id, request).subscribe({
       next: (updated) => {
         this.toastService.success('Annotation updated successfully');
-        this.loadAnnotations();
+        const isStaff = this.isStaffAnnotation(annotation);
+        if (isStaff) {
+          this.staffAnnotations.update(annotations =>
+            annotations.map(a => a.id === annotation.id ? updated : a)
+          );
+        } else {
+          this.userAnnotations.update(annotations =>
+            annotations.map(a => a.id === annotation.id ? updated : a)
+          );
+        }
       },
       error: (err) => {
         console.error('Error updating annotation:', err);
@@ -522,7 +628,18 @@ export class JobAnnotations implements OnInit, OnDestroy {
     this.annotationService.deleteInstrumentJobAnnotation(annotation.id).subscribe({
       next: () => {
         this.toastService.success('Annotation deleted successfully');
-        this.loadAnnotations();
+        const isStaff = this.isStaffAnnotation(annotation);
+        if (isStaff) {
+          this.staffAnnotations.update(annotations =>
+            annotations.filter(a => a.id !== annotation.id)
+          );
+          this.staffTotalCount.update(count => count - 1);
+        } else {
+          this.userAnnotations.update(annotations =>
+            annotations.filter(a => a.id !== annotation.id)
+          );
+          this.userTotalCount.update(count => count - 1);
+        }
       },
       error: (err) => {
         console.error('Error deleting annotation:', err);
@@ -585,7 +702,9 @@ export class JobAnnotations implements OnInit, OnDestroy {
       this.annotationService.retriggerTranscription(annotation.id).subscribe({
         next: (response) => {
           this.toastService.success(response.message || 'Transcription task queued successfully');
-          this.loadAnnotations();
+          const transcribing = this.transcribingAnnotations();
+          transcribing.add(annotation.annotation);
+          this.transcribingAnnotations.set(new Set(transcribing));
         },
         error: (err) => {
           console.error('Error retriggering transcription:', err);
@@ -605,6 +724,10 @@ export class JobAnnotations implements OnInit, OnDestroy {
 
   isTranscribing(annotation: InstrumentJobAnnotation): boolean {
     return this.transcribingAnnotations().has(annotation.annotation);
+  }
+
+  getTranscriptionProgress(annotation: InstrumentJobAnnotation): { percentage: number; description: string } | null {
+    return this.transcriptionProgress().get(annotation.annotation) || null;
   }
 
   getBookingData(annotation: InstrumentJobAnnotation): InstrumentUsage | null {

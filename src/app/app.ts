@@ -3,7 +3,7 @@ import { RouterOutlet, NavigationEnd, Router } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CommonModule } from '@angular/common';
-import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, PoweredByFooterComponent, AuthService } from '@noatgnu/cupcake-core';
+import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, PoweredByFooterComponent, AuthService, WebSocketService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
 import { CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -35,7 +35,9 @@ export class App implements OnInit, OnDestroy {
     private themeService: ThemeService,
     private toastService: ToastService,
     private authService: AuthService,
-    private wsService: CommunicationWebSocketService
+    private coreWsService: WebSocketService,
+    private wsService: CommunicationWebSocketService,
+    private asyncTaskService: AsyncTaskMonitorService
   ) {
     this.themeEffect = effect(() => {
       this.themeService.isDark();
@@ -59,22 +61,26 @@ export class App implements OnInit, OnDestroy {
     if (this.configSubscription) {
       this.configSubscription.unsubscribe();
     }
+    this.coreWsService.disconnect();
     this.wsService.disconnect();
   }
 
   private initializeWebSocket(): void {
     this.authSubscription = this.authService.currentUser$.subscribe(user => {
       if (user) {
-        console.log('User authenticated, connecting to WebSocket...');
-        const token = this.authService.getAccessToken();
-        if (token) {
-          this.wsService.connect(environment.websocketUrl, token);
-        } else {
-          console.warn('User authenticated but no access token available');
-        }
+        console.log('User authenticated, connecting to WebSockets...');
+        console.log('Connecting core WebSocket (notifications endpoint) for async tasks...');
+        this.coreWsService.connect();
+
+        console.log('Connecting communication WebSocket (messaging endpoint)...');
+        this.wsService.connect(environment.websocketUrl, this.authService.getAccessToken()!);
+
+        this.asyncTaskService.startRealtimeUpdates();
       } else {
-        console.log('User not authenticated, disconnecting WebSocket...');
+        console.log('User not authenticated, disconnecting WebSockets...');
+        this.coreWsService.disconnect();
         this.wsService.disconnect();
+        this.asyncTaskService.stopRealtimeUpdates();
       }
     });
   }

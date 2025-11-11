@@ -103,10 +103,17 @@
                     {{ getAnnotationTypeBadge(annotation) }}
                   </span>
                   @if (isTranscribing(annotation)) {
-                    <span class="badge bg-info">
-                      <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                      Transcribing...
-                    </span>
+                    @if (getTranscriptionProgress(annotation); as progress) {
+                      <span class="badge bg-info" [title]="progress.description">
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Transcribing... {{ progress.percentage }}%
+                      </span>
+                    } @else {
+                      <span class="badge bg-info">
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Transcribing...
+                      </span>
+                    }
                   }
                   @if (annotation.annotationUser) {
                     <small class="text-muted">by {{ annotation.annotationUser }}</small>

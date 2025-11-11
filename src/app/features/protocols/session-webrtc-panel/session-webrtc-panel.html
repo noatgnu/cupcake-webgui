@@ -1,0 +1,506 @@
+<div class="webrtc-panel" [class.expanded]="isExpanded()">
+  <div class="panel-header">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0">
+          <i class="bi bi-camera-video me-2"></i>
+          @if (webrtcSession()?.name) {
+            {{ webrtcSession()?.name }}
+          } @else {
+            Live Session
+          }
+        </h6>
+        @if (isConnected()) {
+          <span class="badge bg-success">
+            <i class="bi bi-dot"></i>Connected
+          </span>
+        } @else {
+          <span class="badge bg-secondary">Disconnected</span>
+        }
+        @if (activePeersCount() > 0) {
+          <span class="badge bg-primary">
+            {{ activePeersCount() }} {{ activePeersCount() === 1 ? 'peer' : 'peers' }}
+          </span>
+        }
+      </div>
+      <div class="d-flex gap-2">
+        @if (!isConnected()) {
+          <button
+            class="btn btn-sm btn-success"
+            (click)="connect()"
+            [disabled]="isCreatingSession()"
+            title="Connect to session">
+            @if (isCreatingSession()) {
+              <span class="spinner-border spinner-border-sm"></span>
+            } @else {
+              <i class="bi bi-play-circle"></i>
+            }
+          </button>
+        } @else {
+          <div ngbDropdown class="btn-group">
+            <button
+              class="btn btn-sm btn-danger"
+              (click)="disconnect()"
+              title="Disconnect from session">
+              <i class="bi bi-stop-circle"></i>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-danger dropdown-toggle dropdown-toggle-split"
+              ngbDropdownToggle>
+              <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <div ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
+              <button ngbDropdownItem (click)="toggleVideo()">
+                <i class="bi" [class.bi-camera-video]="videoEnabled()" [class.bi-camera-video-off]="!videoEnabled()"></i>
+                {{ videoEnabled() ? 'Turn off camera' : 'Turn on camera' }}
+              </button>
+              <button ngbDropdownItem (click)="toggleAudio()">
+                <i class="bi" [class.bi-mic]="audioEnabled()" [class.bi-mic-mute]="!audioEnabled()"></i>
+                {{ audioEnabled() ? 'Mute microphone' : 'Unmute microphone' }}
+              </button>
+              <button ngbDropdownItem (click)="toggleScreenShare()">
+                <i class="bi" [class.bi-display]="!screenShareEnabled()" [class.bi-stop-circle]="screenShareEnabled()"></i>
+                {{ screenShareEnabled() ? 'Stop screen share' : 'Share screen' }}
+              </button>
+            </div>
+          </div>
+        }
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          (click)="toggleChat()"
+          [class.active]="showChat()"
+          title="Chat">
+          <i class="bi bi-chat-dots"></i>
+        </button>
+        <div ngbDropdown class="btn-group">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary dropdown-toggle"
+            ngbDropdownToggle
+            title="More options">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+          <div ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
+            <button ngbDropdownItem (click)="toggleSettings()">
+              <i class="bi bi-gear"></i>
+              Settings
+            </button>
+            <div class="dropdown-divider"></div>
+            <button ngbDropdownItem (click)="toggleExpand()">
+              <i class="bi" [class.bi-arrows-angle-expand]="!isExpanded()" [class.bi-arrows-angle-contract]="isExpanded()"></i>
+              {{ isExpanded() ? 'Minimize' : 'Expand' }}
+            </button>
+            <button ngbDropdownItem (click)="close()">
+              <i class="bi bi-x-lg"></i>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (showChat()) {
+    <div class="panel-chat">
+      <div class="chat-content">
+        <div class="chat-messages">
+          @if (chatMessages().length === 0) {
+            <div class="empty-chat text-center text-muted p-4">
+              <i class="bi bi-chat-dots fs-1 mb-2 d-block"></i>
+              <small>No messages yet</small>
+            </div>
+          } @else {
+            @for (msg of chatMessages(); track $index) {
+              <div class="chat-message" [class.chat-message-local]="msg.isLocal">
+                <div class="chat-message-header">
+                  <span class="chat-username">{{ msg.username }}</span>
+                  <span class="chat-timestamp">{{ msg.timestamp | date: 'shortTime' }}</span>
+                </div>
+                <div class="chat-message-text">{{ msg.message }}</div>
+                @if (msg.fileOffer && !msg.isLocal) {
+                  <div class="file-offer mt-2">
+                    @if (getFileProgress(msg.fileOffer.fileId); as progress) {
+                      <div class="file-download-progress">
+                        <div class="progress" style="height: 20px;">
+                          <div class="progress-bar progress-bar-striped progress-bar-animated"
+                               role="progressbar"
+                               [style.width.%]="progress.percentage">
+                            {{ progress.percentage | number:'1.0-0' }}%
+                          </div>
+                        </div>
+                        <small class="text-muted">
+                          {{ progress.chunksReceived }} / {{ progress.totalChunks }} chunks
+                        </small>
+                      </div>
+                    } @else {
+                      <button class="btn btn-sm btn-success mt-1" (click)="downloadFile(msg.fileOffer.fileId)">
+                        <i class="bi bi-download me-1"></i>
+                        Download
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+        <div class="chat-input-container">
+          <input
+            #fileInput
+            type="file"
+            class="d-none"
+            (change)="onFileSelected($event)">
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            (click)="openFileSelector()"
+            [disabled]="!canSendMessages()"
+            title="Send file">
+            <i class="bi bi-paperclip"></i>
+          </button>
+          <input
+            type="text"
+            class="form-control form-control-sm"
+            [placeholder]="canSendMessages() ? 'Type a message...' : 'Waiting for connection...'"
+            [(ngModel)]="chatInput"
+            (keydown.enter)="sendChatMessage()"
+            [disabled]="!canSendMessages()">
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="sendChatMessage()"
+            [disabled]="!chatInput.trim() || !canSendMessages()">
+            <i class="bi bi-send"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showSettings()) {
+    <div class="panel-settings">
+      <div class="settings-content">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Settings</h6>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            (click)="toggleSettings()"
+            title="Close settings">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        @if (!isConnected()) {
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label small mb-0">
+                <i class="bi bi-broadcast me-1"></i>Select Live Session
+              </label>
+              <div class="btn-group">
+                @if (hasEditPermission()) {
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    (click)="openCreateSessionModal()"
+                    title="Create new session">
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                }
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  (click)="loadAvailableSessions()"
+                  [disabled]="isLoadingSessions()"
+                  title="Refresh sessions">
+                  <i class="bi" [class.bi-arrow-clockwise]="!isLoadingSessions()" [class.spinner-border]="isLoadingSessions()" [class.spinner-border-sm]="isLoadingSessions()"></i>
+                </button>
+              </div>
+            </div>
+            @if (availableSessions().length > 0) {
+              <select
+                class="form-select form-select-sm mb-2"
+                [value]="selectedSessionId() || ''"
+                (change)="selectedSessionId.set($any($event.target).value || null)">
+                <option value="">Join/Create Default Session</option>
+                @for (session of availableSessions(); track session.id) {
+                  <option [value]="session.id">
+                    {{ session.name || 'Session ' + session.id.substring(0, 8) }}
+                    @if (session.isDefault) {
+                      (Default)
+                    }
+                    - {{ session.participantsCount || 0 }} participant(s)
+                  </option>
+                }
+              </select>
+              @if (selectedSessionId() && hasEditPermission()) {
+                <div class="d-flex gap-2 mb-2">
+                  @for (session of availableSessions(); track session.id) {
+                    @if (session.id === selectedSessionId() && session.canDelete) {
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        (click)="deleteSession(session.id, session.name)"
+                        [disabled]="isDeletingSession()"
+                        title="Delete selected session">
+                        <i class="bi bi-trash me-1"></i>
+                        Delete Session
+                      </button>
+                    }
+                  }
+                </div>
+              }
+              <div class="form-text small">
+                <i class="bi bi-info-circle me-1"></i>
+                Choose an existing session or create/join the default one
+              </div>
+            } @else {
+              <div class="text-muted small mb-2">
+                <i class="bi bi-info-circle me-1"></i>
+                No active sessions found. Connect to create/join the default session.
+              </div>
+            }
+          </div>
+          <hr class="my-3">
+        }
+
+        @if (webrtcSession()?.canEdit && isConnected()) {
+          <h6 class="mb-3">Session Settings</h6>
+
+          <div class="mb-3">
+            <label class="form-label small d-flex align-items-center gap-2">
+              <i class="bi bi-pencil me-1"></i>Session Name
+              @if (webrtcSession()?.isDefault) {
+                <span class="badge bg-primary">
+                  <i class="bi bi-star-fill"></i> Default
+                </span>
+              }
+            </label>
+            <div class="input-group input-group-sm">
+              <input
+                type="text"
+                class="form-control form-control-sm"
+                [(ngModel)]="sessionNameInput"
+                [placeholder]="webrtcSession()?.isDefault ? 'Default session' : 'Session name'"
+                (keydown.enter)="saveSessionName()">
+              <button
+                class="btn btn-sm btn-success"
+                (click)="saveSessionName()"
+                [disabled]="sessionNameInput === (webrtcSession()?.name || '')"
+                title="Save name">
+                <i class="bi bi-check"></i>
+              </button>
+            </div>
+            <div class="form-text small">
+              <i class="bi bi-info-circle me-1"></i>
+              @if (webrtcSession()?.isDefault) {
+                This is the default session. All users join this session automatically.
+              } @else {
+                Give this session a custom name to distinguish it from the default.
+              }
+            </div>
+          </div>
+
+          @if (!webrtcSession()?.isDefault) {
+            <div class="mb-3">
+              <button
+                class="btn btn-sm btn-outline-primary w-100"
+                (click)="setAsDefaultSession()"
+                title="Make this the default session">
+                <i class="bi bi-star me-1"></i>
+                Set as Default Session
+              </button>
+              <div class="form-text small">
+                <i class="bi bi-info-circle me-1"></i>
+                Make this the default session for all users joining this experiment
+              </div>
+            </div>
+          }
+
+          <hr class="my-3">
+        }
+
+        <h6 class="mb-3">Device Settings</h6>
+
+        <div class="mb-3">
+          <label class="form-label small">
+            <i class="bi bi-camera-video me-1"></i>Camera
+          </label>
+          <select
+            class="form-select form-select-sm"
+            [value]="selectedVideoDevice()"
+            (change)="changeVideoDevice($any($event.target).value)">
+            <option value="">No Camera</option>
+            @for (device of availableVideoDevices(); track device.deviceId) {
+              <option [value]="device.deviceId">
+                {{ device.label || 'Camera ' + ($index + 1) }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small">
+            <i class="bi bi-mic me-1"></i>Microphone
+          </label>
+          <select
+            class="form-select form-select-sm"
+            [value]="selectedAudioDevice()"
+            (change)="changeAudioDevice($any($event.target).value)">
+            <option value="">No Microphone</option>
+            @for (device of availableAudioDevices(); track device.deviceId) {
+              <option [value]="device.deviceId">
+                {{ device.label || 'Microphone ' + ($index + 1) }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="form-text small">
+          <i class="bi bi-info-circle me-1"></i>
+          You can join without camera or microphone
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (isConnected()) {
+    <div class="panel-body">
+      <div class="video-grid">
+        @if (videoEnabled() || screenShareEnabled()) {
+          <div class="local-video-container">
+            <video
+              #localVideo
+              [srcObject]="localStream()"
+              autoplay
+              playsinline
+              muted
+              class="video-element"></video>
+            <div class="video-overlay">
+              <span class="badge bg-dark">You</span>
+              <div class="video-status">
+                @if (!videoEnabled()) {
+                  <i class="bi bi-camera-video-off text-danger"></i>
+                }
+                @if (!audioEnabled()) {
+                  <i class="bi bi-mic-mute text-danger"></i>
+                }
+                @if (screenShareEnabled()) {
+                  <i class="bi bi-display text-success"></i>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @for (peer of remotePeers(); track peer.peerId) {
+          @if ((peer.hasVideo || peer.hasScreenShare) || (peer.stream && peer.stream.getVideoTracks().length > 0)) {
+            <div class="remote-video-container">
+              <video
+                [id]="'remote-video-' + peer.peerId"
+                [srcObject]="peer.stream"
+                (loadedmetadata)="attachStreamToVideo(peer.peerId, peer.stream!)"
+                autoplay
+                playsinline
+                class="video-element"></video>
+              <div class="video-overlay">
+                <span class="badge bg-dark">{{ peer.username }}</span>
+                <div class="video-status">
+                  @if (!peer.hasVideo && !(peer.stream && peer.stream.getVideoTracks().length > 0)) {
+                    <i class="bi bi-camera-video-off text-danger"></i>
+                  }
+                  @if (!peer.hasAudio) {
+                    <i class="bi bi-mic-mute text-danger"></i>
+                  }
+                  @if (peer.hasScreenShare) {
+                    <i class="bi bi-display text-success"></i>
+                  }
+                  @if (peer.connectionState === 'connecting') {
+                    <span class="spinner-border spinner-border-sm text-warning"></span>
+                  } @else if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="remote-video-container audio-only">
+              <div class="audio-only-placeholder">
+                <i class="bi bi-person-circle fs-1"></i>
+                <div class="mt-2">{{ peer.username }}</div>
+              </div>
+              <div class="video-overlay">
+                <div class="video-status">
+                  @if (!peer.hasAudio) {
+                    <i class="bi bi-mic-mute text-danger"></i>
+                  }
+                  @if (peer.connectionState === 'connecting') {
+                    <span class="spinner-border spinner-border-sm text-warning"></span>
+                  } @else if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        }
+
+        @if (remotePeers().length === 0) {
+          <div class="empty-state">
+            <i class="bi bi-people fs-1 text-muted"></i>
+            <p class="text-muted mb-0">Waiting for other participants...</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+@if (showCreateSessionModal()) {
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal fade show d-block" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle me-2"></i>Create New WebRTC Session
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            (click)="closeCreateSessionModal()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Session Name</label>
+            <input
+              type="text"
+              class="form-control"
+              [(ngModel)]="newSessionName"
+              placeholder="Enter session name"
+              (keydown.enter)="createNewSession()"
+              autofocus>
+            <div class="form-text">
+              <i class="bi bi-info-circle me-1"></i>
+              Give your session a descriptive name to help participants identify it
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="closeCreateSessionModal()"
+            [disabled]="isCreatingNewSession()">
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="createNewSession()"
+            [disabled]="!newSessionName.trim() || isCreatingNewSession()">
+            @if (isCreatingNewSession()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            Create Session
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

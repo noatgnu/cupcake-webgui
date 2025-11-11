@@ -5,12 +5,13 @@ import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
 import { ThemeService, AuthService, SiteConfigService } from '@noatgnu/cupcake-core';
 import { NotificationDropdown } from '../../../shared/components/notification-dropdown/notification-dropdown';
 import { MessagingDropdown } from '../../../shared/components/messaging-dropdown/messaging-dropdown';
+import { AsyncTaskDropdown } from '../../../shared/components/async-task-dropdown/async-task-dropdown';
 import { SidebarControl } from '../../services/sidebar-control';
 import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterLink, RouterLinkActive, CommonModule, NotificationDropdown, MessagingDropdown],
+  imports: [RouterLink, RouterLinkActive, CommonModule, NotificationDropdown, MessagingDropdown, AsyncTaskDropdown],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss'
 })

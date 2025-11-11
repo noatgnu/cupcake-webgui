@@ -29,12 +29,22 @@
             </span>
             <span class="badge bg-info ms-2">{{ job()!.jobTypeDisplay || job()!.jobType }}</span>
             <span class="text-muted ms-2">#{{ job()!.id }}</span>
+            @if (hasStaffAccess() && !isDraft()) {
+              <span class="badge bg-success ms-2" title="You have staff access to this job">
+                <i class="bi bi-person-check me-1"></i>
+                Staff Access
+              </span>
+            }
           </div>
 
           @if (canEdit()) {
             <button class="btn btn-primary btn-sm" (click)="editJob()">
               <i class="bi bi-pencil me-2"></i>
-              Continue Editing Draft
+              @if (isDraft()) {
+                Continue Editing Draft
+              } @else {
+                Edit Job Details
+              }
             </button>
           }
         </div>
@@ -236,29 +246,29 @@
               }
             </div>
             <div class="card-body">
-              @if (!isAssignedStaff() && !isDraft()) {
+              @if (!hasStaffAccess() && !isDraft()) {
                 <div class="alert alert-info">
                   <i class="bi bi-info-circle me-2"></i>
                   <strong>Limited Access</strong>
                   <p class="mb-0 small mt-2">
-                    You can view this metadata table, but only assigned staff members can edit it.
+                    You can view this metadata table, but only staff members with appropriate permissions can edit it.
                   </p>
                 </div>
               }
-              @if (isAssignedStaff()) {
+              @if (hasStaffAccess()) {
                 <div class="alert alert-success mb-3">
                   <i class="bi bi-check-circle me-2"></i>
                   <strong>Staff Access</strong>
                   <p class="mb-0 small mt-2">
-                    You are assigned as staff on this job and can edit all metadata fields, including staff-only columns.
+                    You have staff access to this job and can edit all metadata fields, including staff-only columns.
                   </p>
                 </div>
               }
 
               <app-metadata-table-editor
                 [tableId]="job()!.metadataTable!"
-                [canEditStaffOnly]="isAssignedStaff()"
-                [showStaffOnlyFilter]="isAssignedStaff()">
+                [canEditStaffOnly]="hasStaffAccess()"
+                [showStaffOnlyFilter]="hasStaffAccess()">
               </app-metadata-table-editor>
             </div>
           </div>

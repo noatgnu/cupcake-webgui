@@ -1,9 +1,14 @@
 .messaging-dropdown {
   position: relative;
+  z-index: 10001 !important;
+
+  button {
+    z-index: 10001 !important;
+  }
 
   .dropdown-menu {
     position: fixed;
-    z-index: 9999;
+    z-index: 10001 !important;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   }
 

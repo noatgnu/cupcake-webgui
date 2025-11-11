@@ -1,0 +1,190 @@
+<div class="tasks-view h-100 d-flex flex-column">
+  <!-- Header Section -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-list-task me-2"></i>Tasks
+        </h4>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <div class="btn-group" role="group">
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="selectedFilter() === 'all'"
+              [class.btn-outline-primary]="selectedFilter() !== 'all'"
+              (click)="setFilter('all')">
+              All
+              <span class="badge ms-1" [class.bg-white]="selectedFilter() === 'all'" [class.text-primary]="selectedFilter() === 'all'" [class.bg-primary]="selectedFilter() !== 'all'">
+                {{ allTasks().length }}
+              </span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="selectedFilter() === 'active'"
+              [class.btn-outline-primary]="selectedFilter() !== 'active'"
+              (click)="setFilter('active')">
+              <i class="bi bi-hourglass-split me-1"></i>
+              Active
+              <span class="badge ms-1" [class.bg-white]="selectedFilter() === 'active'" [class.text-primary]="selectedFilter() === 'active'" [class.bg-primary]="selectedFilter() !== 'active'">
+                {{ filteredTasks().length }}
+              </span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="selectedFilter() === 'completed'"
+              [class.btn-outline-primary]="selectedFilter() !== 'completed'"
+              (click)="setFilter('completed')">
+              <i class="bi bi-check-circle me-1"></i>
+              Completed
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="selectedFilter() === 'failed'"
+              [class.btn-outline-primary]="selectedFilter() !== 'failed'"
+              (click)="setFilter('failed')">
+              <i class="bi bi-x-circle me-1"></i>
+              Failed
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="content flex-grow-1 overflow-auto">
+      @if (paginatedTasks().length === 0) {
+        <div class="text-center p-5 text-muted">
+          <i class="bi bi-list-task display-1 mb-3 d-block"></i>
+          <p class="lead">
+            @if (selectedFilter() === 'all') {
+              No async tasks have been created yet
+            } @else if (selectedFilter() === 'active') {
+              No active tasks at the moment
+            } @else if (selectedFilter() === 'completed') {
+              No completed tasks
+            } @else {
+              No failed tasks
+            }
+          </p>
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th style="width: 120px;">Status</th>
+                <th style="width: 200px;">Progress</th>
+                <th style="width: 150px;">Created</th>
+                <th style="width: 100px;">Duration</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (task of paginatedTasks(); track task.id) {
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ getTaskDisplayName(task) }}</div>
+                    @if (task.metadataTableName) {
+                      <small class="text-muted d-block">{{ task.metadataTableName }}</small>
+                    }
+                    @if (task.userUsername) {
+                      <small class="text-muted d-block">
+                        <i class="bi bi-person me-1"></i>{{ task.userUsername }}
+                      </small>
+                    }
+                  </td>
+                  <td>
+                    <span class="badge" [class]="getStatusBadgeClass(task.status)">
+                      {{ taskStatusLabels[task.status] }}
+                    </span>
+                    @if (task.errorMessage && task.status === TaskStatus.FAILURE) {
+                      <div class="small text-danger mt-1" [title]="task.errorMessage || ''">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        Error
+                      </div>
+                    }
+                  </td>
+                  <td>
+                    @if (task.progressPercentage !== undefined && task.progressPercentage !== null) {
+                      <div class="progress mb-1" style="height: 20px;">
+                        <div
+                          class="progress-bar"
+                          [class.bg-primary]="task.status === TaskStatus.STARTED"
+                          [class.bg-success]="task.status === TaskStatus.SUCCESS"
+                          [class.bg-danger]="task.status === TaskStatus.FAILURE"
+                          [style.width.%]="task.progressPercentage"
+                          role="progressbar">
+                          {{ task.progressPercentage }}%
+                        </div>
+                      </div>
+                      @if (task.progressDescription) {
+                        <small class="text-muted d-block">{{ task.progressDescription }}</small>
+                      }
+                    } @else if (task.status === TaskStatus.QUEUED) {
+                      <small class="text-muted">
+                        <i class="bi bi-hourglass-split me-1"></i>Queued
+                      </small>
+                    } @else {
+                      <span class="text-muted">-</span>
+                    }
+                  </td>
+                  <td>
+                    <small class="text-muted">{{ task.createdAt | date: 'short' }}</small>
+                  </td>
+                  <td>
+                    <small class="text-muted">{{ formatDuration(task.duration ?? null) }}</small>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      @if (canDownloadResult(task)) {
+                        <button
+                          class="btn btn-sm btn-outline-primary"
+                          (click)="downloadResult(task)"
+                          title="Download result">
+                          <i class="bi bi-download"></i>
+                        </button>
+                      }
+                      @if (canCancelTask(task)) {
+                        <button
+                          class="btn btn-sm btn-outline-danger"
+                          (click)="cancelTask(task.id)"
+                          title="Cancel task">
+                          <i class="bi bi-x-circle"></i>
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+  </div>
+
+  @if (totalPages() > 1) {
+    <div class="footer p-3 border-top">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 justify-content-center">
+          <li class="page-item" [class.disabled]="currentPage() === 1">
+            <button class="page-link" (click)="onPageChange(currentPage() - 1)">Previous</button>
+          </li>
+          <li class="page-item disabled">
+            <span class="page-link">
+              Page {{ currentPage() }} of {{ totalPages() }}
+              ({{ totalTasks() }} total)
+            </span>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage() === totalPages()">
+            <button class="page-link" (click)="onPageChange(currentPage() + 1)">Next</button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  }
+</div>

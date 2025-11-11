@@ -1,7 +1,9 @@
 <app-home-navbar (sectionChange)="showSection($event)" [activeSection]="activeSection" />
 
 <div class="content-wrapper">
-  @if (activeSection === 'dashboard') {
+  @if (activeSection === 'tasks') {
+    <app-tasks-view />
+  } @else if (activeSection === 'dashboard') {
     <div class="container-fluid p-4">
       <div class="row g-4">
     <!-- Welcome Card -->

@@ -1,73 +1,151 @@
 <div class="modal-header">
   <h5 class="modal-title">
     <i class="bi bi-journal-medical me-2"></i>
-    Create New Protocol
+    @if (isImportMode()) {
+      Import Protocol from protocols.io
+    } @else {
+      Create New Protocol
+    }
   </h5>
   <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
 </div>
 
 <div class="modal-body">
-  <form [formGroup]="protocolForm">
-    <div class="mb-3">
-      <label for="protocolTitle" class="form-label">
-        Protocol Title <span class="text-danger">*</span>
-      </label>
-      <input
-        type="text"
-        class="form-control"
-        id="protocolTitle"
-        formControlName="protocolTitle"
-        placeholder="Enter protocol title"
-        [class.is-invalid]="protocolForm.get('protocolTitle')?.invalid && protocolForm.get('protocolTitle')?.touched">
-      @if (protocolForm.get('protocolTitle')?.invalid && protocolForm.get('protocolTitle')?.touched) {
-        <div class="invalid-feedback">
-          Protocol title is required
+  <div class="mb-3">
+    <div class="btn-group w-100" role="group">
+      <button
+        type="button"
+        class="btn"
+        [class.btn-primary]="!isImportMode()"
+        [class.btn-outline-secondary]="isImportMode()"
+        (click)="toggleMode()"
+        [disabled]="saving">
+        <i class="bi bi-plus-lg me-1"></i>
+        Create New
+      </button>
+      <button
+        type="button"
+        class="btn"
+        [class.btn-primary]="isImportMode()"
+        [class.btn-outline-secondary]="!isImportMode()"
+        (click)="toggleMode()"
+        [disabled]="saving">
+        <i class="bi bi-cloud-download me-1"></i>
+        Import from protocols.io
+      </button>
+    </div>
+  </div>
+
+  @if (isImportMode()) {
+    <form [formGroup]="importForm">
+      <div class="mb-3">
+        <label for="protocolsIOUrl" class="form-label">
+          protocols.io URL <span class="text-danger">*</span>
+        </label>
+        <input
+          type="url"
+          class="form-control"
+          id="protocolsIOUrl"
+          formControlName="protocolsIOUrl"
+          placeholder="Enter Protocols.io URL"
+          [class.is-invalid]="importForm.get('protocolsIOUrl')?.invalid && importForm.get('protocolsIOUrl')?.touched">
+        @if (importForm.get('protocolsIOUrl')?.invalid && importForm.get('protocolsIOUrl')?.touched) {
+          <div class="invalid-feedback">
+            Please enter a valid protocols.io URL
+          </div>
+        }
+        <small class="text-muted">
+          *Please note that the URL must be a valid Protocols.io URL or DOI.<br>
+          *Example: <a target="_blank" href="https://www.protocols.io/view/expression-and-purification-of-rab10-1-181-stoichi-4r3l24p1xg1y/v1?step=1" class="example-url">
+            https://www.protocols.io/view/expression-and-purification-of-rab10-1-181-stoichi-4r3l24p1xg1y/v1?step=1
+          </a>
+        </small>
+      </div>
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Import Information</strong>
+        <p class="mb-0 small mt-2">
+          The protocol will be imported with all its steps, sections, and metadata. You will be set as the owner of the imported protocol.
+        </p>
+      </div>
+    </form>
+  } @else {
+    <form [formGroup]="protocolForm">
+      <div class="mb-3">
+        <label for="protocolTitle" class="form-label">
+          Protocol Title <span class="text-danger">*</span>
+        </label>
+        <input
+          type="text"
+          class="form-control"
+          id="protocolTitle"
+          formControlName="protocolTitle"
+          placeholder="Enter protocol title"
+          [class.is-invalid]="protocolForm.get('protocolTitle')?.invalid && protocolForm.get('protocolTitle')?.touched">
+        @if (protocolForm.get('protocolTitle')?.invalid && protocolForm.get('protocolTitle')?.touched) {
+          <div class="invalid-feedback">
+            Protocol title is required
+          </div>
+        }
+      </div>
+
+      <div class="mb-3">
+        <label for="protocolDescription" class="form-label">Description</label>
+        <textarea
+          class="form-control"
+          id="protocolDescription"
+          formControlName="protocolDescription"
+          rows="4"
+          placeholder="Enter protocol description"></textarea>
+        <div class="form-text">
+          Optional: Add a brief description of this protocol
         </div>
-      }
-    </div>
-
-    <div class="mb-3">
-      <label for="protocolDescription" class="form-label">Description</label>
-      <textarea
-        class="form-control"
-        id="protocolDescription"
-        formControlName="protocolDescription"
-        rows="4"
-        placeholder="Enter protocol description"></textarea>
-      <div class="form-text">
-        Optional: Add a brief description of this protocol
       </div>
-    </div>
 
-    <div class="form-check">
-      <input
-        class="form-check-input"
-        type="checkbox"
-        id="enabled"
-        formControlName="enabled">
-      <label class="form-check-label" for="enabled">
-        Enable for public view
-      </label>
-      <div class="form-text">
-        Enabled protocols can be viewed and used by others
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="enabled"
+          formControlName="enabled">
+        <label class="form-check-label" for="enabled">
+          Enable for public view
+        </label>
+        <div class="form-text">
+          Enabled protocols can be viewed and used by others
+        </div>
       </div>
-    </div>
-  </form>
+    </form>
+  }
 </div>
 
 <div class="modal-footer">
   <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
     Cancel
   </button>
-  <button
-    type="button"
-    class="btn btn-primary"
-    (click)="createProtocol()"
-    [disabled]="!protocolForm.valid || saving">
-    @if (saving) {
-      <span class="spinner-border spinner-border-sm me-1"></span>
-    }
-    <i class="bi bi-plus-lg me-1"></i>
-    Create Protocol
-  </button>
+  @if (isImportMode()) {
+    <button
+      type="button"
+      class="btn btn-primary"
+      (click)="importProtocol()"
+      [disabled]="!importForm.valid || saving">
+      @if (saving) {
+        <span class="spinner-border spinner-border-sm me-1"></span>
+      }
+      <i class="bi bi-cloud-download me-1"></i>
+      Import Protocol
+    </button>
+  } @else {
+    <button
+      type="button"
+      class="btn btn-primary"
+      (click)="createProtocol()"
+      [disabled]="!protocolForm.valid || saving">
+      @if (saving) {
+        <span class="spinner-border spinner-border-sm me-1"></span>
+      }
+      <i class="bi bi-plus-lg me-1"></i>
+      Create Protocol
+    </button>
+  }
 </div>

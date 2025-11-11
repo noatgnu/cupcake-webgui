@@ -67,6 +67,7 @@
           <i class="bi bi-person-circle fs-4"></i>
           <app-notification-dropdown></app-notification-dropdown>
           <app-messaging-dropdown></app-messaging-dropdown>
+          <app-async-task-dropdown></app-async-task-dropdown>
         </div>
       } @else {
         <div class="mb-2 p-2 border rounded">
@@ -78,6 +79,7 @@
                 <div class="d-flex gap-1">
                   <app-notification-dropdown></app-notification-dropdown>
                   <app-messaging-dropdown></app-messaging-dropdown>
+                  <app-async-task-dropdown></app-async-task-dropdown>
                 </div>
               </div>
               @if (user.email) {

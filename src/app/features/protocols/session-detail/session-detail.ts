@@ -1,18 +1,20 @@
 import { Component, inject, OnInit, signal, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType } from '@noatgnu/cupcake-core';
-import { MetadataTable, MetadataColumn } from '@noatgnu/cupcake-vanilla';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType } from '@noatgnu/cupcake-core';
+import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
 import { TimerService } from '../../../shared/services/timer';
 import { AnnotationModal } from '../annotation-modal/annotation-modal';
 import { WebvttEditor } from '../webvtt-editor/webvtt-editor';
+import { SessionWebrtcPanel } from '../session-webrtc-panel/session-webrtc-panel';
+import { PeerRole } from '@noatgnu/cupcake-mint-chocolate';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
@@ -27,7 +29,7 @@ interface MolarityHistoryData {
 
 @Component({
   selector: 'app-session-detail',
-  imports: [CommonModule, FormsModule, DurationFormatPipe, StepTemplatePipe, WebvttEditor],
+  imports: [CommonModule, FormsModule, RouterLink, DurationFormatPipe, StepTemplatePipe, WebvttEditor, SessionWebrtcPanel],
   templateUrl: './session-detail.html',
   styleUrl: './session-detail.scss'
 })
@@ -50,16 +52,41 @@ export class SessionDetail implements OnInit, OnDestroy {
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private notificationWs = inject(CCRVNotificationWebSocketService);
+  private ccvWsService = inject(CCVWebSocketService);
   public timer = inject(TimerService);
 
   private destroy$ = new Subject<void>();
 
   readonly Math = Math;
   readonly AnnotationType = AnnotationType;
+  readonly PeerRole = PeerRole;
 
   session = signal<Session | null>(null);
   protocols = signal<ProtocolModel[]>([]);
   selectedProtocolIndex = signal(0);
+
+  webrtcRole = computed(() => {
+    const currentSession = this.session();
+    const currentUser = this.authService.getCurrentUser();
+
+    if (!currentSession || !currentUser) {
+      return PeerRole.PARTICIPANT;
+    }
+
+    if (currentUser.isSuperuser || currentUser.isStaff) {
+      return PeerRole.HOST;
+    }
+
+    if (currentSession.owner === currentUser.id) {
+      return PeerRole.HOST;
+    }
+
+    if (currentSession.editors && currentSession.editors.includes(currentUser.id)) {
+      return PeerRole.HOST;
+    }
+
+    return PeerRole.PARTICIPANT;
+  });
   sections = signal<ProtocolSection[]>([]);
   selectedSectionIndex = signal(0);
   steps = signal<Map<number, ProtocolStep[]>>(new Map());
@@ -76,6 +103,7 @@ export class SessionDetail implements OnInit, OnDestroy {
   bookingDataCache = signal<Map<number, InstrumentUsage>>(new Map());
   metadataTableCache = signal<Map<number, MetadataTable>>(new Map());
   reagentMetadataCache = signal<Map<number, MetadataTable>>(new Map());
+  storedReagentCache = signal<Map<number, any>>(new Map());
   mediaCurrentTimes = signal<Map<number, number>>(new Map());
   transcribingAnnotations = signal<Set<number>>(new Set());
   loadingBookings = signal<Set<number>>(new Set());
@@ -90,7 +118,10 @@ export class SessionDetail implements OnInit, OnDestroy {
   uploading = signal(false);
   uploadProgress = signal(0);
 
+  showWebRTC = signal(false);
+
   transcriptionStatus = signal<Map<number, 'started' | 'completed' | 'failed'>>(new Map());
+  transcriptionProgress = signal<Map<number, { percentage: number; description: string }>>(new Map());
 
   selectedProtocol = computed(() => {
     const index = this.selectedProtocolIndex();
@@ -247,6 +278,10 @@ export class SessionDetail implements OnInit, OnDestroy {
         transcribing.delete(event.annotation_id);
         this.transcribingAnnotations.set(new Set(transcribing));
 
+        const progress = this.transcriptionProgress();
+        progress.delete(event.annotation_id);
+        this.transcriptionProgress.set(new Map(progress));
+
         const message = event.has_translation
           ? `Transcription and translation completed`
           : `Transcription completed`;
@@ -266,8 +301,41 @@ export class SessionDetail implements OnInit, OnDestroy {
         transcribing.delete(event.annotation_id);
         this.transcribingAnnotations.set(new Set(transcribing));
 
+        const progress = this.transcriptionProgress();
+        progress.delete(event.annotation_id);
+        this.transcriptionProgress.set(new Map(progress));
+
         this.toastService.error(`Transcription failed: ${event.error}`);
       });
+
+    this.ccvWsService.filterMessages('async_task.update')
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(message => {
+        this.handleAsyncTaskUpdate(message);
+      });
+  }
+
+  private handleAsyncTaskUpdate(message: any): void {
+    const task = message as AsyncTaskStatus;
+
+    if (!task || !task.result || !task.result.annotation_id) return;
+
+    if (task.taskType !== TaskType.TRANSCRIBE_AUDIO && task.taskType !== TaskType.TRANSCRIBE_VIDEO) {
+      return;
+    }
+
+    const annotationId = task.result.annotation_id;
+    const stepAnns = this.stepAnnotations();
+    const stepAnn = stepAnns.find(sa => sa.annotation === annotationId);
+
+    if (stepAnn) {
+      const progress = this.transcriptionProgress();
+      progress.set(annotationId, {
+        percentage: task.progressPercentage || 0,
+        description: task.progressDescription || ''
+      });
+      this.transcriptionProgress.set(new Map(progress));
+    }
   }
 
   refreshAnnotationById(annotationId: number): void {
@@ -294,13 +362,16 @@ export class SessionDetail implements OnInit, OnDestroy {
       next: (annotation: StepAnnotation) => {
         this.stepService.getProtocolStep(annotation.step).subscribe({
           next: (step: ProtocolStep) => {
-            this.updateSelectedSectionByStep(step);
-
             const allStepsList = this.allSteps();
             const stepIndex = allStepsList.findIndex(s => s.id === step.id);
-            if (stepIndex !== -1) {
-              this.currentStepIndex.set(stepIndex);
+
+            if (stepIndex === -1) {
+              this.toastService.error('This annotation belongs to a step not in this session');
+              return;
             }
+
+            this.updateSelectedSectionByStep(step);
+            this.currentStepIndex.set(stepIndex);
 
             this.annotationDisplayMode.set('single');
 
@@ -357,7 +428,6 @@ export class SessionDetail implements OnInit, OnDestroy {
         this.session.set(session);
         if (session.protocols && session.protocols.length > 0) {
           this.loadProtocols(session.protocols);
-          this.loadStepAnnotations();
         } else {
           this.loading.set(false);
           this.toastService.error('No protocols associated with this session');
@@ -380,7 +450,6 @@ export class SessionDetail implements OnInit, OnDestroy {
           this.session.set(session);
           if (session.protocols && session.protocols.length > 0) {
             this.loadProtocols(session.protocols);
-            this.loadStepAnnotations();
           } else {
             this.loading.set(false);
             this.toastService.error('No protocols associated with this session');
@@ -482,6 +551,7 @@ export class SessionDetail implements OnInit, OnDestroy {
 
         this.initializeTimers();
         this.loadTimersFromBackend();
+        this.loadStepAnnotations();
       })
       .catch(err => {
         console.error('Error loading steps:', err);
@@ -516,6 +586,7 @@ export class SessionDetail implements OnInit, OnDestroy {
         response.results.forEach(action => {
           if (action.reagent) {
             this.loadStoredReagentMetadata(action.reagent);
+            this.loadStoredReagent(action.reagent);
           }
         });
       },
@@ -686,12 +757,21 @@ export class SessionDetail implements OnInit, OnDestroy {
 
     this.stepAnnotationService.getAnnotationsForSession(currentSession.id, params).subscribe({
       next: (response) => {
-        this.stepAnnotations.set(response.results);
-        this.annotationsTotal.set(response.count);
+        const allStepsList = this.allSteps();
+        const validStepIds = new Set(allStepsList.map(s => s.id));
+
+        const filteredResults = response.results.filter(annotation =>
+          validStepIds.has(annotation.step)
+        );
+
+        const filteredCount = Math.floor(response.count * (filteredResults.length / Math.max(response.results.length, 1)));
+
+        this.stepAnnotations.set(filteredResults);
+        this.annotationsTotal.set(filteredCount);
         this.loadingAnnotations.set(false);
         this.currentAnnotationIndex.set(0);
 
-        response.results.forEach(annotation => {
+        filteredResults.forEach(annotation => {
           if (annotation.annotationType === AnnotationType.Booking && annotation.instrumentUsageIds) {
             annotation.instrumentUsageIds.forEach(usageId => {
               this.loadBookingData(usageId);
@@ -832,22 +912,31 @@ export class SessionDetail implements OnInit, OnDestroy {
       next: (response) => {
         response.results.forEach(tk => {
           if (tk.step) {
-            this.timer.remoteTimeKeeper[tk.step.toString()] = tk;
-            if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
-              const stepKey = tk.step.toString();
-              if (this.timer.timeKeeper[stepKey]) {
-                this.timer.timeKeeper[stepKey].current = tk.currentDuration;
-                this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
+            const stepKey = tk.step.toString();
+            this.timer.remoteTimeKeeper[stepKey] = tk;
+
+            if (!this.timer.timeKeeper[stepKey]) {
+              const step = this.allSteps().find(s => s.id === tk.step);
+              if (step && step.stepDuration) {
+                this.timer.initializeTimer(tk.step, step.stepDuration);
               }
             }
-            if (tk.started && tk.step) {
-              const stepKey = tk.step.toString();
-              if (this.timer.timeKeeper[stepKey]) {
+
+            if (this.timer.timeKeeper[stepKey]) {
+              if (tk.started) {
                 const utcDate = new Date(tk.startTime).getTime();
                 this.timer.timeKeeper[stepKey].startTime = utcDate;
                 this.timer.timeKeeper[stepKey].started = true;
+                if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
+                  this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
+                }
                 if (!this.timer.currentTrackingStep.includes(tk.step)) {
                   this.timer.currentTrackingStep.push(tk.step);
+                }
+              } else {
+                if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
+                  this.timer.timeKeeper[stepKey].current = tk.currentDuration;
+                  this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
                 }
               }
             }
@@ -867,7 +956,15 @@ export class SessionDetail implements OnInit, OnDestroy {
     const step = this.allSteps().find(s => s.id === stepId);
     if (!step) return;
 
-    if (!this.timer.remoteTimeKeeper[stepId.toString()]) {
+    const localTimer = this.timer.timeKeeper[stepId.toString()];
+    if (localTimer && localTimer.started) {
+      this.toastService.info('Timer is already running');
+      return;
+    }
+
+    const remoteTimer = this.timer.remoteTimeKeeper[stepId.toString()];
+
+    if (!remoteTimer) {
       this.timeKeeperService.createTimeKeeper({
         session: currentSession.id,
         step: stepId,
@@ -888,8 +985,16 @@ export class SessionDetail implements OnInit, OnDestroy {
           console.error('Error starting timer:', err);
         }
       });
+    } else if (remoteTimer.started) {
+      const utcDate = new Date(remoteTimer.startTime).getTime();
+      this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
+      this.timer.timeKeeper[stepId.toString()].started = true;
+      if (!this.timer.currentTrackingStep.includes(stepId)) {
+        this.timer.currentTrackingStep.push(stepId);
+      }
+      this.toastService.info('Timer synced with running timer');
     } else {
-      const timeKeeperId = this.timer.remoteTimeKeeper[stepId.toString()].id;
+      const timeKeeperId = remoteTimer.id;
       this.timeKeeperService.startTimer(timeKeeperId).subscribe({
         next: (response) => {
           this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
@@ -928,12 +1033,26 @@ export class SessionDetail implements OnInit, OnDestroy {
 
   resetTimer(stepId: number): void {
     const step = this.allSteps().find(s => s.id === stepId);
-    if (step && step.stepDuration) {
-      this.timer.timeKeeper[stepId.toString()].current = step.stepDuration;
-      this.timer.timeKeeper[stepId.toString()].duration = step.stepDuration;
-      this.timer.timeKeeper[stepId.toString()].previousStop = step.stepDuration;
-    }
+    if (!step || !step.stepDuration) return;
+
+    this.timer.timeKeeper[stepId.toString()].current = step.stepDuration;
+    this.timer.timeKeeper[stepId.toString()].duration = step.stepDuration;
+    this.timer.timeKeeper[stepId.toString()].previousStop = step.stepDuration;
     this.timer.timeKeeper[stepId.toString()].started = false;
+
+    const remoteTimer = this.timer.remoteTimeKeeper[stepId.toString()];
+    if (remoteTimer) {
+      this.timeKeeperService.resetTimer(remoteTimer.id).subscribe({
+        next: (response) => {
+          this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
+          this.toastService.success('Timer reset successfully');
+        },
+        error: (err) => {
+          this.toastService.error('Failed to reset timer on server');
+          console.error('Error resetting timer:', err);
+        }
+      });
+    }
   }
 
   openAnnotationModal(): void {
@@ -1333,6 +1452,40 @@ export class SessionDetail implements OnInit, OnDestroy {
     return this.reagentMetadataCache().get(storedReagentId) || null;
   }
 
+  private loadStoredReagent(storedReagentId: number): void {
+    if (this.storedReagentCache().has(storedReagentId)) {
+      return;
+    }
+
+    this.reagentService.getStoredReagent(storedReagentId).subscribe({
+      next: (storedReagent) => {
+        this.storedReagentCache.update(cache => {
+          const newCache = new Map(cache);
+          newCache.set(storedReagentId, storedReagent);
+          return newCache;
+        });
+      },
+      error: (err) => {
+        console.error(`Error loading stored reagent ${storedReagentId}:`, err);
+      }
+    });
+  }
+
+  getActionsForStepReagent(stepReagent: any): ReagentAction[] {
+    const step = this.currentStep();
+    if (!step) return [];
+
+    const stepActions = this.reagentActions().get(step.id) || [];
+    const reagentTemplateId = stepReagent.reagent?.id || stepReagent.reagentId;
+
+    if (!reagentTemplateId) return [];
+
+    return stepActions.filter(action => {
+      const storedReagent = this.storedReagentCache().get(action.reagent);
+      return storedReagent && storedReagent.reagent === reagentTemplateId;
+    });
+  }
+
   toggleHistoryEntryScratched(annotation: StepAnnotation, entryId: string): void {
     const history = this.parseCalculatorHistory(annotation.annotationText);
     const updatedHistory = history.map(entry =>
@@ -1454,6 +1607,10 @@ export class SessionDetail implements OnInit, OnDestroy {
     return this.mediaCurrentTimes().get(annotationId) || 0;
   }
 
+  toggleWebRTC(): void {
+    this.showWebRTC.update(show => !show);
+  }
+
   downloadAnnotation(annotation: StepAnnotation): void {
     if (!annotation.id) {
       this.toastService.error('Invalid annotation');
@@ -1481,6 +1638,11 @@ export class SessionDetail implements OnInit, OnDestroy {
   isTranscribing(annotation: StepAnnotation): boolean {
     if (!annotation.annotation) return false;
     return this.transcribingAnnotations().has(annotation.annotation);
+  }
+
+  getTranscriptionProgress(annotation: StepAnnotation): { percentage: number; description: string } | null {
+    if (!annotation.annotation) return null;
+    return this.transcriptionProgress().get(annotation.annotation) || null;
   }
 
   ngOnDestroy(): void {

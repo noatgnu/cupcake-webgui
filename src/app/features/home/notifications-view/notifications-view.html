@@ -35,7 +35,7 @@
     </div>
   </nav>
 
-  <div class="content flex-grow-1 p-3 overflow-auto">
+  <div class="content flex-grow-1 overflow-auto">
     @if (loading()) {
       <div class="text-center p-5">
         <div class="spinner-border text-primary" role="status">
@@ -48,66 +48,73 @@
         <p class="lead">No notifications found</p>
       </div>
     } @else {
-      <div class="notifications-list">
-        @for (notification of notifications(); track notification.id) {
-          <div
-            class="notification-card card mb-3"
-            [class.unread]="!notification.isRead">
-            <div class="card-body">
-              <div class="d-flex gap-3">
-                <div class="flex-shrink-0">
-                  <i [class]="getPriorityIcon(notification.priority) + ' fs-3 ' + getPriorityClass(notification.priority)"></i>
-                </div>
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div class="flex-grow-1">
-                      <h5 class="card-title mb-1">{{ notification.title }}</h5>
-                      <div class="d-flex gap-2 mb-2">
-                        <span [class]="'badge ' + getPriorityBadgeClass(notification.priority)">
-                          {{ notification.priority }}
-                        </span>
-                        <span class="badge bg-secondary">
-                          {{ notification.notificationType }}
-                        </span>
-                        @if (!notification.isRead) {
-                          <span class="badge bg-info">Unread</span>
-                        }
-                      </div>
-                    </div>
-                    @if (!notification.isRead) {
-                      <button
-                        class="btn btn-sm btn-outline-primary"
-                        (click)="markAsRead(notification)">
-                        Mark as Read
-                      </button>
-                    }
-                  </div>
-                  <p class="card-text">{{ notification.message }}</p>
-                  @if (hasReagentLink(notification)) {
-                    <button
-                      class="btn btn-primary btn-sm mb-2"
-                      (click)="navigateToReagent(notification)">
-                      <i class="bi bi-box-arrow-up-right me-1"></i>
-                      View Reagent
-                    </button>
-                  }
-                  <div class="text-muted small">
-                    <i class="bi bi-clock me-1"></i>
-                    {{ getTimeAgo(notification.createdAt) }}
-                    <span class="mx-2">|</span>
-                    {{ formatDate(notification.createdAt) }}
-                  </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th style="width: 40px;"></th>
+              <th>Notification</th>
+              <th style="width: 120px;">Priority</th>
+              <th style="width: 150px;">Type</th>
+              <th style="width: 150px;">Time</th>
+              <th style="width: 150px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (notification of notifications(); track notification.id) {
+              <tr [class.table-primary]="!notification.isRead">
+                <td class="text-center">
+                  <i [class]="getPriorityIcon(notification.priority) + ' ' + getPriorityClass(notification.priority)"></i>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ notification.title }}</div>
+                  <div class="text-muted small">{{ notification.message }}</div>
                   @if (notification.senderName) {
                     <div class="text-muted small mt-1">
                       <i class="bi bi-person me-1"></i>
                       From: {{ notification.senderName }}
                     </div>
                   }
-                </div>
-              </div>
-            </div>
-          </div>
-        }
+                </td>
+                <td>
+                  <span [class]="'badge ' + getPriorityBadgeClass(notification.priority)">
+                    {{ notification.priority }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge bg-secondary">
+                    {{ notification.notificationType }}
+                  </span>
+                </td>
+                <td>
+                  <small class="text-muted">
+                    {{ getTimeAgo(notification.createdAt) }}
+                  </small>
+                </td>
+                <td>
+                  <div class="d-flex gap-1 flex-wrap">
+                    @if (!notification.isRead) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="markAsRead(notification)"
+                        title="Mark as read">
+                        <i class="bi bi-check"></i>
+                      </button>
+                    }
+                    @if (hasReagentLink(notification)) {
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        (click)="navigateToReagent(notification)"
+                        title="View reagent">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
       </div>
     }
   </div>

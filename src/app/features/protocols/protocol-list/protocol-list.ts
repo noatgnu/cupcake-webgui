@@ -22,8 +22,10 @@ export class ProtocolList implements OnInit {
   private modalService = inject(NgbModal);
 
   protocols = signal<ProtocolModel[]>([]);
+  selectedProtocol = signal<ProtocolModel | null>(null);
   loading = signal(false);
   searchTerm = '';
+  accessTypeFilter = signal<'all' | 'owned' | 'shared' | 'public'>('all');
 
   total = signal(0);
   page = signal(1);
@@ -48,7 +50,16 @@ export class ProtocolList implements OnInit {
       params.search = this.searchTerm.trim();
     }
 
-    this.protocolService.getProtocols(params).subscribe({
+    const accessType = this.accessTypeFilter();
+    let observable;
+
+    if (accessType !== 'all') {
+      observable = this.protocolService.getProtocolsByAccessType(accessType, params);
+    } else {
+      observable = this.protocolService.getProtocols(params);
+    }
+
+    observable.subscribe({
       next: (response) => {
         this.protocols.set(response.results);
         this.total.set(response.count);
@@ -67,6 +78,12 @@ export class ProtocolList implements OnInit {
     this.loadProtocols();
   }
 
+  onAccessTypeChange(accessType: 'all' | 'owned' | 'shared' | 'public'): void {
+    this.accessTypeFilter.set(accessType);
+    this.page.set(1);
+    this.loadProtocols();
+  }
+
   previousPage(): void {
     if (this.page() > 1) {
       this.page.update(p => p - 1);
@@ -81,8 +98,23 @@ export class ProtocolList implements OnInit {
     }
   }
 
+  selectProtocol(protocol: ProtocolModel): void {
+    this.selectedProtocol.set(protocol);
+  }
+
+  deselectProtocol(): void {
+    this.selectedProtocol.set(null);
+  }
+
   openProtocolEditor(protocolId: number): void {
     this.router.navigate(['/protocols', protocolId, 'edit']);
+  }
+
+  editSelectedProtocol(): void {
+    const protocol = this.selectedProtocol();
+    if (protocol) {
+      this.openProtocolEditor(protocol.id);
+    }
   }
 
   createNewProtocol(): void {

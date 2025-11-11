@@ -1,8 +1,9 @@
-import { Component, inject, OnInit, signal, ElementRef, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, signal, ElementRef, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MessageThreadService } from '@noatgnu/cupcake-mint-chocolate';
 import type { MessageThread } from '@noatgnu/cupcake-mint-chocolate';
+import { DropdownCoordinator } from '../../services/dropdown-coordinator';
 
 @Component({
   selector: 'app-messaging-dropdown',
@@ -13,6 +14,7 @@ import type { MessageThread } from '@noatgnu/cupcake-mint-chocolate';
 export class MessagingDropdown implements OnInit {
   private messageThreadService = inject(MessageThreadService);
   private router = inject(Router);
+  private dropdownCoordinator = inject(DropdownCoordinator);
 
   @ViewChild('toggleButton', { read: ElementRef }) toggleButton?: ElementRef;
 
@@ -21,6 +23,15 @@ export class MessagingDropdown implements OnInit {
   loading = signal(false);
   isOpen = signal(false);
   dropdownPosition = signal({ bottom: 0, left: 0 });
+
+  constructor() {
+    effect(() => {
+      const activeDropdown = this.dropdownCoordinator.getActiveDropdown();
+      if (activeDropdown !== 'messaging') {
+        this.isOpen.set(false);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.loadRecentThreads();
@@ -43,10 +54,15 @@ export class MessagingDropdown implements OnInit {
   }
 
   toggleDropdown(): void {
-    this.isOpen.update(v => !v);
-    if (this.isOpen()) {
+    const willBeOpen = !this.isOpen();
+    if (willBeOpen) {
+      this.dropdownCoordinator.openDropdown('messaging');
+      this.isOpen.set(true);
       this.calculateDropdownPosition();
       this.loadRecentThreads();
+    } else {
+      this.dropdownCoordinator.closeDropdown('messaging');
+      this.isOpen.set(false);
     }
   }
 
@@ -77,11 +93,13 @@ export class MessagingDropdown implements OnInit {
   }
 
   viewThread(thread: MessageThread): void {
+    this.dropdownCoordinator.closeDropdown('messaging');
     this.router.navigate(['/home/messages', thread.id]);
     this.isOpen.set(false);
   }
 
   viewAll(): void {
+    this.dropdownCoordinator.closeDropdown('messaging');
     this.router.navigate(['/home/messages']);
     this.isOpen.set(false);
   }

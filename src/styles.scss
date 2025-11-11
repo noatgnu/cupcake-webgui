@@ -78,3 +78,35 @@
   color: var(--bs-warning-text-emphasis);
   border-color: var(--bs-warning-border-subtle);
 }
+
+ccc-toast-container,
+.toast-container {
+  z-index: 9999 !important;
+}
+
+.ngb-toast,
+.toast {
+  z-index: 9999 !important;
+}
+
+.modal {
+  z-index: 9998 !important;
+}
+
+.modal-backdrop {
+  z-index: 9997 !important;
+}
+
+.offcanvas,
+.offcanvas-backdrop {
+  z-index: 9996 !important;
+}
+
+.dropdown-menu {
+  z-index: 10001 !important;
+}
+
+ngb-alert,
+.alert {
+  z-index: 100 !important;
+}

@@ -368,6 +368,13 @@
                           </button>
                           <button
                             type="button"
+                            class="btn btn-sm btn-outline-info"
+                            (click)="openColumnHistory(column); $event.stopPropagation()"
+                            title="View column history">
+                            <i class="bi bi-clock-history"></i>
+                          </button>
+                          <button
+                            type="button"
                             class="btn btn-sm btn-outline-danger"
                             (click)="removeColumn(column); $event.stopPropagation()"
                             title="Remove column"

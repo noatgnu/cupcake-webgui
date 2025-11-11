@@ -1,9 +1,10 @@
-import { Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NotificationService, CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
 import type { Notification, NotificationPriority } from '@noatgnu/cupcake-mint-chocolate';
+import { DropdownCoordinator } from '../../services/dropdown-coordinator';
 
 @Component({
   selector: 'app-notification-dropdown',
@@ -15,6 +16,7 @@ export class NotificationDropdown implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private router = inject(Router);
   private wsService = inject(CommunicationWebSocketService);
+  private dropdownCoordinator = inject(DropdownCoordinator);
 
   @ViewChild('toggleButton', { read: ElementRef }) toggleButton?: ElementRef;
 
@@ -25,6 +27,15 @@ export class NotificationDropdown implements OnInit, OnDestroy {
   dropdownPosition = signal({ bottom: 0, left: 0 });
 
   private wsSubscription?: Subscription;
+
+  constructor() {
+    effect(() => {
+      const activeDropdown = this.dropdownCoordinator.getActiveDropdown();
+      if (activeDropdown !== 'notification') {
+        this.isOpen.set(false);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.loadUnreadNotifications();
@@ -65,10 +76,15 @@ export class NotificationDropdown implements OnInit, OnDestroy {
   }
 
   toggleDropdown(): void {
-    this.isOpen.update(v => !v);
-    if (this.isOpen()) {
+    const willBeOpen = !this.isOpen();
+    if (willBeOpen) {
+      this.dropdownCoordinator.openDropdown('notification');
+      this.isOpen.set(true);
       this.calculateDropdownPosition();
       this.loadUnreadNotifications();
+    } else {
+      this.dropdownCoordinator.closeDropdown('notification');
+      this.isOpen.set(false);
     }
   }
 
@@ -112,6 +128,7 @@ export class NotificationDropdown implements OnInit, OnDestroy {
   }
 
   viewAll(): void {
+    this.dropdownCoordinator.closeDropdown('notification');
     this.router.navigate(['/home/notifications']);
     this.isOpen.set(false);
   }
@@ -155,6 +172,7 @@ export class NotificationDropdown implements OnInit, OnDestroy {
   navigateToReagent(notification: Notification, event: Event): void {
     event.stopPropagation();
     if (this.hasReagentLink(notification)) {
+      this.dropdownCoordinator.closeDropdown('notification');
       this.router.navigateByUrl(notification.data.link);
       this.isOpen.set(false);
       this.markAsRead(notification);

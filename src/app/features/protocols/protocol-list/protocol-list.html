@@ -2,11 +2,49 @@
   <!-- Header Section -->
   <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
     <div class="container-fluid">
-      <div class="d-flex align-items-center justify-content-between w-100">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
         <h4 class="navbar-brand m-0 fw-bold">
           <i class="bi bi-journal-medical me-2"></i>Protocols
         </h4>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <div class="btn-group btn-group-sm" role="group">
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="accessTypeFilter() === 'all'"
+              [class.btn-outline-secondary]="accessTypeFilter() !== 'all'"
+              (click)="onAccessTypeChange('all')">
+              <i class="bi bi-list me-1"></i>
+              All
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="accessTypeFilter() === 'owned'"
+              [class.btn-outline-secondary]="accessTypeFilter() !== 'owned'"
+              (click)="onAccessTypeChange('owned')">
+              <i class="bi bi-person me-1"></i>
+              My Protocols
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="accessTypeFilter() === 'shared'"
+              [class.btn-outline-secondary]="accessTypeFilter() !== 'shared'"
+              (click)="onAccessTypeChange('shared')">
+              <i class="bi bi-people me-1"></i>
+              Shared
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="accessTypeFilter() === 'public'"
+              [class.btn-outline-secondary]="accessTypeFilter() !== 'public'"
+              (click)="onAccessTypeChange('public')">
+              <i class="bi bi-globe me-1"></i>
+              Public
+            </button>
+          </div>
           <div class="input-group" style="width: 300px;">
             <span class="input-group-text">
               <i class="bi bi-search"></i>
@@ -28,120 +66,237 @@
   </nav>
 
   <div class="protocol-content flex-grow-1 p-3" style="min-height: 0;">
-    <div class="card h-100 d-flex flex-column">
-      <div class="card-header flex-shrink-0">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">
-            <i class="bi bi-list-check me-2"></i>
-            All Protocols
-          </h6>
-          <span class="badge bg-secondary">{{ total() }}</span>
+    @if (loading()) {
+      <div class="text-center p-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
         </div>
       </div>
-      <div class="card-body flex-grow-1 p-0" style="overflow-y: auto; min-height: 0;">
-        @if (loading()) {
-          <div class="text-center p-4">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Loading...</span>
+    } @else {
+      <div class="protocols-layout d-flex gap-3 h-100">
+        <!-- Left Panel: Protocol List -->
+        <div class="protocols-panel-left">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Protocol List
+              </h6>
             </div>
-          </div>
-        } @else if (protocols().length === 0) {
-          <div class="empty-state text-center text-muted p-5">
-            <i class="bi bi-journal-medical fs-1 mb-3 d-block"></i>
-            @if (searchTerm) {
-              <h5>No Protocols Found</h5>
-              <p class="mb-3">No protocols match your search criteria</p>
-              <button class="btn btn-outline-primary" (click)="searchTerm = ''; onSearchChange()">
-                Clear Search
-              </button>
-            } @else {
-              <h5>No Protocols</h5>
-              <p class="mb-3">Create your first protocol to get started</p>
-              <button class="btn btn-primary" (click)="createNewProtocol()">
-                <i class="bi bi-plus-lg me-2"></i>
-                Create Protocol
-              </button>
+            <div class="card-body">
+              @if (protocols().length === 0) {
+                <div class="empty-state-small text-center text-muted p-3">
+                  <i class="bi bi-journal-medical fs-2 mb-2 d-block"></i>
+                  @if (searchTerm) {
+                    <small>No protocols match your search</small>
+                  } @else {
+                    <small>No protocols found</small>
+                  }
+                </div>
+              } @else {
+                <div class="list-group list-group-flush">
+                  @for (protocol of protocols(); track protocol.id) {
+                    <div
+                      class="list-group-item protocol-list-item"
+                      [class.active]="selectedProtocol()?.id === protocol.id"
+                      (click)="selectProtocol(protocol)"
+                      role="button">
+                      <div class="d-flex align-items-start gap-2">
+                        <div class="flex-grow-1">
+                          <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div class="fw-semibold">
+                              {{ protocol.protocolTitle || 'Untitled Protocol' }}
+                            </div>
+                            @if (protocol.enabled) {
+                              <span class="badge bg-success">Public</span>
+                            }
+                          </div>
+                          <div class="d-flex gap-2 small text-muted">
+                            @if (protocol.stepsCount !== undefined && protocol.stepsCount !== null) {
+                              <span><i class="bi bi-list-check me-1"></i>{{ protocol.stepsCount }} steps</span>
+                            }
+                            @if (protocol.isVaulted) {
+                              <span class="badge bg-warning text-dark"><i class="bi bi-safe2 me-1"></i>Vaulted</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            @if (total() > pageSize) {
+              <div class="card-footer">
+                <div class="d-flex justify-content-center">
+                  <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                      <li class="page-item" [class.disabled]="page() === 1">
+                        <button class="page-link" (click)="previousPage()">Previous</button>
+                      </li>
+                      <li class="page-item disabled">
+                        <span class="page-link">{{ page() }} / {{ Math.ceil(total() / pageSize) }}</span>
+                      </li>
+                      <li class="page-item" [class.disabled]="page() * pageSize >= total()">
+                        <button class="page-link" (click)="nextPage()">Next</button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+                <div class="text-center mt-2">
+                  <small class="text-muted">
+                    Showing {{ (page() - 1) * pageSize + 1 }}-{{ Math.min(page() * pageSize, total()) }} of {{ total() }}
+                  </small>
+                </div>
+              </div>
             }
           </div>
-        } @else {
-          <div class="list-group list-group-flush">
-            @for (protocol of protocols(); track protocol.id) {
-              <button
-                type="button"
-                class="list-group-item list-group-item-action text-start"
-                (click)="openProtocolEditor(protocol.id)">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div class="flex-grow-1">
-                    <div class="d-flex align-items-center mb-1">
-                      <h6 class="mb-0">{{ protocol.protocolTitle || 'Untitled Protocol' }}</h6>
-                      <div class="form-check form-switch ms-2">
+        </div>
+
+        <!-- Right Panel: Protocol Details -->
+        <div class="protocols-panel-right">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  @if (selectedProtocol()) {
+                    <span>Protocol Details</span>
+                  } @else {
+                    <span class="text-muted">Select a protocol</span>
+                  }
+                </h6>
+                @if (selectedProtocol()) {
+                  <div class="d-flex gap-2 align-items-center">
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="editSelectedProtocol()"
+                      title="Edit Protocol">
+                      <i class="bi bi-pencil me-1"></i>
+                      Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="deselectProtocol()">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (!selectedProtocol()) {
+                <div class="empty-state text-center text-muted">
+                  <i class="bi bi-journal-medical"></i>
+                  <h5>No Protocol Selected</h5>
+                  <p>Select a protocol from the list to view its details</p>
+                </div>
+              } @else {
+                <div class="detail-content">
+                  <div class="mb-3">
+                    <h5>{{ selectedProtocol()!.protocolTitle || 'Untitled Protocol' }}</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                      @if (selectedProtocol()!.enabled) {
+                        <span class="badge bg-success">Public</span>
+                      } @else {
+                        <span class="badge bg-secondary">Private</span>
+                      }
+                      @if (selectedProtocol()!.isVaulted) {
+                        <span class="badge bg-warning text-dark">
+                          <i class="bi bi-safe2 me-1"></i>Vaulted
+                        </span>
+                      }
+                      <div class="form-check form-switch">
                         <input
                           class="form-check-input"
                           type="checkbox"
-                          [checked]="protocol.enabled"
-                          (click)="toggleEnabled(protocol, $event)"
-                          title="Make protocol viewable to everyone">
-                        <label class="form-check-label small">
-                          Public
+                          [checked]="selectedProtocol()!.enabled"
+                          (change)="toggleEnabled(selectedProtocol()!, $event)"
+                          id="enableSwitch">
+                        <label class="form-check-label small" for="enableSwitch">
+                          Make public
                         </label>
                       </div>
                     </div>
-                    @if (protocol.protocolDescription) {
-                      <p class="mb-1 small text-muted">{{ protocol.protocolDescription }}</p>
-                    }
-                    <div class="d-flex gap-3 small text-muted">
-                      @if (protocol.stepsCount !== undefined && protocol.stepsCount !== null) {
-                        <span><i class="bi bi-list-check me-1"></i>{{ protocol.stepsCount }} steps</span>
+                  </div>
+
+                  @if (selectedProtocol()!.protocolDescription) {
+                    <div class="border-top pt-3 mt-3">
+                      <h6 class="text-muted mb-2">Description</h6>
+                      <p>{{ selectedProtocol()!.protocolDescription }}</p>
+                    </div>
+                  }
+
+                  <div class="border-top pt-3 mt-3">
+                    <h6 class="text-muted mb-2">Statistics</h6>
+                    <div class="row">
+                      @if (selectedProtocol()!.stepsCount !== undefined && selectedProtocol()!.stepsCount !== null) {
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Steps</small>
+                          <div>{{ selectedProtocol()!.stepsCount }}</div>
+                        </div>
                       }
-                      @if (protocol.averageComplexity !== undefined && protocol.averageComplexity !== null) {
-                        <span><i class="bi bi-speedometer2 me-1"></i>{{ protocol.averageComplexity.toFixed(1) }}/5</span>
+                      @if (selectedProtocol()!.averageComplexity !== undefined && selectedProtocol()!.averageComplexity !== null) {
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Avg. Complexity</small>
+                          <div>{{ selectedProtocol()!.averageComplexity!.toFixed(1) }}/5</div>
+                        </div>
                       }
-                      @if (protocol.averageDuration !== undefined && protocol.averageDuration !== null) {
-                        <span><i class="bi bi-clock me-1"></i>{{ protocol.averageDuration.toFixed(1) }}/5</span>
-                      }
-                      @if (protocol.isVaulted) {
-                        <span class="badge bg-warning text-dark"><i class="bi bi-safe2 me-1"></i>Vaulted</span>
+                      @if (selectedProtocol()!.averageDuration !== undefined && selectedProtocol()!.averageDuration !== null) {
+                        <div class="col-6 mb-2">
+                          <small class="text-muted">Avg. Duration</small>
+                          <div>{{ selectedProtocol()!.averageDuration!.toFixed(1) }}/5</div>
+                        </div>
                       }
                     </div>
-                    <small class="text-muted">Updated {{ protocol.updatedAt | date: 'short' }}</small>
                   </div>
-                  <div class="btn-group btn-group-sm ms-2">
-                    <button
-                      class="btn btn-outline-primary"
-                      (click)="startSession(protocol, $event)"
-                      title="Start Session">
-                      <i class="bi bi-play-circle"></i>
-                    </button>
-                    <button
-                      class="btn btn-outline-danger"
-                      (click)="deleteProtocol(protocol.id, $event)"
-                      title="Delete Protocol">
-                      <i class="bi bi-trash"></i>
-                    </button>
+
+                  @if (selectedProtocol()!.protocolUrl) {
+                    <div class="border-top pt-3 mt-3">
+                      <h6 class="text-muted mb-2">Source</h6>
+                      <div>
+                        <a [href]="selectedProtocol()!.protocolUrl" target="_blank" class="btn btn-sm btn-outline-primary">
+                          <i class="bi bi-link-45deg me-1"></i>
+                          View on protocols.io
+                        </a>
+                      </div>
+                    </div>
+                  }
+
+                  <div class="border-top pt-3 mt-3">
+                    <h6 class="text-muted mb-2">Timestamps</h6>
+                    <div class="row">
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Created</small>
+                        <div>{{ selectedProtocol()!.createdAt | date: 'short' }}</div>
+                      </div>
+                      <div class="col-6 mb-2">
+                        <small class="text-muted">Updated</small>
+                        <div>{{ selectedProtocol()!.updatedAt | date: 'short' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="border-top pt-3 mt-3">
+                    <h6 class="text-muted mb-2">Actions</h6>
+                    <div class="d-flex gap-2">
+                      <button
+                        class="btn btn-primary"
+                        (click)="startSession(selectedProtocol()!, $event)">
+                        <i class="bi bi-play-circle me-1"></i>
+                        Start Session
+                      </button>
+                      <button
+                        class="btn btn-outline-danger"
+                        (click)="deleteProtocol(selectedProtocol()!.id, $event)">
+                        <i class="bi bi-trash me-1"></i>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </button>
-            }
+              }
+            </div>
           </div>
-        }
-      </div>
-      @if (total() > pageSize) {
-        <div class="card-footer flex-shrink-0">
-          <nav>
-            <ul class="pagination pagination-sm mb-0 justify-content-center">
-              <li class="page-item" [class.disabled]="page() === 1">
-                <button class="page-link" (click)="previousPage()">Previous</button>
-              </li>
-              <li class="page-item disabled">
-                <span class="page-link">{{ page() }} / {{ Math.ceil(total() / pageSize) }}</span>
-              </li>
-              <li class="page-item" [class.disabled]="page() * pageSize >= total()">
-                <button class="page-link" (click)="nextPage()">Next</button>
-              </li>
-            </ul>
-          </nav>
         </div>
-      }
-    </div>
+      </div>
+    }
   </div>
 </div>

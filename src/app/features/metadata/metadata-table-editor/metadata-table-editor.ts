@@ -10,27 +10,26 @@ import {
   MetadataColumnService,
   MetadataValueEditModal,
   MetadataValueEditConfig,
-  AsyncExportService,
   ChunkedUploadService,
   AsyncTaskUIService,
   ColumnEditModal,
-  MetadataExportRequest,
   ExcelExportModalComponent,
   ExcelExportOptions,
   ColumnType,
   SearchReplaceModal,
   SearchReplaceConfig,
   MetadataValidationModal,
-  MetadataValidationConfig,
   SamplePool,
   SamplePoolService,
   SamplePoolCreateModal,
   SamplePoolEditModal,
   SamplePoolDetailsModal,
   MetadataColumnAutofillModal,
-  MetadataColumnAutofillConfig
+  MetadataColumnAutofillConfig,
+  MetadataColumnHistoryModal,
+  ColumnHistoryModalConfig
 } from '@noatgnu/cupcake-vanilla';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { ToastService, MetadataExportRequest, MetadataValidationConfig } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-metadata-table-editor',
@@ -164,7 +163,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
   constructor(
     private metadataTableService: MetadataTableService,
     private metadataColumnService: MetadataColumnService,
-    private asyncExportService: AsyncExportService,
     private chunkedUploadService: ChunkedUploadService,
     private asyncTaskService: AsyncTaskUIService,
     private toastService: ToastService,
@@ -397,6 +395,22 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     });
   }
 
+  openColumnHistory(column: MetadataColumn): void {
+    if (!column.id) return;
+
+    const config: ColumnHistoryModalConfig = {
+      columnId: column.id,
+      columnName: column.displayName || column.name
+    };
+
+    const modalRef = this.modalService.open(MetadataColumnHistoryModal, {
+      size: 'lg',
+      backdrop: 'static'
+    });
+
+    modalRef.componentInstance.config = config;
+  }
+
   private updateColumnSettings(columnId: number, columnData: Partial<MetadataColumn>): void {
     this.metadataColumnService.patchMetadataColumn(columnId, columnData).subscribe({
       next: (updatedColumn: MetadataColumn) => {
@@ -615,7 +629,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           if (result?.taskId) {
             this.toastService.success(`SDRF import task queued successfully! Task ID: ${result.taskId}`);
             this.asyncTaskService.monitorTask(result.taskId);
-            this.asyncTaskService.startRealtimeUpdates();
           } else {
             this.toastService.success('SDRF file imported successfully!');
             this.loadTable(this.tableId);
@@ -670,7 +683,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           if (result?.taskId) {
             this.toastService.success(`Excel import task queued successfully! Task ID: ${result.taskId}`);
             this.asyncTaskService.monitorTask(result.taskId);
-            this.asyncTaskService.startRealtimeUpdates();
           } else {
             this.toastService.success('Excel file imported successfully!');
             this.loadTable(this.tableId);
@@ -708,15 +720,9 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       includePools: false
     };
 
-    this.toastService.info('Starting SDRF export...');
-
-    this.asyncExportService.sdrfFile(request).subscribe({
+    this.asyncTaskService.queueSdrfExport(request).subscribe({
       next: (result: any) => {
-        if (result.taskId) {
-          this.asyncTaskService.monitorTask(result.taskId);
-          this.asyncTaskService.startRealtimeUpdates();
-          this.toastService.success(`SDRF export task queued successfully! Task ID: ${result.taskId}`);
-        }
+        this.toastService.success(`SDRF export queued successfully! Task ID: ${result.taskId}`);
       },
       error: (error: any) => {
         console.error('Error exporting SDRF:', error);
@@ -749,15 +755,9 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           includePools: options.includePools || false
         };
 
-        this.toastService.info('Starting Excel export...');
-
-        this.asyncExportService.excelTemplate(request).subscribe({
+        this.asyncTaskService.queueExcelExport(request).subscribe({
           next: (result: any) => {
-            if (result.taskId) {
-              this.asyncTaskService.monitorTask(result.taskId);
-              this.asyncTaskService.startRealtimeUpdates();
-              this.toastService.success(`Excel export task queued successfully! Task ID: ${result.taskId}`);
-            }
+            this.toastService.success(`Excel export queued successfully! Task ID: ${result.taskId}`);
           },
           error: (error: any) => {
             console.error('Error exporting Excel:', error);
@@ -787,7 +787,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     modalRef.result.then((result: { success: boolean; task_id: string; message: string }) => {
       if (result.success && result.task_id) {
         this.asyncTaskService.monitorTask(result.task_id);
-        this.asyncTaskService.startRealtimeUpdates();
       }
     }).catch(() => {});
   }

@@ -1,16 +1,16 @@
 .metadata-table-wrapper {
   .navbar {
     position: relative;
-    z-index: 1050;
+    z-index: 100;
   }
 
   .btn-group {
     position: relative;
-    z-index: 1060;
+    z-index: 110;
   }
 
   .dropdown-menu {
-    z-index: 1070;
+    z-index: 120 !important;
   }
 
   .metadata-table {

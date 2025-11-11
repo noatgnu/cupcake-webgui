@@ -12,7 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withHashLocation()),
-    { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: environment.apiUrl } },
+    { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: environment.apiUrl, websocketUrl: environment.websocketUrl } },
     provideHttpClient(
       withInterceptors([authInterceptor])
     ),

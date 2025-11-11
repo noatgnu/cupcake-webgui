@@ -11,14 +11,14 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
 export class HomeNavbar {
   private sidebarControl = inject(SidebarControl);
 
-  @Input() activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' = 'dashboard';
-  @Output() sectionChange = new EventEmitter<'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config'>();
+  @Input() activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' = 'dashboard';
+  @Output() sectionChange = new EventEmitter<'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks'>();
 
   onToggleSidebar(): void {
     this.sidebarControl.toggle();
   }
 
-  navigateToSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config'): void {
+  navigateToSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks'): void {
     this.sectionChange.emit(section);
   }
 }

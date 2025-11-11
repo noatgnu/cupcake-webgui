@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -23,7 +23,12 @@ export class ProtocolCreateModal {
     enabled: [false]
   });
 
+  importForm: FormGroup = this.fb.group({
+    protocolsIOUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/(www\.)?protocols\.io\/.+/)]]
+  });
+
   saving = false;
+  isImportMode = signal(false);
 
   createProtocol(): void {
     if (!this.protocolForm.valid) {
@@ -46,6 +51,34 @@ export class ProtocolCreateModal {
       error: (err) => {
         this.toastService.error('Failed to create protocol');
         console.error('Error creating protocol:', err);
+        this.saving = false;
+      }
+    });
+  }
+
+  toggleMode(): void {
+    this.isImportMode.set(!this.isImportMode());
+    this.protocolForm.reset({ enabled: false });
+    this.importForm.reset();
+  }
+
+  importProtocol(): void {
+    if (!this.importForm.valid) {
+      this.toastService.error('Please enter a valid protocols.io URL');
+      return;
+    }
+
+    this.saving = true;
+    const url = this.importForm.value.protocolsIOUrl;
+
+    this.protocolService.importFromProtocolsIO(url).subscribe({
+      next: (protocol) => {
+        this.toastService.success('Protocol imported successfully from protocols.io');
+        this.activeModal.close(protocol);
+      },
+      error: (err) => {
+        this.toastService.error(err?.error?.error || 'Failed to import protocol from protocols.io');
+        console.error('Error importing protocol:', err);
         this.saving = false;
       }
     });

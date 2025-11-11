@@ -1,4 +1,4 @@
-.notification-dropdown {
+.async-task-dropdown {
   position: relative;
   z-index: 10001 !important;
 
@@ -12,22 +12,26 @@
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   }
 
-  .notification-item {
-    cursor: pointer;
+  .task-item {
+    cursor: default;
+    transition: background-color 0.2s;
+    position: relative;
     border-left: 3px solid transparent;
-    transition: all 0.2s;
 
     &:hover {
-      background-color: var(--bs-light);
+      background-color: rgba(0, 0, 0, 0.05);
     }
 
-    &.unread {
-      background-color: var(--bs-primary-bg-subtle);
-      border-left-color: var(--bs-primary);
+    &.has-download {
+      border-left-color: #0d6efd;
     }
   }
 
   .badge {
     font-size: 0.65rem;
+  }
+
+  .progress {
+    background-color: rgba(0, 0, 0, 0.1);
   }
 }

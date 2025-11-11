@@ -1,0 +1,66 @@
+@if (hasActiveTasks()) {
+  <div class="floating-panel" [class.minimized]="isMinimized()">
+    <div class="panel-header" (click)="toggleMinimize()">
+      <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="fw-semibold">Active Tasks ({{ taskCount() }})</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button
+          class="btn btn-sm btn-link p-0"
+          (click)="viewAllTasks(); $event.stopPropagation()"
+          title="View all tasks">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </button>
+        <button class="btn btn-sm btn-link p-0" title="{{ isMinimized() ? 'Expand' : 'Minimize' }}">
+          <i class="bi" [class.bi-chevron-up]="!isMinimized()" [class.bi-chevron-down]="isMinimized()"></i>
+        </button>
+      </div>
+    </div>
+
+    @if (!isMinimized()) {
+      <div class="panel-body">
+        @for (task of activeTasks(); track task.id) {
+          <div class="task-item">
+            <div class="task-info">
+              <div class="task-name">
+                {{ getTaskDisplayName(task) }}
+                @if (task.metadataTableName) {
+                  <span class="text-muted">- {{ task.metadataTableName }}</span>
+                }
+              </div>
+              @if (task.progressPercentage !== undefined && task.progressPercentage > 0) {
+                <div class="progress mt-1" style="height: 4px;">
+                  <div
+                    class="progress-bar"
+                    [class.bg-primary]="task.status === TaskStatus.STARTED"
+                    [class.bg-secondary]="task.status === TaskStatus.QUEUED"
+                    [style.width.%]="getProgressPercentage(task)"
+                    role="progressbar">
+                  </div>
+                </div>
+                <small class="text-muted">{{ task.progressPercentage }}%</small>
+              } @else {
+                <small class="text-muted">
+                  @if (task.status === TaskStatus.QUEUED) {
+                    Queued...
+                  } @else {
+                    Processing...
+                  }
+                </small>
+              }
+            </div>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              (click)="cancelTask(task.id, $event)"
+              title="Cancel task">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
