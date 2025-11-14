@@ -1,8 +1,9 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
-import { BrowserWindow, ipcMain, dialog } from 'electron';
+import { BrowserWindow, ipcMain, dialog, app } from 'electron';
 import { RedisManager } from './RedisManager';
+import type { Config } from './PythonManager';
 
 export interface BackendStatus {
   service: string;
@@ -31,11 +32,13 @@ export class BackendManager {
   private outputListeners: Array<(data: string) => void> = [];
   private redisManager: RedisManager;
   private pidFilePath: string;
+  private configPath: string;
 
   constructor(userDataPath: string, isDev: boolean) {
     this.userDataPath = userDataPath;
     this.isDev = isDev;
     this.pidFilePath = path.join(this.userDataPath, 'cupcake-processes.json');
+    this.configPath = path.join(this.userDataPath, 'cupcake-config.json');
     this.redisManager = new RedisManager({
       userDataPath: this.userDataPath,
       isDev: this.isDev
@@ -43,6 +46,18 @@ export class BackendManager {
     this.redisManager.setLogCallback((message, type) => {
       this.sendBackendLog(`redis: ${message}`, type || 'info');
     });
+  }
+
+  private loadConfig(): Config {
+    try {
+      if (fs.existsSync(this.configPath)) {
+        const config: Config = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
+        return config;
+      }
+    } catch (error) {
+      console.warn('Failed to load config:', error);
+    }
+    return {};
   }
 
   private getTrackedProcesses(): ProcessTracking[] {
@@ -129,7 +144,9 @@ export class BackendManager {
 
   private getDjangoEnvironment(): NodeJS.ProcessEnv {
     const redisEnv = this.redisManager.getEnvironmentVariables();
-    return {
+    const config = this.loadConfig();
+
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       DJANGO_SETTINGS_MODULE: 'cupcake_vanilla.settings_electron',
       ELECTRON_APP_DATA: this.userDataPath,
@@ -143,6 +160,12 @@ export class BackendManager {
       PYTHONUNBUFFERED: '1',
       ...redisEnv
     };
+
+    if (config.protocolsIoAccessToken) {
+      env.PROTOCOLS_IO_ACCESS_TOKEN = config.protocolsIoAccessToken;
+    }
+
+    return env;
   }
 
   private getCommandAndArgs(backendDir: string, venvPython: string, scriptArgs: string[]): { command: string; args: string[] } {

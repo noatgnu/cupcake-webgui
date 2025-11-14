@@ -6,7 +6,8 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService } from '@noatgnu/cupcake-core';
+import type { SiteConfig } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
@@ -51,6 +52,7 @@ export class SessionDetail implements OnInit, OnDestroy {
   private annotationUploadService = inject(AnnotationChunkedUploadService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private siteConfigService = inject(SiteConfigService);
   private notificationWs = inject(CCRVNotificationWebSocketService);
   private ccvWsService = inject(CCVWebSocketService);
   public timer = inject(TimerService);
@@ -61,6 +63,7 @@ export class SessionDetail implements OnInit, OnDestroy {
   readonly AnnotationType = AnnotationType;
   readonly PeerRole = PeerRole;
 
+  siteConfig = signal<SiteConfig | null>(null);
   session = signal<Session | null>(null);
   protocols = signal<ProtocolModel[]>([]);
   selectedProtocolIndex = signal(0);
@@ -119,6 +122,11 @@ export class SessionDetail implements OnInit, OnDestroy {
   uploadProgress = signal(0);
 
   showWebRTC = signal(false);
+
+  webrtcFeatureEnabled = computed(() => {
+    const config = this.siteConfig();
+    return config?.uiFeatures?.show_webrtc !== false;
+  });
 
   transcriptionStatus = signal<Map<number, 'started' | 'completed' | 'failed'>>(new Map());
   transcriptionProgress = signal<Map<number, { percentage: number; description: string }>>(new Map());
@@ -218,6 +226,10 @@ export class SessionDetail implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.siteConfigService.config$.pipe(takeUntil(this.destroy$)).subscribe(config => {
+      this.siteConfig.set(config);
+    });
+
     const id = this.route.snapshot.paramMap.get('id');
 
     if (!id) {

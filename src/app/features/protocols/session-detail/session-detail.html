@@ -52,7 +52,7 @@
                 }
               </div>
             }
-            @if (session()) {
+            @if (session() && webrtcFeatureEnabled()) {
               <button
                 class="btn btn-sm"
                 [class.btn-success]="showWebRTC()"

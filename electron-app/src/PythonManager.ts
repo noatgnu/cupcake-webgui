@@ -18,6 +18,12 @@ export interface ValidationResult {
 export interface Config {
   pythonPath?: string;
   venvPath?: string;
+  pythonVersion?: string;
+  protocolsIoAccessToken?: string;
+  enableCupcakeMacaron?: boolean;
+  enableCupcakeMintChocolate?: boolean;
+  enableCupcakeSaltedCaramel?: boolean;
+  enableCupcakeRedVelvet?: boolean;
   [key: string]: any;
 }
 

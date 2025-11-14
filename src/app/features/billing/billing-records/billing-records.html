@@ -1,0 +1,150 @@
+<app-billing-navbar></app-billing-navbar>
+
+<div class="container-fluid p-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Billing Records</h2>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="searchQuery" class="form-label">Search</label>
+          <input
+            type="text"
+            class="form-control"
+            id="searchQuery"
+            [(ngModel)]="searchQuery"
+            (keyup.enter)="onSearch()"
+            placeholder="Search by description, cost center, or funder...">
+        </div>
+        <div class="col-md-4">
+          <label for="statusFilter" class="form-label">Status</label>
+          <select
+            class="form-select"
+            id="statusFilter"
+            [(ngModel)]="statusFilter"
+            (ngModelChange)="onStatusFilterChange($event)">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="billed">Billed</option>
+            <option value="paid">Paid</option>
+            <option value="disputed">Disputed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-100" (click)="onSearch()">
+            <i class="bi bi-search me-1"></i>Search
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center p-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else {
+    @if (billingRecords().length === 0) {
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        No billing records found.
+      </div>
+    } @else {
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>User</th>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Cost Center</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (record of billingRecords(); track record.id) {
+                <tr>
+                  <td>
+                    <small>
+                      {{ record.billingPeriodStart | date:'short' }}<br>
+                      to {{ record.billingPeriodEnd | date:'short' }}
+                    </small>
+                  </td>
+                  <td>
+                    <div>{{ record.username }}</div>
+                    @if (record.userEmail) {
+                      <small class="text-muted">{{ record.userEmail }}</small>
+                    }
+                  </td>
+                  <td>
+                    <div>{{ record.billableItemName }}</div>
+                    @if (record.description) {
+                      <small class="text-muted">{{ record.description }}</small>
+                    }
+                  </td>
+                  <td>
+                    {{ record.quantity }} {{ record.billingUnitDisplay }}
+                  </td>
+                  <td>
+                    <strong>{{ record.totalAmount | currency:record.currency }}</strong>
+                    <br>
+                    <small class="text-muted">
+                      Unit: {{ record.unitPrice | currency:record.currency }}
+                    </small>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="getStatusBadgeClass(record.status)">
+                      {{ record.statusDisplay }}
+                    </span>
+                  </td>
+                  <td>
+                    @if (record.costCenter) {
+                      <div>{{ record.costCenter }}</div>
+                    }
+                    @if (record.funder) {
+                      <small class="text-muted">Funder: {{ record.funder }}</small>
+                    }
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      [ngbTooltip]="'View Details'"
+                      type="button">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted">
+              Showing {{ ((page() - 1) * pageSize) + 1 }} to {{ Math.min(page() * pageSize, total()) }} of {{ total() }} records
+            </div>
+            <ngb-pagination
+              [(page)]="page"
+              [pageSize]="pageSize"
+              [collectionSize]="total()"
+              [maxSize]="5"
+              [rotate]="true"
+              [boundaryLinks]="true"
+              (pageChange)="onPageChange($event)">
+            </ngb-pagination>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

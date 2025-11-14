@@ -52,7 +52,7 @@ export class SiteConfig implements OnInit {
     this.siteConfigService.getCurrentConfig().subscribe({
       next: (config) => {
         this.config.set(config);
-        this.formData.set({
+        const formDataValue: SiteConfigUpdateRequest = {
           siteName: config.siteName,
           primaryColor: config.primaryColor,
           showPoweredBy: config.showPoweredBy,
@@ -60,7 +60,11 @@ export class SiteConfig implements OnInit {
           enableOrcidLogin: config.enableOrcidLogin,
           bookingDeletionWindowMinutes: config.bookingDeletionWindowMinutes,
           logoUrl: config.logoUrl
-        });
+        };
+        if (config.uiFeatures) {
+          formDataValue.uiFeatures = config.uiFeatures;
+        }
+        this.formData.set(formDataValue);
         this.loading.set(false);
       },
       error: (err) => {
@@ -99,10 +103,21 @@ export class SiteConfig implements OnInit {
     });
   }
 
+  updateUIFeature(featureName: string, value: boolean): void {
+    this.formData.update(data => {
+      const uiFeatures = { ...data.uiFeatures };
+      uiFeatures[featureName] = value;
+      return {
+        ...data,
+        uiFeatures
+      };
+    });
+  }
+
   resetForm(): void {
     const currentConfig = this.config();
     if (currentConfig) {
-      this.formData.set({
+      const formDataValue: SiteConfigUpdateRequest = {
         siteName: currentConfig.siteName,
         primaryColor: currentConfig.primaryColor,
         showPoweredBy: currentConfig.showPoweredBy,
@@ -110,7 +125,11 @@ export class SiteConfig implements OnInit {
         enableOrcidLogin: currentConfig.enableOrcidLogin,
         bookingDeletionWindowMinutes: currentConfig.bookingDeletionWindowMinutes,
         logoUrl: currentConfig.logoUrl
-      });
+      };
+      if (currentConfig.uiFeatures) {
+        formDataValue.uiFeatures = currentConfig.uiFeatures;
+      }
+      this.formData.set(formDataValue);
     }
   }
 }
