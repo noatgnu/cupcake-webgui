@@ -1,0 +1,235 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-pencil me-2"></i>
+    Edit Job Details
+    @if (isStaffEdit) {
+      <span class="badge bg-warning text-dark ms-2">
+        <i class="bi bi-shield-lock me-1"></i>
+        Staff Edit
+      </span>
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  @if (isStaffEdit) {
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Staff Editing Mode</strong>
+      <p class="mb-0 small mt-2">
+        You are editing this job as staff. You can update job details that are typically not editable by regular users after submission.
+      </p>
+    </div>
+  }
+
+  <div class="mb-3">
+    <label for="jobName" class="form-label">
+      Job Name <span class="text-danger">*</span>
+    </label>
+    <input
+      type="text"
+      class="form-control"
+      id="jobName"
+      [value]="jobName()"
+      (input)="jobName.set($any($event.target).value)"
+      [disabled]="saving()"
+      placeholder="Enter job name">
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label for="funder" class="form-label">Funder</label>
+      <input
+        type="text"
+        class="form-control"
+        id="funder"
+        [value]="funder()"
+        (input)="funder.set($any($event.target).value)"
+        [disabled]="saving()"
+        placeholder="Enter funder">
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="costCenter" class="form-label">Cost Center</label>
+      <input
+        type="text"
+        class="form-control"
+        id="costCenter"
+        [value]="costCenter()"
+        (input)="costCenter.set($any($event.target).value)"
+        [disabled]="saving()"
+        placeholder="Enter cost center">
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="sampleNumber" class="form-label">
+      Sample Number <span class="text-danger">*</span>
+    </label>
+    <input
+      type="number"
+      class="form-control"
+      id="sampleNumber"
+      [value]="sampleNumber()"
+      (input)="sampleNumber.set(+$any($event.target).value)"
+      [disabled]="saving()"
+      min="1"
+      placeholder="Enter sample number">
+  </div>
+
+  @if (job.canEditStaffOnlyColumns) {
+    <div class="border-top pt-3 mt-3">
+      <h6 class="mb-3">
+        <i class="bi bi-people me-2"></i>
+        Assigned Staff
+      </h6>
+
+      <div class="mb-3">
+        <label class="form-label">
+          Search and Add Staff
+        </label>
+        <input
+          type="text"
+          class="form-control"
+          [ngbTypeahead]="searchUsers"
+          [resultFormatter]="userFormatter"
+          [inputFormatter]="userInputFormatter"
+          (selectItem)="onStaffSelected($event)"
+          [disabled]="saving()"
+          placeholder="Type username to search..."
+          autocomplete="off">
+        <div class="form-text">Type at least 2 characters to search for users. Lab group members can assign staff.</div>
+      </div>
+
+      @if (loadingStaff()) {
+        <div class="text-center py-2">
+          <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading staff...</span>
+          </div>
+        </div>
+      } @else if (selectedStaff().length > 0) {
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          @for (staff of selectedStaff(); track staff.id) {
+            <span class="badge bg-primary d-flex align-items-center gap-2">
+              <i class="bi bi-person"></i>
+              {{ staff.username }}
+              @if (staff.firstName || staff.lastName) {
+                <span class="text-white-50">({{ staff.firstName }} {{ staff.lastName }})</span>
+              }
+              <button
+                type="button"
+                class="btn-close btn-close-white"
+                (click)="removeStaff(staff)"
+                [disabled]="saving()"
+                style="font-size: 0.7em;">
+              </button>
+            </span>
+          }
+        </div>
+      } @else {
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          No staff assigned. Search and select users above to assign them.
+        </div>
+      }
+    </div>
+  }
+
+  <div class="border-top pt-3 mt-3">
+    <h6 class="mb-3">
+      <i class="bi bi-gear me-2"></i>
+      Technical Details
+    </h6>
+
+    <div class="row">
+      <div class="col-md-8 mb-3">
+        <label for="searchEngine" class="form-label">Search Engine</label>
+        <input
+          type="text"
+          class="form-control"
+          id="searchEngine"
+          list="searchEngineList"
+          [value]="searchEngine()"
+          (input)="searchEngine.set($any($event.target).value)"
+          [disabled]="saving()"
+          placeholder="Enter or select search engine">
+        <datalist id="searchEngineList">
+          @for (engine of Object.keys(autocompleteData().search_engines); track engine) {
+            <option [value]="engine">{{ engine }}</option>
+          }
+        </datalist>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <label for="searchEngineVersion" class="form-label">Version</label>
+        <input
+          type="text"
+          class="form-control"
+          id="searchEngineVersion"
+          list="searchEngineVersionList"
+          [value]="searchEngineVersion()"
+          (input)="searchEngineVersion.set($any($event.target).value)"
+          [disabled]="saving() || !searchEngine()"
+          placeholder="Version">
+        @if (searchEngine()) {
+          <datalist id="searchEngineVersionList">
+            @for (version of searchEngineVersions(); track version) {
+              <option [value]="version">{{ version }}</option>
+            }
+          </datalist>
+        }
+        @if (!searchEngine()) {
+          <div class="form-text text-muted">Select a search engine first</div>
+        }
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="method" class="form-label">Method</label>
+      <input
+        type="text"
+        class="form-control"
+        id="method"
+        [value]="method()"
+        (input)="method.set($any($event.target).value)"
+        [disabled]="saving()"
+        placeholder="Enter method">
+    </div>
+
+    <div class="mb-3">
+      <label for="location" class="form-label">Location</label>
+      <input
+        type="text"
+        class="form-control"
+        id="location"
+        [value]="location()"
+        (input)="location.set($any($event.target).value)"
+        [disabled]="saving()"
+        placeholder="Enter location">
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button
+    type="button"
+    class="btn btn-outline-secondary"
+    (click)="cancel()"
+    [disabled]="saving()">
+    <i class="bi bi-x me-1"></i>
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="save()"
+    [disabled]="saving() || !jobName().trim() || sampleNumber() < 1">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    } @else {
+      <i class="bi bi-check me-1"></i>
+    }
+    Save Changes
+  </button>
+</div>

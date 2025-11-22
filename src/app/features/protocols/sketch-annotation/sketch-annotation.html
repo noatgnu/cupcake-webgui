@@ -1,0 +1,128 @@
+<div class="sketch-container">
+  <div class="toolbar mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="d-flex gap-2 align-items-center">
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="!isErasing()"
+          [class.btn-outline-primary]="isErasing()"
+          (click)="selectDrawingMode()"
+          title="Draw mode">
+          <i class="bi bi-pencil me-1"></i>Draw
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="isErasing()"
+          [class.btn-outline-primary]="!isErasing()"
+          (click)="toggleEraser()"
+          title="Eraser mode">
+          <i class="bi bi-eraser me-1"></i>Eraser
+        </button>
+      </div>
+
+      @if (!isErasing()) {
+        <div class="d-flex gap-2 align-items-center flex-column align-items-start">
+          <div class="d-flex gap-2 align-items-center">
+            <label class="small text-muted mb-0">Color:</label>
+            <div class="d-flex gap-1">
+              @for (color of colors; track color) {
+                <button
+                  type="button"
+                  class="color-btn"
+                  [class.selected]="selectedColor() === color"
+                  [style.background-color]="color"
+                  (click)="selectedColor.set(color)"
+                  [attr.aria-label]="'Color ' + color">
+                </button>
+              }
+            </div>
+          </div>
+          @if (getColorAdjustmentInfo(selectedColor())) {
+            <div class="small text-muted">
+              <i class="bi bi-info-circle me-1"></i>
+              {{ getColorAdjustmentInfo(selectedColor()) }}
+            </div>
+          }
+        </div>
+      }
+
+      <div class="d-flex gap-2 align-items-center">
+        <label class="small text-muted mb-0">{{ isErasing() ? 'Eraser' : 'Brush' }} Size:</label>
+        <div class="d-flex gap-1">
+          @if (isErasing()) {
+            @for (width of eraserWidths; track width) {
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                [class.active]="selectedWidth() === width"
+                (click)="selectedWidth.set(width)">
+                {{ width }}px
+              </button>
+            }
+          } @else {
+            @for (width of widths; track width) {
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                [class.active]="selectedWidth() === width"
+                (click)="selectedWidth.set(width)">
+                {{ width }}px
+              </button>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          (click)="undo()"
+          [disabled]="!canUndo()"
+          title="Undo">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          (click)="redo()"
+          [disabled]="!canRedo()"
+          title="Redo">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="useColorCorrection()"
+          [class.btn-outline-secondary]="!useColorCorrection()"
+          (click)="useColorCorrection.set(!useColorCorrection())"
+          title="Toggle automatic color contrast adjustment for dark/light mode">
+          <i class="bi bi-palette me-1"></i>Auto Contrast
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger"
+          (click)="clear()"
+          title="Clear canvas">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas
+      #canvas
+      class="drawing-canvas"
+      [class.draw-mode]="!isErasing()"
+      [class.erase-mode]="isErasing()">
+    </canvas>
+  </div>
+
+  <div class="small text-muted mt-3">
+    <i class="bi bi-info-circle me-1"></i>
+    Use your mouse, stylus, or touch to draw on the canvas. Click Save button below when done.
+  </div>
+</div>

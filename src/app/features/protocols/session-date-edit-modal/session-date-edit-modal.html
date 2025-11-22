@@ -1,0 +1,101 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-calendar-event me-2"></i>
+    Edit Session Dates
+  </h5>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <label for="startedAt" class="form-label">
+      <i class="bi bi-calendar-event me-1"></i>
+      Started At
+    </label>
+    <div class="input-group">
+      <input
+        type="datetime-local"
+        class="form-control"
+        id="startedAt"
+        [value]="startedAt()"
+        (input)="startedAt.set($any($event.target).value)"
+        [disabled]="saving()">
+      @if (startedAt()) {
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="clearStartDate()"
+          [disabled]="saving()"
+          title="Clear start date">
+          <i class="bi bi-x"></i>
+        </button>
+      }
+    </div>
+    <div class="form-text">When the session started. Leave empty if not started yet.</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="endedAt" class="form-label">
+      <i class="bi bi-calendar-check me-1"></i>
+      Ended At
+    </label>
+    <div class="input-group">
+      <input
+        type="datetime-local"
+        class="form-control"
+        id="endedAt"
+        [value]="endedAt()"
+        (input)="endedAt.set($any($event.target).value)"
+        [disabled]="saving()">
+      @if (endedAt()) {
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="clearEndDate()"
+          [disabled]="saving()"
+          title="Clear end date">
+          <i class="bi bi-x"></i>
+        </button>
+      }
+    </div>
+    <div class="form-text">When the session ended. Leave empty if session is still ongoing.</div>
+  </div>
+
+  @if (session?.startedAt || session?.endedAt) {
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Current Values:</strong>
+      <div class="small mt-2">
+        @if (session.startedAt) {
+          <div>Started: {{ session.startedAt | date: 'medium' }}</div>
+        }
+        @if (session.endedAt) {
+          <div>Ended: {{ session.endedAt | date: 'medium' }}</div>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  <button
+    type="button"
+    class="btn btn-outline-secondary"
+    (click)="cancel()"
+    [disabled]="saving()">
+    <i class="bi bi-x me-1"></i>
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="save()"
+    [disabled]="saving()">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2"></span>
+    } @else {
+      <i class="bi bi-check me-1"></i>
+    }
+    Save Changes
+  </button>
+</div>

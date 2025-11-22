@@ -55,6 +55,24 @@
             </a>
           </li>
         }
+        @if (isSuperuser()) {
+          @for (item of superuserItems; track item.route) {
+            <li class="nav-item">
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                class="nav-link d-flex align-items-center px-3 py-2 rounded"
+                [class.justify-content-center]="isCollapsed()"
+                [class.gap-3]="!isCollapsed()"
+                [title]="isCollapsed() ? item.label : ''">
+                <i class="bi {{item.icon}} fs-5"></i>
+                @if (!isCollapsed()) {
+                  <span>{{item.label}}</span>
+                }
+              </a>
+            </li>
+          }
+        }
       </ul>
     }
   </nav>

@@ -24,11 +24,19 @@
               {{ session()!.endedAt | date: 'short' }}
             </span>
           }
-          @if (session()?.startedAt && session()?.endedAt) {
+          @if (isSessionCompleted()) {
             <span class="badge bg-success">
               <i class="bi bi-check-circle me-1"></i>
               Completed
             </span>
+          }
+          @if (session()) {
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              (click)="editSessionDates()"
+              title="Edit session dates">
+              <i class="bi bi-pencil"></i>
+            </button>
           }
         </div>
         @if (selectedProtocol()) {
@@ -51,6 +59,15 @@
                   </button>
                 }
               </div>
+            }
+            @if (session()) {
+              <button
+                class="btn btn-sm btn-outline-primary"
+                (click)="exportSessionHtml()"
+                title="Export session with all protocols and annotations as HTML">
+                <i class="bi bi-file-earmark-arrow-down me-1"></i>
+                Export HTML
+              </button>
             }
             @if (session() && webrtcFeatureEnabled()) {
               <button
@@ -406,12 +423,59 @@
                                 }
                               </div>
                               @if (annotation.fileUrl) {
-                                <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
-                                  <i class="bi bi-download"></i>
-                                </button>
+                                @if (annotation.annotationType === AnnotationType.Sketch) {
+                                  <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" title="Download sketch">
+                                      <i class="bi bi-download"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                      <li><h6 class="dropdown-header">Export as SVG</h6></li>
+                                      <li><a class="dropdown-item" (click)="exportSketchAsSVG(annotation)">
+                                        <i class="bi bi-filetype-svg me-2"></i>Download SVG
+                                      </a></li>
+                                      <li><hr class="dropdown-divider"></li>
+                                      <li><h6 class="dropdown-header">Export as PNG</h6></li>
+                                      <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 1920, 1080)">
+                                        <i class="bi bi-image me-2"></i>1920x1080 (Full HD)
+                                      </a></li>
+                                      <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 3840, 2160)">
+                                        <i class="bi bi-image me-2"></i>3840x2160 (4K)
+                                      </a></li>
+                                      <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 7680, 4320)">
+                                        <i class="bi bi-image me-2"></i>7680x4320 (8K)
+                                      </a></li>
+                                      <li><hr class="dropdown-divider"></li>
+                                      <li><h6 class="dropdown-header">Export Raw Data</h6></li>
+                                      <li><a class="dropdown-item" (click)="downloadSketchJSON(annotation)">
+                                        <i class="bi bi-filetype-json me-2"></i>Download JSON
+                                      </a></li>
+                                    </ul>
+                                  </div>
+                                } @else {
+                                  <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
+                                    <i class="bi bi-download"></i>
+                                  </button>
+                                }
                               }
                             </div>
                             <div class="annotation-content" [class.scratched-content]="annotation.scratched">
+                              @if (annotation.annotationType === AnnotationType.Sketch && annotation.fileUrl) {
+                                <div class="mb-3">
+                                  <div class="text-center mb-2">
+                                    <canvas #sketchCanvas [attr.data-annotation-id]="annotation.id" class="img-fluid rounded border" style="max-height: 400px; max-width: 100%;"></canvas>
+                                  </div>
+                                  <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                    <button
+                                      class="btn btn-sm"
+                                      [class.btn-primary]="useSketchColorCorrection()"
+                                      [class.btn-outline-secondary]="!useSketchColorCorrection()"
+                                      (click)="useSketchColorCorrection.set(!useSketchColorCorrection()); renderAllSketches()"
+                                      title="Toggle automatic color contrast adjustment for dark/light mode">
+                                      <i class="bi bi-palette me-1"></i>Auto Contrast
+                                    </button>
+                                  </div>
+                                </div>
+                              }
                               @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
                                 <div class="mb-3 text-center">
                                   <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">
@@ -641,12 +705,59 @@
                               }
                             </div>
                             @if (annotation.fileUrl) {
-                              <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
-                                <i class="bi bi-download"></i>
-                              </button>
+                              @if (annotation.annotationType === AnnotationType.Sketch) {
+                                <div class="btn-group btn-group-sm">
+                                  <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" title="Download sketch">
+                                    <i class="bi bi-download"></i>
+                                  </button>
+                                  <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><h6 class="dropdown-header">Export as SVG</h6></li>
+                                    <li><a class="dropdown-item" (click)="exportSketchAsSVG(annotation)">
+                                      <i class="bi bi-filetype-svg me-2"></i>Download SVG
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header">Export as PNG</h6></li>
+                                    <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 1920, 1080)">
+                                      <i class="bi bi-image me-2"></i>1920x1080 (Full HD)
+                                    </a></li>
+                                    <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 3840, 2160)">
+                                      <i class="bi bi-image me-2"></i>3840x2160 (4K)
+                                    </a></li>
+                                    <li><a class="dropdown-item" (click)="exportSketchAtResolution(annotation, 7680, 4320)">
+                                      <i class="bi bi-image me-2"></i>7680x4320 (8K)
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header">Export Raw Data</h6></li>
+                                    <li><a class="dropdown-item" (click)="downloadSketchJSON(annotation)">
+                                      <i class="bi bi-filetype-json me-2"></i>Download JSON
+                                    </a></li>
+                                  </ul>
+                                </div>
+                              } @else {
+                                <button class="btn btn-sm btn-outline-primary" (click)="downloadAnnotation(annotation)" title="Download">
+                                  <i class="bi bi-download"></i>
+                                </button>
+                              }
                             }
                           </div>
                           <div class="annotation-content" [class.scratched-content]="annotation.scratched">
+                            @if (annotation.annotationType === AnnotationType.Sketch && annotation.fileUrl) {
+                              <div class="mb-3">
+                                <div class="text-center mb-2">
+                                  <canvas #sketchCanvas [attr.data-annotation-id]="annotation.id" class="img-fluid rounded border" style="max-height: 400px; max-width: 100%;"></canvas>
+                                </div>
+                                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                  <button
+                                    class="btn btn-sm"
+                                    [class.btn-primary]="useSketchColorCorrection()"
+                                    [class.btn-outline-secondary]="!useSketchColorCorrection()"
+                                    (click)="useSketchColorCorrection.set(!useSketchColorCorrection()); renderAllSketches()"
+                                    title="Toggle automatic color contrast adjustment for dark/light mode">
+                                    <i class="bi bi-palette me-1"></i>Auto Contrast
+                                  </button>
+                                </div>
+                              </div>
+                            }
                             @if (annotation.annotationType === AnnotationType.Image && annotation.fileUrl) {
                               <div class="mb-3 text-center">
                                 <img [src]="annotation.fileUrl" class="img-fluid rounded" alt="Annotation image" style="max-height: 400px;">

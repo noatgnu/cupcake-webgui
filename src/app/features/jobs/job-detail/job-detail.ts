@@ -4,8 +4,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { InstrumentJobService, InstrumentJob, Status } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { MetadataTableEditor } from '../../metadata/metadata-table-editor/metadata-table-editor';
 import { JobAnnotationsSection } from './job-annotations-section/job-annotations-section';
+import { JobEditModal } from '../job-edit-modal/job-edit-modal';
 
 @Component({
   selector: 'app-job-detail',
@@ -19,6 +21,7 @@ export class JobDetail implements OnInit {
   private authService = inject(AuthService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private modalService = inject(NgbModal);
 
   job = signal<InstrumentJob | null>(null);
   loading = signal(false);
@@ -106,9 +109,35 @@ export class JobDetail implements OnInit {
   editJob(): void {
     const jobValue = this.job();
     if (!jobValue) return;
-    this.router.navigate(['/jobs/submit'], {
-      queryParams: { jobId: jobValue.id }
+
+    if (!this.isDraft() && this.hasStaffAccess()) {
+      this.openEditModal();
+    } else {
+      this.router.navigate(['/jobs/submit'], {
+        queryParams: { jobId: jobValue.id }
+      });
+    }
+  }
+
+  openEditModal(): void {
+    const jobValue = this.job();
+    if (!jobValue) return;
+
+    const modalRef = this.modalService.open(JobEditModal, {
+      size: 'lg',
+      backdrop: 'static'
     });
+
+    modalRef.componentInstance.job = jobValue;
+    modalRef.componentInstance.isStaffEdit = this.hasStaffAccess();
+
+    modalRef.result.then(
+      (updatedJob: InstrumentJob) => {
+        this.job.set(updatedJob);
+      },
+      () => {
+      }
+    );
   }
 
   backToList(): void {

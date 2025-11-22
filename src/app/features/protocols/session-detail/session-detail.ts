@@ -1,18 +1,20 @@
-import { Component, inject, OnInit, signal, computed, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, OnDestroy, AfterViewInit, ViewChildren, QueryList, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService } from '@noatgnu/cupcake-red-velvet';
+import { HttpClient } from '@angular/common/http';
+import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
 import type { SiteConfig } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
 import { TimerService } from '../../../shared/services/timer';
 import { AnnotationModal } from '../annotation-modal/annotation-modal';
+import { SessionDateEditModal } from '../session-date-edit-modal/session-date-edit-modal';
 import { WebvttEditor } from '../webvtt-editor/webvtt-editor';
 import { SessionWebrtcPanel } from '../session-webrtc-panel/session-webrtc-panel';
 import { PeerRole } from '@noatgnu/cupcake-mint-chocolate';
@@ -34,16 +36,19 @@ interface MolarityHistoryData {
   templateUrl: './session-detail.html',
   styleUrl: './session-detail.scss'
 })
-export class SessionDetail implements OnInit, OnDestroy {
+export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
+  @ViewChildren('sketchCanvas') sketchCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private modalService = inject(NgbModal);
+  private http = inject(HttpClient);
   private sessionService = inject(SessionService);
   private protocolService = inject(ProtocolService);
   private sectionService = inject(ProtocolSectionService);
   private stepService = inject(ProtocolStepService);
   private stepReagentService = inject(StepReagentService);
   private stepAnnotationService = inject(StepAnnotationService);
+  private instrumentUsageStepAnnotationService = inject(InstrumentUsageStepAnnotationService);
   private instrumentUsageService = inject(InstrumentUsageService);
   private instrumentService = inject(InstrumentService);
   private reagentActionService = inject(ReagentActionService);
@@ -53,6 +58,7 @@ export class SessionDetail implements OnInit, OnDestroy {
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private siteConfigService = inject(SiteConfigService);
+  private themeService = inject(ThemeService);
   private notificationWs = inject(CCRVNotificationWebSocketService);
   private ccvWsService = inject(CCVWebSocketService);
   public timer = inject(TimerService);
@@ -67,6 +73,7 @@ export class SessionDetail implements OnInit, OnDestroy {
   session = signal<Session | null>(null);
   protocols = signal<ProtocolModel[]>([]);
   selectedProtocolIndex = signal(0);
+  useSketchColorCorrection = signal(true);
 
   webrtcRole = computed(() => {
     const currentSession = this.session();
@@ -126,6 +133,16 @@ export class SessionDetail implements OnInit, OnDestroy {
   webrtcFeatureEnabled = computed(() => {
     const config = this.siteConfig();
     return config?.uiFeatures?.show_webrtc !== false;
+  });
+
+  isSessionCompleted = computed(() => {
+    const currentSession = this.session();
+    if (!currentSession?.startedAt || !currentSession?.endedAt) {
+      return false;
+    }
+    const endDate = new Date(currentSession.endedAt);
+    const now = new Date();
+    return endDate <= now;
   });
 
   transcriptionStatus = signal<Map<number, 'started' | 'completed' | 'failed'>>(new Map());
@@ -716,6 +733,57 @@ export class SessionDetail implements OnInit, OnDestroy {
     this.router.navigate(['/protocols/sessions']);
   }
 
+  exportSessionHtml(): void {
+    const sessionValue = this.session();
+    if (!sessionValue?.id) {
+      this.toastService.error('No session available to export');
+      return;
+    }
+
+    this.toastService.info('Generating export URL...');
+    this.sessionService.getExportUrl(sessionValue.id).subscribe({
+      next: (response) => {
+        console.log('Export URL response:', response);
+        if (response && response.downloadUrl) {
+          const opened = window.open(response.downloadUrl, '_blank');
+          if (!opened) {
+            this.toastService.warning('Please allow popups to download the export');
+          }
+        } else {
+          console.error('Invalid response format:', response);
+          this.toastService.error('Invalid export URL response');
+        }
+      },
+      error: (err) => {
+        console.error('Error getting export URL:', err);
+        const errorMsg = err.error?.detail || err.error?.message || 'Failed to get export URL';
+        this.toastService.error(errorMsg);
+      }
+    });
+  }
+
+  editSessionDates(): void {
+    const currentSession = this.session();
+    if (!currentSession) {
+      this.toastService.error('No session available to edit');
+      return;
+    }
+
+    const modalRef = this.modalService.open(SessionDateEditModal, {
+      size: 'md',
+      centered: true
+    });
+    const modalInstance = modalRef.componentInstance as any;
+    modalInstance.session = currentSession;
+
+    modalRef.result.then(
+      (updatedSession: Session) => {
+        this.session.set(updatedSession);
+      },
+      () => {}
+    );
+  }
+
   startSession(): void {
     const currentSession = this.session();
     if (!currentSession) return;
@@ -1117,18 +1185,23 @@ export class SessionDetail implements OnInit, OnDestroy {
           }
         }).subscribe({
           next: (annotation) => {
-            this.bookingDataCache.update(cache => {
-              const newCache = new Map(cache);
-              if (annotation.instrumentUsageIds && annotation.instrumentUsageIds.length > 0) {
-                annotation.instrumentUsageIds.forEach(id => {
-                  newCache.set(id, usage);
+            this.instrumentUsageStepAnnotationService.linkStepAnnotationToBooking(annotation.id, usage.id).subscribe({
+              next: () => {
+                this.bookingDataCache.update(cache => {
+                  const newCache = new Map(cache);
+                  newCache.set(usage.id, usage);
+                  return newCache;
                 });
+                this.toastService.success('Instrument booked and linked to step');
+                this.uploading.set(false);
+                this.loadStepAnnotations();
+              },
+              error: (err) => {
+                this.toastService.error('Failed to link booking to step annotation');
+                console.error('Error linking booking:', err);
+                this.uploading.set(false);
               }
-              return newCache;
             });
-            this.toastService.success('Instrument booked and linked to step');
-            this.uploading.set(false);
-            this.loadStepAnnotations();
           },
           error: (err) => {
             this.toastService.error('Failed to create step annotation for booking');
@@ -1229,7 +1302,7 @@ export class SessionDetail implements OnInit, OnDestroy {
       {
         annotation: annotationText || `Uploaded file: ${file.name}`,
         annotationType: annotationType,
-        autoTranscribe: autoTranscribe,
+        autoTranscribe: annotationType === AnnotationType.Sketch ? false : autoTranscribe,
         onProgress: (progress: number) => {
           this.uploadProgress.set(Math.round(progress));
         }
@@ -1655,6 +1728,258 @@ export class SessionDetail implements OnInit, OnDestroy {
   getTranscriptionProgress(annotation: StepAnnotation): { percentage: number; description: string } | null {
     if (!annotation.annotation) return null;
     return this.transcriptionProgress().get(annotation.annotation) || null;
+  }
+
+  exportSketchAsSVG(annotation: StepAnnotation): void {
+    if (!annotation.fileUrl) {
+      this.toastService.error('No sketch file available');
+      return;
+    }
+
+    fetch(annotation.fileUrl, {
+      credentials: 'include',
+      mode: 'cors'
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to load sketch: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(vectorDataString => {
+        const vectorData = JSON.parse(vectorDataString);
+        const svg = this.reconstructSVG(vectorData);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sketch_${annotation.id}.svg`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.toastService.success('SVG exported successfully');
+      })
+      .catch(error => {
+        this.toastService.error('Failed to export SVG');
+        console.error('SVG export error:', error);
+      });
+  }
+
+  exportSketchAtResolution(annotation: StepAnnotation, targetWidth: number, targetHeight: number): void {
+    if (!annotation.fileUrl) {
+      this.toastService.error('No sketch file available');
+      return;
+    }
+
+    fetch(annotation.fileUrl, {
+      credentials: 'include',
+      mode: 'cors'
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to load sketch: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(vectorDataString => {
+        const vectorData = JSON.parse(vectorDataString);
+        const canvas = this.reconstructCanvas(vectorData, targetWidth, targetHeight);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `sketch_${annotation.id}_${targetWidth}x${targetHeight}.png`;
+            link.click();
+            URL.revokeObjectURL(url);
+            this.toastService.success(`Exported as ${targetWidth}x${targetHeight} PNG`);
+          }
+        }, 'image/png');
+      })
+      .catch(error => {
+        this.toastService.error('Failed to export high-resolution image');
+        console.error('High-res export error:', error);
+      });
+  }
+
+  private reconstructSVG(vectorData: any): string {
+    const { width, height, strokes, backgroundColor } = vectorData;
+    const bgColor = backgroundColor || 'white';
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+    svg += `<rect width="100%" height="100%" fill="${bgColor}"/>`;
+
+    for (const stroke of strokes) {
+      if (stroke.points.length < 2) continue;
+
+      const pathData = stroke.points.map((point: any, index: number) => {
+        return index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`;
+      }).join(' ');
+
+      if (stroke.color === 'eraser') {
+        svg += `<path d="${pathData}" stroke="white" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+      } else {
+        const adjustedColor = this.getContrastAdjustedColor(stroke.color);
+        svg += `<path d="${pathData}" stroke="${adjustedColor}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+      }
+    }
+
+    svg += '</svg>';
+    return svg;
+  }
+
+  private reconstructCanvas(vectorData: any, targetWidth: number, targetHeight: number): HTMLCanvasElement {
+    const { width: originalWidth, height: originalHeight, strokes, backgroundColor } = vectorData;
+    const scaleX = targetWidth / originalWidth;
+    const scaleY = targetHeight / originalHeight;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = backgroundColor || 'white';
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+    for (const stroke of strokes) {
+      if (stroke.points.length < 2) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
+
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x * scaleX, stroke.points[i].y * scaleY);
+      }
+
+      if (stroke.color === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = this.getContrastAdjustedColor(stroke.color);
+      }
+
+      ctx.lineWidth = stroke.width * Math.min(scaleX, scaleY);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    return canvas;
+  }
+
+  ngAfterViewInit(): void {
+    this.renderAllSketches();
+
+    this.sketchCanvases.changes.subscribe(() => {
+      this.renderAllSketches();
+    });
+  }
+
+  renderAllSketches(): void {
+    this.sketchCanvases.forEach(canvasRef => {
+      const canvas = canvasRef.nativeElement;
+      const annotationId = canvas.getAttribute('data-annotation-id');
+      if (annotationId) {
+        const annotation = this.stepAnnotations().find(a => a.id === parseInt(annotationId));
+        if (annotation && annotation.fileUrl) {
+          this.loadAndRenderSketch(canvas, annotation.fileUrl);
+        }
+      }
+    });
+  }
+
+  private loadAndRenderSketch(canvas: HTMLCanvasElement, fileUrl: string): void {
+    fetch(fileUrl, {
+      credentials: 'include',
+      mode: 'cors'
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to load sketch: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(vectorDataString => {
+        this.renderSketchOnCanvas(canvas, vectorDataString);
+      })
+      .catch(error => {
+        console.error('Error loading sketch JSON:', error);
+      });
+  }
+
+  private getContrastAdjustedColor(color: string): string {
+    if (!this.useSketchColorCorrection()) {
+      return color;
+    }
+
+    const isDark = this.themeService.isDark();
+
+    if (color === '#000000' || color === '#000') {
+      return isDark ? '#FFFFFF' : '#000000';
+    }
+
+    if (color === '#FFFFFF' || color === '#FFF' || color.toLowerCase() === 'white') {
+      return isDark ? '#FFFFFF' : '#000000';
+    }
+
+    return color;
+  }
+
+  private renderSketchOnCanvas(canvas: HTMLCanvasElement, vectorDataString: string): void {
+    try {
+      const vectorData = JSON.parse(vectorDataString);
+      const { width, height, strokes, backgroundColor } = vectorData;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = backgroundColor || 'white';
+      ctx.fillRect(0, 0, width, height);
+
+      for (const stroke of strokes) {
+        if (stroke.points.length < 2) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+
+        if (stroke.color === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = this.getContrastAdjustedColor(stroke.color);
+        }
+
+        ctx.lineWidth = stroke.width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+    } catch (error) {
+      console.error('Error rendering sketch:', error);
+    }
+  }
+
+  downloadSketchJSON(annotation: StepAnnotation): void {
+    if (!annotation.fileUrl) {
+      this.toastService.error('No sketch file available');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = annotation.fileUrl;
+    link.download = `sketch_${annotation.id}.json`;
+    link.click();
+    this.toastService.success('JSON downloaded successfully');
   }
 
   ngOnDestroy(): void {

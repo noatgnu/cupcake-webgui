@@ -69,12 +69,21 @@ export class Sidebar implements OnInit, OnDestroy {
   });
 
   adminItems = [
-    { icon: 'bi-sliders', label: 'Site Config', route: '/home/site-config' }
+    { icon: 'bi-sliders', label: 'Site Config', route: '/admin/site-config', requiresSuperuser: false }
+  ];
+
+  superuserItems = [
+    { icon: 'bi-cpu-fill', label: 'Worker Status', route: '/admin/worker-status', requiresSuperuser: true }
   ];
 
   isAdmin(): boolean {
     const user = this.currentUser();
     return user ? (user.isStaff || user.isSuperuser) : false;
+  }
+
+  isSuperuser(): boolean {
+    const user = this.currentUser();
+    return user ? user.isSuperuser : false;
   }
 
   toggleTheme(): void {

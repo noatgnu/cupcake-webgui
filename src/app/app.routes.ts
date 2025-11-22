@@ -49,10 +49,6 @@ export const routes: Routes = [
             loadComponent: () => import('./features/home/messages-view/messages-view').then(m => m.MessagesView)
           },
           {
-            path: 'site-config',
-            loadComponent: () => import('./features/admin/site-config/site-config').then(m => m.SiteConfig)
-          },
-          {
             path: '',
             pathMatch: 'full',
             redirectTo: 'dashboard'
@@ -134,6 +130,10 @@ export const routes: Routes = [
       {
         path: 'billing',
         loadChildren: () => import('./features/billing/billing.routes').then(m => m.billingRoutes)
+      },
+      {
+        path: 'admin',
+        loadChildren: () => import('./features/admin/admin.routes').then(m => m.adminRoutes)
       },
       {
         path: '',

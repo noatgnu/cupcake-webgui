@@ -7,12 +7,13 @@ import { MediaRecorderAnnotation } from '../media-recorder-annotation/media-reco
 import { InstrumentBookingAnnotation } from '../instrument-booking-annotation/instrument-booking-annotation';
 import { CalculatorAnnotation } from '../calculator-annotation/calculator-annotation';
 import { MolarityCalculatorAnnotation } from '../molarity-calculator-annotation/molarity-calculator-annotation';
+import { SketchAnnotation } from '../sketch-annotation/sketch-annotation';
 import type { StepAnnotation } from '@noatgnu/cupcake-red-velvet';
 import type { InstrumentUsage } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-annotation-modal',
-  imports: [CommonModule, FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation],
+  imports: [CommonModule, FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation, SketchAnnotation],
   templateUrl: './annotation-modal.html',
   styleUrl: './annotation-modal.scss'
 })
@@ -23,11 +24,12 @@ export class AnnotationModal implements OnInit {
   @ViewChild(CalculatorAnnotation) calculatorComponent?: CalculatorAnnotation;
   @ViewChild(MolarityCalculatorAnnotation) molarityComponent?: MolarityCalculatorAnnotation;
   @ViewChild(InstrumentBookingAnnotation) bookingComponent?: InstrumentBookingAnnotation;
+  @ViewChild(SketchAnnotation) sketchComponent?: SketchAnnotation;
 
   stepAnnotation?: StepAnnotation;
   stepId!: number;
 
-  annotationMode: 'text' | 'upload' | 'record' | 'book' | 'calculator' | 'molarity' = 'text';
+  annotationMode: 'text' | 'upload' | 'record' | 'book' | 'calculator' | 'molarity' | 'sketch' = 'text';
   selectedFile = signal<File | null>(null);
   selectedAnnotationType = AnnotationType.Image;
   annotationText = '';
@@ -88,11 +90,32 @@ export class AnnotationModal implements OnInit {
     this.annotationMode = 'upload';
   }
 
+
   clearFile(): void {
     this.selectedFile.set(null);
   }
 
   save(): void {
+    if (this.annotationMode === 'sketch') {
+      if (!this.sketchComponent) {
+        this.toastService.error('Sketch component not available');
+        return;
+      }
+
+      const file = this.sketchComponent.getSketchData();
+      if (!file) {
+        this.toastService.error('Failed to generate sketch data');
+        return;
+      }
+
+      this.activeModal.close({
+        file: file,
+        annotationType: AnnotationType.Sketch,
+        stepId: this.stepId
+      });
+      return;
+    }
+
     if (this.annotationMode === 'text') {
       if (!this.annotationText.trim()) {
         this.toastService.error('Please enter annotation text');

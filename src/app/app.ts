@@ -3,7 +3,7 @@ import { RouterOutlet, NavigationEnd, Router } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CommonModule } from '@angular/common';
-import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, PoweredByFooterComponent, AuthService, WebSocketService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
+import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, PoweredByFooterComponent, AuthService, WebSocketService, AsyncTaskMonitorService, DemoModeBannerComponent } from '@noatgnu/cupcake-core';
 import { CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -12,7 +12,7 @@ import { environment } from '../environments/environment';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NgbModule, CommonModule, PoweredByFooterComponent, ToastContainerComponent],
+  imports: [RouterOutlet, NgbModule, CommonModule, PoweredByFooterComponent, ToastContainerComponent, DemoModeBannerComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

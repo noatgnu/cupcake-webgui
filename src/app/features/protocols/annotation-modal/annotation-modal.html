@@ -24,6 +24,11 @@
         <i class="bi bi-record-circle me-1"></i>Record
       </label>
 
+      <input type="radio" class="btn-check" name="annotationMode" id="modeSketch" value="sketch" [(ngModel)]="annotationMode">
+      <label class="btn btn-outline-primary" for="modeSketch">
+        <i class="bi bi-pencil me-1"></i>Sketch
+      </label>
+
       <input type="radio" class="btn-check" name="annotationMode" id="modeBook" value="book" [(ngModel)]="annotationMode">
       <label class="btn btn-outline-primary" for="modeBook">
         <i class="bi bi-calendar-check me-1"></i>Book
@@ -129,37 +134,12 @@
           <strong>Recording ready:</strong> {{ selectedFile()!.name }}
         </div>
         <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearFile()">
-          <i class="bi bi-x-circle me-1"></i>Clear
+          <i class="bi bi-trash"></i>
         </button>
       </div>
     }
-
-    <div class="mb-3 mt-3">
-      <label for="annotationTextRecord" class="form-label">Annotation Text (Optional)</label>
-      <textarea
-        class="form-control"
-        id="annotationTextRecord"
-        rows="3"
-        [(ngModel)]="annotationText"
-        placeholder="Add notes or description for this recording"></textarea>
-    </div>
-
-    @if (hasAudio()) {
-      <div class="mb-3">
-        <div class="form-check">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            id="autoTranscribeRecord"
-            [(ngModel)]="autoTranscribe">
-          <label class="form-check-label" for="autoTranscribeRecord">
-            <i class="bi bi-mic-fill me-1"></i>
-            Auto-transcribe audio
-            <small class="text-muted d-block">Automatically generate transcript from recorded content</small>
-          </label>
-        </div>
-      </div>
-    }
+  } @else if (annotationMode === 'sketch') {
+    <app-sketch-annotation></app-sketch-annotation>
   } @else if (annotationMode === 'book') {
     <app-instrument-booking-annotation
       (cancelled)="onBookingCancelled()">

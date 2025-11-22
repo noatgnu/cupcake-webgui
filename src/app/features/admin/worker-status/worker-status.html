@@ -1,0 +1,189 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <app-admin-navbar></app-admin-navbar>
+
+  <div class="flex-grow-1 p-4 overflow-auto">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="m-0 fw-bold">
+        <i class="bi bi-cpu-fill me-2"></i>Worker Status
+      </h4>
+      @if (canView()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="refreshStatus()" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+          } @else {
+            <i class="bi bi-arrow-clockwise me-1"></i>
+          }
+          Refresh
+        </button>
+      }
+    </div>
+    @if (!canView()) {
+      <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Access Denied. Only superusers can view worker status.
+      </div>
+    } @else if (loading() && !workerStatus()) {
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else if (workerStatus()) {
+      <div class="row g-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="bi bi-server me-2"></i>Workers ({{ workerStatus()?.workerCount || 0 }})
+              </h5>
+            </div>
+            <div class="card-body">
+              @if (workerStatus()?.workers && workerStatus()!.workers.length > 0) {
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>State</th>
+                        <th>Hostname</th>
+                        <th>PID</th>
+                        <th>Queues</th>
+                        <th>Current Job</th>
+                        <th>Jobs</th>
+                        <th>Working Time</th>
+                        <th>Birth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (worker of workerStatus()!.workers; track worker.name) {
+                        <tr>
+                          <td>
+                            <strong>{{ worker.name }}</strong>
+                          </td>
+                          <td>
+                            <span class="badge" [ngClass]="getWorkerStateBadgeClass(worker.state)">
+                              {{ worker.state }}
+                            </span>
+                          </td>
+                          <td>{{ worker.hostname }}</td>
+                          <td><code>{{ worker.pid }}</code></td>
+                          <td>
+                            @if (worker.queues && worker.queues.length > 0) {
+                              <div class="d-flex flex-wrap gap-1">
+                                @for (queue of worker.queues; track queue) {
+                                  <span class="badge bg-info">{{ queue }}</span>
+                                }
+                              </div>
+                            } @else {
+                              <span class="text-muted">None</span>
+                            }
+                          </td>
+                          <td>
+                            @if (worker.currentJob) {
+                              <div>
+                                <strong>{{ worker.currentJob.funcName }}</strong>
+                                @if (worker.currentJob.description) {
+                                  <div class="small text-muted">{{ worker.currentJob.description }}</div>
+                                }
+                                @if (worker.currentJob.startedAt) {
+                                  <div class="small text-muted">
+                                    Started: {{ worker.currentJob.startedAt | date: 'short' }}
+                                  </div>
+                                }
+                              </div>
+                            } @else {
+                              <span class="text-muted">No current job</span>
+                            }
+                          </td>
+                          <td>
+                            <div class="small">
+                              <i class="bi bi-check-circle text-success me-1"></i>{{ worker.successfulJobCount }}
+                            </div>
+                            <div class="small">
+                              <i class="bi bi-x-circle text-danger me-1"></i>{{ worker.failedJobCount }}
+                            </div>
+                          </td>
+                          <td>{{ formatDuration(worker.totalWorkingTime) }}</td>
+                          <td>
+                            @if (worker.birth) {
+                              <small>{{ worker.birth | date: 'short' }}</small>
+                            } @else {
+                              <span class="text-muted">Unknown</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="alert alert-info mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  No workers found
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Queue Statistics
+              </h5>
+            </div>
+            <div class="card-body">
+              @if (workerStatus()?.queues && Object.keys(workerStatus()!.queues).length > 0) {
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>Queue Name</th>
+                        <th>Total</th>
+                        <th>Scheduled</th>
+                        <th>Started</th>
+                        <th>Finished</th>
+                        <th>Failed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (queueEntry of Object.entries(workerStatus()!.queues); track queueEntry[0]) {
+                        <tr>
+                          <td><strong>{{ queueEntry[0] }}</strong></td>
+                          <td>{{ queueEntry[1].count }}</td>
+                          <td>
+                            <span class="badge bg-secondary">{{ queueEntry[1].scheduledCount }}</span>
+                          </td>
+                          <td>
+                            <span class="badge bg-primary">{{ queueEntry[1].startedCount }}</span>
+                          </td>
+                          <td>
+                            <span class="badge bg-success">{{ queueEntry[1].finishedCount }}</span>
+                          </td>
+                          <td>
+                            <span class="badge bg-danger">{{ queueEntry[1].failedCount }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="alert alert-info mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  No queue statistics available
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    } @else {
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Unable to load worker status. Please try refreshing the page.
+      </div>
+    }
+  </div>
+</div>

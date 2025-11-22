@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SiteConfigService, ToastService, AuthService } from '@noatgnu/cupcake-core';
 import type { SiteConfig as SiteConfigModel, SiteConfigUpdateRequest } from '@noatgnu/cupcake-core';
+import { AdminNavbar } from '../admin-navbar/admin-navbar';
 
 @Component({
   selector: 'app-site-config',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminNavbar],
   templateUrl: './site-config.html',
   styleUrl: './site-config.scss'
 })
@@ -25,8 +26,13 @@ export class SiteConfig implements OnInit {
     showPoweredBy: true,
     allowUserRegistration: false,
     enableOrcidLogin: false,
-    bookingDeletionWindowMinutes: 30
+    bookingDeletionWindowMinutes: 30,
+    whisperCppModel: ''
   });
+
+  availableWhisperModels = signal<any[]>([]);
+  loadingWhisperModels = signal(false);
+  refreshingWhisperModels = signal(false);
 
   canEdit = signal(false);
   Object = Object;
@@ -35,6 +41,7 @@ export class SiteConfig implements OnInit {
   ngOnInit(): void {
     this.checkPermissions();
     this.loadConfig();
+    this.loadAvailableWhisperModels();
   }
 
   checkPermissions(): void {
@@ -59,10 +66,11 @@ export class SiteConfig implements OnInit {
           allowUserRegistration: config.allowUserRegistration,
           enableOrcidLogin: config.enableOrcidLogin,
           bookingDeletionWindowMinutes: config.bookingDeletionWindowMinutes,
-          logoUrl: config.logoUrl
+          logoUrl: config.logoUrl,
+          whisperCppModel: config.whisperCppModel
         };
-        if (config.uiFeatures) {
-          formDataValue.uiFeatures = config.uiFeatures;
+        if (config.uiFeaturesWithDefaults) {
+          formDataValue.uiFeatures = { ...config.uiFeaturesWithDefaults };
         }
         this.formData.set(formDataValue);
         this.loading.set(false);
@@ -124,12 +132,46 @@ export class SiteConfig implements OnInit {
         allowUserRegistration: currentConfig.allowUserRegistration,
         enableOrcidLogin: currentConfig.enableOrcidLogin,
         bookingDeletionWindowMinutes: currentConfig.bookingDeletionWindowMinutes,
-        logoUrl: currentConfig.logoUrl
+        logoUrl: currentConfig.logoUrl,
+        whisperCppModel: currentConfig.whisperCppModel
       };
-      if (currentConfig.uiFeatures) {
-        formDataValue.uiFeatures = currentConfig.uiFeatures;
+      if (currentConfig.uiFeaturesWithDefaults) {
+        formDataValue.uiFeatures = { ...currentConfig.uiFeaturesWithDefaults };
       }
       this.formData.set(formDataValue);
     }
+  }
+
+  loadAvailableWhisperModels(): void {
+    this.loadingWhisperModels.set(true);
+    this.siteConfigService.getAvailableWhisperModels().subscribe({
+      next: (response: {models: any[], count: number}) => {
+        this.availableWhisperModels.set(response.models);
+        this.loadingWhisperModels.set(false);
+      },
+      error: (err: any) => {
+        console.error('Error loading Whisper models:', err);
+        this.toastService.error('Failed to load available Whisper models');
+        this.loadingWhisperModels.set(false);
+      }
+    });
+  }
+
+  refreshWhisperModels(): void {
+    this.refreshingWhisperModels.set(true);
+    this.siteConfigService.refreshWhisperModels().subscribe({
+      next: (response: {status: string, message: string, job_id: string}) => {
+        this.toastService.success(response.message || 'Whisper models refresh started');
+        this.refreshingWhisperModels.set(false);
+        setTimeout(() => {
+          this.loadAvailableWhisperModels();
+        }, 2000);
+      },
+      error: (err: any) => {
+        console.error('Error refreshing Whisper models:', err);
+        this.toastService.error('Failed to refresh Whisper models');
+        this.refreshingWhisperModels.set(false);
+      }
+    });
   }
 }
