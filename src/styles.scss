@@ -110,3 +110,13 @@ ngb-alert,
 .alert {
   z-index: 100 !important;
 }
+
+// Demo mode banner offset
+body.demo-mode-active {
+  padding-top: 140px;
+  transition: padding-top 0.3s ease;
+}
+
+body.demo-mode-active.demo-mode-collapsed {
+  padding-top: 60px;
+}

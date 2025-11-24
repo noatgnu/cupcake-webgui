@@ -2,7 +2,7 @@ import { Component, inject, signal, OnInit, OnDestroy, computed } from '@angular
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
-import { ThemeService, AuthService, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ThemeService, AuthService, SiteConfigService, DemoModeService } from '@noatgnu/cupcake-core';
 import type { SiteConfig } from '@noatgnu/cupcake-core';
 import { NotificationDropdown } from '../../../shared/components/notification-dropdown/notification-dropdown';
 import { MessagingDropdown } from '../../../shared/components/messaging-dropdown/messaging-dropdown';
@@ -23,6 +23,7 @@ export class Sidebar implements OnInit, OnDestroy {
   private router = inject(Router);
   private sidebarControl = inject(SidebarControl);
   private siteConfigService = inject(SiteConfigService);
+  private demoModeService = inject(DemoModeService);
   private subscription?: Subscription;
 
   currentUser$ = this.authService.currentUser$;
@@ -30,6 +31,7 @@ export class Sidebar implements OnInit, OnDestroy {
   currentUser = signal(this.authService.getCurrentUser());
   siteConfig = signal<SiteConfig | null>(null);
   siteConfig$ = this.siteConfigService.config$;
+  isDemoMode = signal(false);
 
   ngOnInit(): void {
     this.currentUser.set(this.authService.getCurrentUser());
@@ -38,6 +40,9 @@ export class Sidebar implements OnInit, OnDestroy {
     });
     this.siteConfigService.config$.subscribe(config => {
       this.siteConfig.set(config);
+    });
+    this.demoModeService.demoMode$.subscribe(info => {
+      this.isDemoMode.set(info.isActive);
     });
     this.subscription = this.sidebarControl.toggle$.subscribe(() => {
       this.isCollapsed.update(v => !v);

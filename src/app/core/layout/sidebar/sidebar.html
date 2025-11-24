@@ -147,6 +147,22 @@
           <span style="font-size: 0.7rem;">Powered by <strong>CUPCAKE</strong></span>
         </div>
       }
+      @if (isDemoMode()) {
+        <div class="d-flex justify-content-center mt-2">
+          <span class="badge bg-danger">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            DEMO
+          </span>
+        </div>
+      }
+    } @else {
+      @if (isDemoMode()) {
+        <div class="d-flex justify-content-center">
+          <span class="badge bg-danger" title="Demo Mode">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </span>
+        </div>
+      }
     }
   </div>
 </div>
