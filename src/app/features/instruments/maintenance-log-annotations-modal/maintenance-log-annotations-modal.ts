@@ -1,8 +1,8 @@
-import { Component, inject, Input, signal, OnInit } from '@angular/core';
+import { Component, inject, Input, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, ApiService, Annotation, AnnotationType } from '@noatgnu/cupcake-core';
+import { ToastService, ApiService, Annotation, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
 import { MaintenanceService, type MaintenanceLog, type MaintenanceLogAnnotation } from '@noatgnu/cupcake-macaron';
 
 @Component({
@@ -16,6 +16,7 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
   private maintenanceService = inject(MaintenanceService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
+  private siteConfigService = inject(SiteConfigService);
 
   @Input() maintenanceLog!: MaintenanceLog;
   @Input() canManage = false;
@@ -29,6 +30,11 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
   loadingAnnotations = signal(true);
   maintenanceLogAnnotations = signal<MaintenanceLogAnnotation[]>([]);
   showUploadForm = signal(false);
+
+  maxUploadSizeText = computed(() => {
+    const maxSize = this.siteConfigService.getMaxChunkedUploadSize();
+    return this.siteConfigService.formatFileSize(maxSize);
+  });
 
   ngOnInit(): void {
     this.loadAnnotations();

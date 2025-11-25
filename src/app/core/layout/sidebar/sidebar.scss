@@ -1,5 +1,6 @@
 .sidebar-content {
-  background: var(--surface-primary);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
 
   &.collapsed {
     .sidebar-logo {
@@ -9,36 +10,39 @@
 }
 
 .sidebar-header {
-  background: var(--surface-primary);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
 }
 
 .sidebar-nav {
   .nav-link {
-    color: var(--text-primary);
+    color: var(--bs-body-color);
     transition: all 0.2s ease;
     white-space: nowrap;
 
     &:hover {
-      background: var(--surface-tertiary);
-      color: var(--brand-primary);
+      background: var(--bs-secondary-bg);
+      color: var(--bs-primary);
     }
 
     &.active {
-      background: var(--brand-primary);
-      color: white;
+      background: var(--bs-primary);
+      color: #ffffff;
+      font-weight: 500;
 
       i {
-        color: white;
+        color: #ffffff;
       }
     }
 
     i {
-      color: var(--text-secondary);
+      color: var(--bs-secondary-color);
       transition: color 0.2s ease;
     }
   }
 }
 
 .sidebar-footer {
-  background: var(--surface-tertiary);
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
 }

@@ -2,7 +2,7 @@ import { Component, inject, signal, computed, ViewChild, Input } from '@angular/
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, AnnotationType } from '@noatgnu/cupcake-core';
+import { ToastService, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
 import { MediaRecorderAnnotation } from '../../../protocols/media-recorder-annotation/media-recorder-annotation';
 import { InstrumentBookingAnnotation } from '../../../protocols/instrument-booking-annotation/instrument-booking-annotation';
 import { CalculatorAnnotation } from '../../../protocols/calculator-annotation/calculator-annotation';
@@ -17,6 +17,7 @@ import { MolarityCalculatorAnnotation } from '../../../protocols/molarity-calcul
 export class AddAnnotationModal {
   public activeModal = inject(NgbActiveModal);
   private toastService = inject(ToastService);
+  private siteConfigService = inject(SiteConfigService);
 
   @ViewChild(CalculatorAnnotation) calculatorComponent?: CalculatorAnnotation;
   @ViewChild(MolarityCalculatorAnnotation) molarityComponent?: MolarityCalculatorAnnotation;
@@ -43,6 +44,11 @@ export class AddAnnotationModal {
     }
     return ['text', 'upload', 'record', 'calculator', 'molarity'];
   }
+
+  maxUploadSizeText = computed(() => {
+    const maxSize = this.siteConfigService.getMaxChunkedUploadSize();
+    return this.siteConfigService.formatFileSize(maxSize);
+  });
 
   hasAudio = computed(() => {
     const file = this.selectedFile();

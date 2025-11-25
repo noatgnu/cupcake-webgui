@@ -2,7 +2,7 @@ import { Component, inject, signal, OnInit, computed, ViewChild } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, AnnotationType } from '@noatgnu/cupcake-core';
+import { ToastService, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
 import { MediaRecorderAnnotation } from '../media-recorder-annotation/media-recorder-annotation';
 import { InstrumentBookingAnnotation } from '../instrument-booking-annotation/instrument-booking-annotation';
 import { CalculatorAnnotation } from '../calculator-annotation/calculator-annotation';
@@ -20,6 +20,7 @@ import type { InstrumentUsage } from '@noatgnu/cupcake-macaron';
 export class AnnotationModal implements OnInit {
   public activeModal = inject(NgbActiveModal);
   private toastService = inject(ToastService);
+  private siteConfigService = inject(SiteConfigService);
 
   @ViewChild(CalculatorAnnotation) calculatorComponent?: CalculatorAnnotation;
   @ViewChild(MolarityCalculatorAnnotation) molarityComponent?: MolarityCalculatorAnnotation;
@@ -43,6 +44,11 @@ export class AnnotationModal implements OnInit {
 
     const fileType = file.type;
     return fileType.startsWith('audio/') || fileType.startsWith('video/');
+  });
+
+  maxUploadSizeText = computed(() => {
+    const maxSize = this.siteConfigService.getMaxChunkedUploadSize();
+    return this.siteConfigService.formatFileSize(maxSize);
   });
 
   ngOnInit(): void {

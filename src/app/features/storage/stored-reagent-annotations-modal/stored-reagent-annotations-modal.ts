@@ -2,7 +2,7 @@ import { Component, inject, Input, signal, OnInit, computed } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, ApiService, AnnotationFolder, Annotation } from '@noatgnu/cupcake-core';
+import { ToastService, ApiService, AnnotationFolder, Annotation, SiteConfigService } from '@noatgnu/cupcake-core';
 import { ReagentService, StoredReagent, StoredReagentAnnotation } from '@noatgnu/cupcake-macaron';
 
 interface AnnotationsByFolder {
@@ -26,6 +26,7 @@ export class StoredReagentAnnotationsModal implements OnInit {
   private reagentService = inject(ReagentService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
+  private siteConfigService = inject(SiteConfigService);
 
   @Input() storedReagent!: StoredReagent;
   @Input() canManage = false;
@@ -47,6 +48,11 @@ export class StoredReagentAnnotationsModal implements OnInit {
     const folders = this.availableFolders();
     const activeId = this.activeTabId();
     return folders.find(f => f.id === activeId) || folders[0] || null;
+  });
+
+  maxUploadSizeText = computed(() => {
+    const maxSize = this.siteConfigService.getMaxChunkedUploadSize();
+    return this.siteConfigService.formatFileSize(maxSize);
   });
 
   currentTabAnnotations = computed(() => {

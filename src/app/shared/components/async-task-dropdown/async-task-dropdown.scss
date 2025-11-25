@@ -19,11 +19,11 @@
     border-left: 3px solid transparent;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.05);
+      background-color: var(--bs-secondary-bg);
     }
 
     &.has-download {
-      border-left-color: #0d6efd;
+      border-left-color: var(--bs-primary);
     }
   }
 
@@ -32,6 +32,6 @@
   }
 
   .progress {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: var(--bs-secondary-bg);
   }
 }

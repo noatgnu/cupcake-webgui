@@ -29,7 +29,7 @@ import {
   MetadataColumnHistoryModal,
   ColumnHistoryModalConfig
 } from '@noatgnu/cupcake-vanilla';
-import { ToastService, MetadataExportRequest, MetadataValidationConfig } from '@noatgnu/cupcake-core';
+import { ToastService, MetadataExportRequest, MetadataValidationConfig, SiteConfigService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-metadata-table-editor',
@@ -79,6 +79,11 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
   sortedPools = computed(() => {
     const pools = this.table()?.samplePools || [];
     return [...pools].sort((a, b) => a.poolName.localeCompare(b.poolName));
+  });
+
+  maxUploadSizeText = computed(() => {
+    const maxSize = this.siteConfigService.getMaxChunkedUploadSize();
+    return this.siteConfigService.formatFileSize(maxSize);
   });
 
   poolTableRows = computed(() => {
@@ -167,7 +172,8 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     private asyncTaskService: AsyncTaskUIService,
     private toastService: ToastService,
     private modalService: NgbModal,
-    private samplePoolService: SamplePoolService
+    private samplePoolService: SamplePoolService,
+    private siteConfigService: SiteConfigService
   ) {}
 
   ngOnInit(): void {
