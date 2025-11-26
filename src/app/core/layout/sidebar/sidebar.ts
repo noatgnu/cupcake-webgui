@@ -58,7 +58,7 @@ export class Sidebar implements OnInit, OnDestroy {
     { icon: 'bi-journal-text', label: 'Protocols', route: '/protocols', featureFlag: 'showProtocols' },
     { icon: 'bi-gear', label: 'Instruments', route: '/instruments', featureFlag: 'showInstruments' },
     { icon: 'bi-box-seam', label: 'Storage', route: '/storage', featureFlag: 'showStorage' },
-    { icon: 'bi-briefcase', label: 'Jobs', route: '/jobs', featureFlag: null },
+    { icon: 'bi-briefcase', label: 'Jobs', route: '/jobs', featureFlag: 'showMetadataTables' },
     { icon: 'bi-cash-coin', label: 'Billing', route: '/billing', featureFlag: 'showBilling' }
   ];
 
