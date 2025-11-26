@@ -55,21 +55,21 @@ export class Sidebar implements OnInit, OnDestroy {
 
   private allNavItems = [
     { icon: 'bi-house-door', label: 'Home', route: '/home', featureFlag: null },
-    { icon: 'bi-journal-text', label: 'Protocols', route: '/protocols', featureFlag: 'show_protocols' },
-    { icon: 'bi-gear', label: 'Instruments', route: '/instruments', featureFlag: 'show_instruments' },
-    { icon: 'bi-box-seam', label: 'Storage', route: '/storage', featureFlag: 'show_storage' },
+    { icon: 'bi-journal-text', label: 'Protocols', route: '/protocols', featureFlag: 'showProtocols' },
+    { icon: 'bi-gear', label: 'Instruments', route: '/instruments', featureFlag: 'showInstruments' },
+    { icon: 'bi-box-seam', label: 'Storage', route: '/storage', featureFlag: 'showStorage' },
     { icon: 'bi-briefcase', label: 'Jobs', route: '/jobs', featureFlag: null },
-    { icon: 'bi-cash-coin', label: 'Billing', route: '/billing', featureFlag: 'show_billing' }
+    { icon: 'bi-cash-coin', label: 'Billing', route: '/billing', featureFlag: 'showBilling' }
   ];
 
   navItems = computed(() => {
     const config = this.siteConfig();
-    if (!config?.uiFeatures) {
+    if (!config?.uiFeaturesWithDefaults) {
       return this.allNavItems;
     }
     return this.allNavItems.filter(item => {
       if (!item.featureFlag) return true;
-      return config.uiFeatures[item.featureFlag] !== false;
+      return config.uiFeaturesWithDefaults[item.featureFlag] !== false;
     });
   });
 
@@ -116,11 +116,11 @@ export class Sidebar implements OnInit, OnDestroy {
 
   showNotifications(): boolean {
     const config = this.siteConfig();
-    return config?.uiFeatures?.show_notifications !== false;
+    return config?.uiFeaturesWithDefaults?.['showNotifications'] !== false;
   }
 
   showMessages(): boolean {
     const config = this.siteConfig();
-    return config?.uiFeatures?.show_messages !== false;
+    return config?.uiFeaturesWithDefaults?.['showMessages'] !== false;
   }
 }

@@ -132,7 +132,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
 
   webrtcFeatureEnabled = computed(() => {
     const config = this.siteConfig();
-    return config?.uiFeatures?.show_webrtc !== false;
+    return config?.uiFeaturesWithDefaults?.['showWebrtc'] !== false;
   });
 
   isSessionCompleted = computed(() => {

@@ -70,7 +70,7 @@ export class SiteConfig implements OnInit {
           whisperCppModel: config.whisperCppModel
         };
         if (config.uiFeaturesWithDefaults) {
-          formDataValue.uiFeatures = { ...config.uiFeaturesWithDefaults };
+          formDataValue.uiFeatures = this.convertUIFeaturesToSnakeCase(config.uiFeaturesWithDefaults);
         }
         this.formData.set(formDataValue);
         this.loading.set(false);
@@ -122,6 +122,15 @@ export class SiteConfig implements OnInit {
     });
   }
 
+  convertUIFeaturesToSnakeCase(features: any): any {
+    const snakeCaseFeatures: any = {};
+    Object.entries(features).forEach(([key, value]) => {
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      snakeCaseFeatures[snakeKey] = value;
+    });
+    return snakeCaseFeatures;
+  }
+
   resetForm(): void {
     const currentConfig = this.config();
     if (currentConfig) {
@@ -136,7 +145,7 @@ export class SiteConfig implements OnInit {
         whisperCppModel: currentConfig.whisperCppModel
       };
       if (currentConfig.uiFeaturesWithDefaults) {
-        formDataValue.uiFeatures = { ...currentConfig.uiFeaturesWithDefaults };
+        formDataValue.uiFeatures = this.convertUIFeaturesToSnakeCase(currentConfig.uiFeaturesWithDefaults);
       }
       this.formData.set(formDataValue);
     }
