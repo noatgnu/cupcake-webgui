@@ -9,5 +9,51 @@
     </button>
 
     <span class="navbar-brand mb-0">Billing</span>
+
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#billingNavbar"
+      aria-controls="billingNavbar"
+      aria-expanded="false"
+      aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="billingNavbar">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/billing/records" routerLinkActive="active">
+            <i class="bi bi-receipt me-1"></i>
+            Records
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/billing/service-tiers" routerLinkActive="active">
+            <i class="bi bi-award me-1"></i>
+            Service Tiers
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/billing/billable-item-types" routerLinkActive="active">
+            <i class="bi bi-tag me-1"></i>
+            Item Types
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/billing/service-prices" routerLinkActive="active">
+            <i class="bi bi-currency-dollar me-1"></i>
+            Prices
+          </a>
+        </li>
+        <li class="nav-item">
+          <button class="btn btn-outline-light btn-sm ms-2" (click)="openQuoteRequest()">
+            <i class="bi bi-calculator me-1"></i>
+            Request Quote
+          </button>
+        </li>
+      </ul>
+    </div>
   </div>
 </nav>

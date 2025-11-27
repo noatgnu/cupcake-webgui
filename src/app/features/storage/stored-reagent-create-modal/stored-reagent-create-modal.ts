@@ -27,6 +27,7 @@ export class StoredReagentCreateModal {
   reagentName: string | Reagent = '';
   reagentUnit = '';
   quantity = 0;
+  molecularWeight: number | null = null;
   notes = '';
   expirationDate = '';
   lowStockThreshold: number | null = null;
@@ -136,6 +137,10 @@ export class StoredReagentCreateModal {
 
     if (this.lowStockThreshold !== null && this.lowStockThreshold > 0) {
       payload.lowStockThreshold = this.lowStockThreshold;
+    }
+
+    if (this.molecularWeight !== null && this.molecularWeight > 0) {
+      payload.molecularWeight = this.molecularWeight;
     }
 
     if (this.imageBase64) {

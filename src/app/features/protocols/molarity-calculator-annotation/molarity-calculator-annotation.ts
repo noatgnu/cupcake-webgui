@@ -1,7 +1,11 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NgbTypeahead, NgbHighlight } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
+import { ReagentService, StoredReagent } from '@noatgnu/cupcake-macaron';
+import { Observable } from 'rxjs';
+import { debounceTime, map, switchMap } from 'rxjs/operators';
 
 interface HistoryEntry {
   id: string;
@@ -17,12 +21,13 @@ type CalculationMode = 'dynamic' | 'massFromVolumeAndConcentration' | 'volumeFro
 
 @Component({
   selector: 'app-molarity-calculator-annotation',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgbTypeahead, NgbHighlight],
   templateUrl: './molarity-calculator-annotation.html',
   styleUrl: './molarity-calculator-annotation.scss'
 })
 export class MolarityCalculatorAnnotation implements OnInit {
   private toastService = inject(ToastService);
+  private reagentService = inject(ReagentService);
 
   private idCounter = 0;
 
@@ -72,6 +77,50 @@ export class MolarityCalculatorAnnotation implements OnInit {
   readonly massUnits = ['ng', 'μg', 'mg', 'g', 'kg'];
   readonly volumeUnits = ['nL', 'μL', 'mL', 'L'];
   readonly molarityUnits = ['nM', 'μM', 'mM', 'M'];
+
+  searchReagents = (text$: Observable<string>): Observable<StoredReagent[]> => {
+    return text$.pipe(
+      debounceTime(200),
+      switchMap(term => {
+        if (!term || term.length < 2) {
+          return new Observable<StoredReagent[]>(observer => {
+            observer.next([]);
+            observer.complete();
+          });
+        }
+        return this.reagentService.getStoredReagents({
+          search: term,
+          molecularWeight__isnull: false,
+          limit: 10
+        }).pipe(
+          map(response => response.results)
+        );
+      })
+    );
+  };
+
+  formatReagent = (reagent: StoredReagent | string) => {
+    if (typeof reagent === 'string') {
+      return reagent;
+    }
+    return `${reagent.reagentName} (${reagent.molecularWeight} g/mol)`;
+  };
+
+  resultFormatter = (reagent: StoredReagent) => {
+    if (typeof reagent === 'string') {
+      return reagent;
+    }
+    return `${reagent.reagentName} (${reagent.molecularWeight} g/mol)`;
+  };
+
+  onSelectReagent(event: any): void {
+    event.preventDefault();
+    const reagent = event.item as StoredReagent;
+    if (reagent.molecularWeight) {
+      this.molecularWeight.set(reagent.molecularWeight);
+      this.toastService.success(`Loaded MW: ${reagent.molecularWeight} g/mol from ${reagent.reagentName}`);
+    }
+  }
 
   visibleHistory = computed(() => {
     return [...this.dataLog()].reverse();

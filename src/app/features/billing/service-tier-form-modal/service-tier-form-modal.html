@@ -1,0 +1,197 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-award me-2"></i>
+    {{ tierId() ? 'Edit Service Tier' : 'Create Service Tier' }}
+  </h5>
+  <button type="button" class="btn-close" aria-label="Close" (click)="close()"></button>
+</div>
+
+<div class="modal-body">
+  @if (loading()) {
+    <div class="text-center p-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label for="tierName" class="form-label">Tier Name <span class="text-danger">*</span></label>
+          <input
+            type="text"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('tierName')"
+            id="tierName"
+            formControlName="tierName"
+            placeholder="e.g., Standard, Premium, Enterprise">
+          @if (isFieldInvalid('tierName')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('tierName') }}
+            </div>
+          }
+        </div>
+
+        <div class="col-md-4">
+          <label for="priorityLevel" class="form-label">Priority Level <span class="text-danger">*</span></label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('priorityLevel')"
+            id="priorityLevel"
+            formControlName="priorityLevel"
+            min="1"
+            max="100">
+          @if (isFieldInvalid('priorityLevel')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('priorityLevel') }}
+            </div>
+          }
+          <small class="form-text text-muted">Higher number = higher priority</small>
+        </div>
+
+        <div class="col-12">
+          <label for="description" class="form-label">Description</label>
+          <textarea
+            class="form-control"
+            id="description"
+            formControlName="description"
+            rows="3"
+            placeholder="Enter a description for this service tier..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+          <label for="baseRateMultiplier" class="form-label">Base Rate Multiplier <span class="text-danger">*</span></label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('baseRateMultiplier')"
+            id="baseRateMultiplier"
+            formControlName="baseRateMultiplier"
+            step="0.1"
+            min="0">
+          @if (isFieldInvalid('baseRateMultiplier')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('baseRateMultiplier') }}
+            </div>
+          }
+          <small class="form-text text-muted">Multiply base prices by this value</small>
+        </div>
+
+        <div class="col-md-6">
+          <label for="discountPercentage" class="form-label">Discount Percentage <span class="text-danger">*</span></label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('discountPercentage')"
+            id="discountPercentage"
+            formControlName="discountPercentage"
+            min="0"
+            max="100"
+            step="1">
+          @if (isFieldInvalid('discountPercentage')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('discountPercentage') }}
+            </div>
+          }
+          <small class="form-text text-muted">Discount applied to prices</small>
+        </div>
+
+        <div class="col-md-6">
+          <label for="maxConcurrentBookings" class="form-label">Max Concurrent Bookings</label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('maxConcurrentBookings')"
+            id="maxConcurrentBookings"
+            formControlName="maxConcurrentBookings"
+            min="1">
+          @if (isFieldInvalid('maxConcurrentBookings')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('maxConcurrentBookings') }}
+            </div>
+          }
+          <small class="form-text text-muted">Leave empty for unlimited</small>
+        </div>
+
+        <div class="col-md-6">
+          <label for="advanceBookingDays" class="form-label">Advance Booking Days <span class="text-danger">*</span></label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('advanceBookingDays')"
+            id="advanceBookingDays"
+            formControlName="advanceBookingDays"
+            min="0">
+          @if (isFieldInvalid('advanceBookingDays')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('advanceBookingDays') }}
+            </div>
+          }
+          <small class="form-text text-muted">How far in advance bookings can be made</small>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Features</label>
+          <div class="input-group mb-2">
+            <input
+              type="text"
+              class="form-control"
+              [(ngModel)]="newFeature"
+              [ngModelOptions]="{standalone: true}"
+              placeholder="Enter a feature..."
+              (keyup.enter)="addFeature()">
+            <button
+              class="btn btn-outline-primary"
+              type="button"
+              (click)="addFeature()">
+              <i class="bi bi-plus-circle me-1"></i>
+              Add Feature
+            </button>
+          </div>
+          @if (features().length > 0) {
+            <div class="d-flex flex-wrap gap-2">
+              @for (feature of features(); track feature) {
+                <span class="badge bg-primary">
+                  {{ feature }}
+                  <button
+                    type="button"
+                    class="btn-close btn-close-white ms-2"
+                    style="font-size: 0.6rem;"
+                    (click)="removeFeature(feature)"></button>
+                </span>
+              }
+            </div>
+          } @else {
+            <small class="text-muted">No features added yet</small>
+          }
+        </div>
+
+        <div class="col-12">
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="isActive"
+              formControlName="isActive">
+            <label class="form-check-label" for="isActive">
+              Active
+            </label>
+          </div>
+        </div>
+      </div>
+    </form>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="submitting()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="onSubmit()" [disabled]="loading() || submitting() || form.invalid">
+    @if (submitting()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    {{ tierId() ? 'Update' : 'Create' }} Service Tier
+  </button>
+</div>

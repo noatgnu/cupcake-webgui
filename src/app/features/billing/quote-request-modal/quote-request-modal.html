@@ -1,0 +1,208 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-calculator me-2"></i>
+    Request Service Quote
+  </h5>
+  <button type="button" class="btn-close" aria-label="Close" (click)="close()"></button>
+</div>
+
+<div class="modal-body">
+  @if (loading()) {
+    <div class="text-center p-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else {
+    <form [formGroup]="form">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Select an instrument, service tier, and billable item to get an estimated cost quote.
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label for="instrument" class="form-label">Instrument <span class="text-danger">*</span></label>
+          <select
+            class="form-select"
+            [class.is-invalid]="isFieldInvalid('instrument')"
+            id="instrument"
+            formControlName="instrument">
+            <option [ngValue]="null">Select an instrument...</option>
+            @for (instrument of instruments(); track instrument.id) {
+              <option [ngValue]="instrument.id">
+                {{ instrument.instrumentName }}
+              </option>
+            }
+          </select>
+          @if (isFieldInvalid('instrument')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('instrument') }}
+            </div>
+          }
+        </div>
+
+        <div class="col-md-6">
+          <label for="serviceTier" class="form-label">Service Tier <span class="text-danger">*</span></label>
+          <select
+            class="form-select"
+            [class.is-invalid]="isFieldInvalid('serviceTier')"
+            id="serviceTier"
+            formControlName="serviceTier">
+            <option [ngValue]="null">Select a service tier...</option>
+            @for (tier of serviceTiers(); track tier.id) {
+              <option [ngValue]="tier.id">
+                {{ tier.tierName }}
+                @if (tier.discountPercentage > 0) {
+                  ({{ tier.discountPercentage }}% discount)
+                }
+              </option>
+            }
+          </select>
+          @if (isFieldInvalid('serviceTier')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('serviceTier') }}
+            </div>
+          }
+        </div>
+
+        <div class="col-md-6">
+          <label for="billableItemType" class="form-label">Billable Item Type <span class="text-danger">*</span></label>
+          <select
+            class="form-select"
+            [class.is-invalid]="isFieldInvalid('billableItemType')"
+            id="billableItemType"
+            formControlName="billableItemType">
+            <option [ngValue]="null">Select a billable item type...</option>
+            @for (itemType of billableItemTypes(); track itemType.id) {
+              <option [ngValue]="itemType.id">
+                {{ itemType.name }} ({{ itemType.defaultBillingUnitDisplay }})
+              </option>
+            }
+          </select>
+          @if (isFieldInvalid('billableItemType')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('billableItemType') }}
+            </div>
+          }
+        </div>
+
+        <div class="col-md-6">
+          <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('quantity')"
+            id="quantity"
+            formControlName="quantity"
+            step="0.01"
+            min="0.01">
+          @if (isFieldInvalid('quantity')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('quantity') }}
+            </div>
+          }
+          @if (selectedPrice()) {
+            <small class="form-text text-muted">
+              In {{ selectedPrice()?.billingUnitDisplay }}
+            </small>
+          }
+        </div>
+
+        @if (costBreakdown()) {
+          <div class="col-12">
+            <div class="card bg-light">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="bi bi-currency-dollar me-2"></i>
+                  Cost Estimate
+                  @if (calculating()) {
+                    <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                  }
+                </h6>
+              </div>
+              <div class="card-body">
+                <table class="table table-sm mb-0">
+                  <tbody>
+                    <tr>
+                      <td>Unit Price:</td>
+                      <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.unitPrice.toFixed(2) }}</td>
+                    </tr>
+                    <tr>
+                      <td>Subtotal:</td>
+                      <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.subtotal.toFixed(2) }}</td>
+                    </tr>
+                    @if (costBreakdown()!.setupFee > 0) {
+                      <tr>
+                        <td>Setup Fee:</td>
+                        <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.setupFee.toFixed(2) }}</td>
+                      </tr>
+                    }
+                    @if (costBreakdown()!.bulkDiscount > 0) {
+                      <tr class="text-success">
+                        <td>Bulk Discount:</td>
+                        <td class="text-end">-{{ costBreakdown()!.currency }} {{ costBreakdown()!.bulkDiscount.toFixed(2) }}</td>
+                      </tr>
+                    }
+                    @if (costBreakdown()!.taxAmount > 0) {
+                      <tr>
+                        <td>Tax:</td>
+                        <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.taxAmount.toFixed(2) }}</td>
+                      </tr>
+                    }
+                    <tr class="fw-bold border-top">
+                      <td>TOTAL:</td>
+                      <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.total.toFixed(2) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="col-12">
+          <label for="contactEmail" class="form-label">Contact Email <span class="text-danger">*</span></label>
+          <input
+            type="email"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('contactEmail')"
+            id="contactEmail"
+            formControlName="contactEmail"
+            placeholder="your@email.com">
+          @if (isFieldInvalid('contactEmail')) {
+            <div class="invalid-feedback">
+              {{ getFieldError('contactEmail') }}
+            </div>
+          }
+        </div>
+
+        <div class="col-12">
+          <label for="notes" class="form-label">Additional Notes</label>
+          <textarea
+            class="form-control"
+            id="notes"
+            formControlName="notes"
+            rows="3"
+            placeholder="Any additional requirements or questions..."></textarea>
+        </div>
+      </div>
+    </form>
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()">
+    Cancel
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="generateQuote()"
+    [disabled]="loading() || form.invalid || !costBreakdown()">
+    <i class="bi bi-download me-2"></i>
+    Download Quote
+  </button>
+</div>

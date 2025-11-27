@@ -26,6 +26,7 @@ export class StoredReagentEditModal implements OnInit {
   sendingNotification = signal(false);
 
   currentQuantity = 0;
+  molecularWeight: number | null = null;
   notes = '';
   expirationDate = '';
   lowStockThreshold: number | null = null;
@@ -48,6 +49,7 @@ export class StoredReagentEditModal implements OnInit {
 
   ngOnInit(): void {
     this.currentQuantity = this.storedReagent.currentQuantity;
+    this.molecularWeight = this.storedReagent.molecularWeight || null;
     this.notes = this.storedReagent.notes || '';
     this.expirationDate = this.storedReagent.expirationDate || '';
     this.lowStockThreshold = this.storedReagent.lowStockThreshold || null;
@@ -77,6 +79,12 @@ export class StoredReagentEditModal implements OnInit {
 
     if (this.lowStockThreshold !== null && this.lowStockThreshold > 0) {
       payload.lowStockThreshold = this.lowStockThreshold;
+    }
+
+    if (this.molecularWeight !== null && this.molecularWeight > 0) {
+      payload.molecularWeight = this.molecularWeight;
+    } else {
+      payload.molecularWeight = null;
     }
 
     if (this.imageBase64) {

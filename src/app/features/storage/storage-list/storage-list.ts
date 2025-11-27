@@ -60,6 +60,8 @@ export class StorageList implements OnInit {
   reagentPage = signal(1);
   reagentSearch = '';
   includeSubStorage = false;
+  molecularWeightMin: number | null = null;
+  molecularWeightMax: number | null = null;
 
   readonly pageSize = 10;
   readonly typeLabels = StorageObjectTypeLabels;
@@ -116,6 +118,8 @@ export class StorageList implements OnInit {
         this.reagentPage.set(1);
         this.reagentSearch = '';
         this.includeSubStorage = false;
+        this.molecularWeightMin = null;
+        this.molecularWeightMax = null;
         this.loadChildStorageObjects();
         this.loadBreadcrumbs();
         this.loadStoredReagents();
@@ -233,6 +237,14 @@ export class StorageList implements OnInit {
       params.includeSubStorage = true;
     }
 
+    if (this.molecularWeightMin !== null && this.molecularWeightMin > 0) {
+      params.molecularWeightGte = this.molecularWeightMin;
+    }
+
+    if (this.molecularWeightMax !== null && this.molecularWeightMax > 0) {
+      params.molecularWeightLte = this.molecularWeightMax;
+    }
+
     const sharedReagentId = this.sharedReagentId();
     if (sharedReagentId) {
       params.id = sharedReagentId;
@@ -312,6 +324,11 @@ export class StorageList implements OnInit {
   }
 
   onReagentSearchChange(): void {
+    this.reagentPage.set(1);
+    this.loadStoredReagents();
+  }
+
+  onReagentFilterChange(): void {
     this.reagentPage.set(1);
     this.loadStoredReagents();
   }

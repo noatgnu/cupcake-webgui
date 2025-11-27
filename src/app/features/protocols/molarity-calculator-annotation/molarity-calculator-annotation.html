@@ -90,12 +90,30 @@
       </div>
 
       <div class="mb-2">
-        <label class="form-label small">Molecular Weight (g/mol)</label>
-        <input
-          type="number"
-          class="form-control"
-          [(ngModel)]="$any(molecularWeight)"
-          placeholder="Enter molecular weight">
+        <label class="form-label small">
+          Molecular Weight (g/mol)
+          <i class="bi bi-search ms-1 text-muted" title="Search reagents with known molecular weights"></i>
+        </label>
+        <div class="input-group">
+          <input
+            #mwLookup1="ngbTypeahead"
+            type="search"
+            class="form-control"
+            [ngbTypeahead]="searchReagents"
+            [inputFormatter]="formatReagent"
+            [resultFormatter]="resultFormatter"
+            [resultTemplate]="rt"
+            (selectItem)="onSelectReagent($event)"
+            placeholder="Search reagent or enter MW"
+            autocomplete="off">
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(molecularWeight)"
+            placeholder="MW value"
+            style="max-width: 120px;">
+        </div>
+        <small class="form-text text-muted">Search reagents or enter MW directly</small>
       </div>
 
       <div class="row g-2 mb-3">
@@ -170,12 +188,30 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label small">Molecular Weight (g/mol)</label>
-        <input
-          type="number"
-          class="form-control"
-          [(ngModel)]="$any(molecularWeight)"
-          placeholder="Enter molecular weight">
+        <label class="form-label small">
+          Molecular Weight (g/mol)
+          <i class="bi bi-search ms-1 text-muted" title="Search reagents with known molecular weights"></i>
+        </label>
+        <div class="input-group">
+          <input
+            #mwLookup2="ngbTypeahead"
+            type="search"
+            class="form-control"
+            [ngbTypeahead]="searchReagents"
+            [inputFormatter]="formatReagent"
+            [resultFormatter]="resultFormatter"
+            [resultTemplate]="rt"
+            (selectItem)="onSelectReagent($event)"
+            placeholder="Search reagent or enter MW"
+            autocomplete="off">
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(molecularWeight)"
+            placeholder="MW value"
+            style="max-width: 120px;">
+        </div>
+        <small class="form-text text-muted">Search reagents or enter MW directly</small>
       </div>
 
       <button
@@ -231,12 +267,30 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label small">Molecular Weight (g/mol)</label>
-        <input
-          type="number"
-          class="form-control"
-          [(ngModel)]="$any(molecularWeight)"
-          placeholder="Enter molecular weight">
+        <label class="form-label small">
+          Molecular Weight (g/mol)
+          <i class="bi bi-search ms-1 text-muted" title="Search reagents with known molecular weights"></i>
+        </label>
+        <div class="input-group">
+          <input
+            #mwLookup3="ngbTypeahead"
+            type="search"
+            class="form-control"
+            [ngbTypeahead]="searchReagents"
+            [inputFormatter]="formatReagent"
+            [resultFormatter]="resultFormatter"
+            [resultTemplate]="rt"
+            (selectItem)="onSelectReagent($event)"
+            placeholder="Search reagent or enter MW"
+            autocomplete="off">
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(molecularWeight)"
+            placeholder="MW value"
+            style="max-width: 120px;">
+        </div>
+        <small class="form-text text-muted">Search reagents or enter MW directly</small>
       </div>
 
       <button
@@ -292,12 +346,30 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label small">Molecular Weight (g/mol)</label>
-        <input
-          type="number"
-          class="form-control"
-          [(ngModel)]="$any(molecularWeight)"
-          placeholder="Enter molecular weight">
+        <label class="form-label small">
+          Molecular Weight (g/mol)
+          <i class="bi bi-search ms-1 text-muted" title="Search reagents with known molecular weights"></i>
+        </label>
+        <div class="input-group">
+          <input
+            #mwLookup4="ngbTypeahead"
+            type="search"
+            class="form-control"
+            [ngbTypeahead]="searchReagents"
+            [inputFormatter]="formatReagent"
+            [resultFormatter]="resultFormatter"
+            [resultTemplate]="rt"
+            (selectItem)="onSelectReagent($event)"
+            placeholder="Search reagent or enter MW"
+            autocomplete="off">
+          <input
+            type="number"
+            class="form-control"
+            [(ngModel)]="$any(molecularWeight)"
+            placeholder="MW value"
+            style="max-width: 120px;">
+        </div>
+        <small class="form-text text-muted">Search reagents or enter MW directly</small>
       </div>
 
       <button
@@ -378,6 +450,13 @@
         <i class="bi bi-calculator me-1"></i>Calculate Final Volume (V2)
       </button>
     }
+
+    <ng-template #rt let-r="result" let-t="term">
+      <div class="d-flex justify-content-between align-items-center">
+        <ngb-highlight [result]="r.reagentName || ''" [term]="t"></ngb-highlight>
+        <small class="text-muted ms-2">{{ r.molecularWeight }} g/mol</small>
+      </div>
+    </ng-template>
 
     @if (visibleHistory().length > 0) {
       <div class="mt-3">

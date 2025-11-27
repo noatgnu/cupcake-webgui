@@ -1,0 +1,226 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-receipt me-2"></i>
+    Billing Record Details
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  @if (loading()) {
+    <div class="text-center p-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  } @else if (record()) {
+    <div class="row g-4">
+      <!-- Record Information -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h6 class="mb-0">
+              <i class="bi bi-info-circle me-2"></i>Record Information
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Record ID</label>
+                <p class="form-control-plaintext">{{ record()!.id }}</p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Status</label>
+                <p class="form-control-plaintext">
+                  <span class="badge" [ngClass]="getStatusBadgeClass(record()!.status)">
+                    {{ record()!.statusDisplay }}
+                  </span>
+                </p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">User</label>
+                <p class="form-control-plaintext">
+                  {{ record()!.username }}
+                  @if (record()!.userEmail) {
+                    <br><small class="text-muted">{{ record()!.userEmail }}</small>
+                  }
+                </p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Billing Period</label>
+                <p class="form-control-plaintext">
+                  <small>
+                    {{ record()!.billingPeriodStart | date:'medium' }}<br>
+                    to {{ record()!.billingPeriodEnd | date:'medium' }}
+                  </small>
+                </p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Service Tier</label>
+                <p class="form-control-plaintext">{{ record()!.serviceTierName }}</p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold">Item Type</label>
+                <p class="form-control-plaintext">{{ record()!.billableItemName }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost Breakdown -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header bg-success text-white">
+            <h6 class="mb-0">
+              <i class="bi bi-calculator me-2"></i>Cost Breakdown
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm mb-3">
+                <tbody>
+                  <tr>
+                    <td class="fw-bold">Quantity</td>
+                    <td class="text-end">{{ record()!.quantity }} {{ record()!.billingUnitDisplay }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Unit Price</td>
+                    <td class="text-end">{{ record()!.unitPrice | currency:record()!.currency }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Subtotal</td>
+                    <td class="text-end">{{ record()!.subtotal | currency:record()!.currency }}</td>
+                  </tr>
+                  @if (record()!.setupFee && record()!.setupFee > 0) {
+                    <tr>
+                      <td class="fw-bold">Setup Fee</td>
+                      <td class="text-end">{{ record()!.setupFee | currency:record()!.currency }}</td>
+                    </tr>
+                  }
+                  @if (record()!.discountAmount && record()!.discountAmount > 0) {
+                    <tr class="table-success">
+                      <td class="fw-bold">Discount</td>
+                      <td class="text-end">-{{ record()!.discountAmount | currency:record()!.currency }}</td>
+                    </tr>
+                  }
+                  @if (record()!.taxAmount && record()!.taxAmount > 0) {
+                    <tr>
+                      <td class="fw-bold">Tax</td>
+                      <td class="text-end">{{ record()!.taxAmount | currency:record()!.currency }}</td>
+                    </tr>
+                  }
+                  <tr class="table-primary fw-bold">
+                    <td>Total Amount</td>
+                    <td class="text-end fs-5">{{ record()!.totalAmount | currency:record()!.currency }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Information -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header bg-secondary text-white">
+            <h6 class="mb-0">
+              <i class="bi bi-file-text me-2"></i>Additional Information
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              @if (record()!.costCenter) {
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Cost Center</label>
+                  <p class="form-control-plaintext">{{ record()!.costCenter }}</p>
+                </div>
+              }
+              @if (record()!.funder) {
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Funder</label>
+                  <p class="form-control-plaintext">{{ record()!.funder }}</p>
+                </div>
+              }
+              @if (record()!.description) {
+                <div class="col-12">
+                  <label class="form-label fw-bold">Description</label>
+                  <p class="form-control-plaintext">{{ record()!.description }}</p>
+                </div>
+              }
+              @if (record()!.notes) {
+                <div class="col-12">
+                  <label class="form-label fw-bold">Notes</label>
+                  <p class="form-control-plaintext">{{ record()!.notes }}</p>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approval Information -->
+      @if (record()!.approvedBy || record()!.approvedAt) {
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header bg-info text-white">
+              <h6 class="mb-0">
+                <i class="bi bi-check-circle me-2"></i>Approval Information
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                @if (record()!.approvedBy) {
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold">Approved By</label>
+                    <p class="form-control-plaintext">{{ record()!.approvedBy }}</p>
+                  </div>
+                }
+                @if (record()!.approvedAt) {
+                  <div class="col-md-6">
+                    <label class="form-label fw-bold">Approved At</label>
+                    <p class="form-control-plaintext">{{ record()!.approvedAt | date:'medium' }}</p>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Timestamps -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold text-muted">Created At</label>
+                <p class="form-control-plaintext"><small>{{ record()!.createdAt | date:'medium' }}</small></p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold text-muted">Updated At</label>
+                <p class="form-control-plaintext"><small>{{ record()!.updatedAt | date:'medium' }}</small></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<div class="modal-footer">
+  @if (canApprove()) {
+    <button type="button" class="btn btn-success" (click)="approveRecord()" [disabled]="approving()">
+      @if (approving()) {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      }
+      <i class="bi bi-check-circle me-2"></i>
+      Approve Record
+    </button>
+  }
+  <button type="button" class="btn btn-secondary" (click)="close()">
+    Close
+  </button>
+</div>
