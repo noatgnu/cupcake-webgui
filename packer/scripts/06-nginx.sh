@@ -1,17 +1,146 @@
 #!/bin/bash
 set -eux
 
-# Deploy nginx configs
-cp /tmp/packer-nginx/cupcake.conf /etc/nginx/sites-available/cupcake.conf
-cp /tmp/packer-nginx/vanilla.conf /etc/nginx/sites-available/vanilla.conf
+# cupcake.local nginx config
+cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
+upstream django_backend {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 80;
+    server_name cupcake.local cupcake;
+
+    client_max_body_size 2G;
+
+    root /opt/cupcake/webgui;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_vary on;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://django_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /admin/ {
+        proxy_pass http://django_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws/ {
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+    }
+
+    location /static/ {
+        alias /opt/cupcake/static/;
+        expires 7d;
+    }
+
+    location /media/ {
+        alias /opt/cupcake/media/;
+        expires 7d;
+    }
+
+    location /internal/media/ {
+        internal;
+        alias /opt/cupcake/media/;
+    }
+}
+NGINXEOF
+
+# vanilla.local nginx config
+cat > /etc/nginx/sites-available/vanilla.conf << 'NGINXEOF'
+upstream django_backend {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 80;
+    server_name vanilla.local vanilla;
+
+    client_max_body_size 2G;
+
+    root /opt/cupcake/vanilla;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_vary on;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://django_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /admin/ {
+        proxy_pass http://django_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws/ {
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+    }
+
+    location /static/ {
+        alias /opt/cupcake/static/;
+        expires 7d;
+    }
+
+    location /media/ {
+        alias /opt/cupcake/media/;
+        expires 7d;
+    }
+
+    location /internal/media/ {
+        internal;
+        alias /opt/cupcake/media/;
+    }
+}
+NGINXEOF
 
 ln -sf /etc/nginx/sites-available/cupcake.conf /etc/nginx/sites-enabled/
 ln -sf /etc/nginx/sites-available/vanilla.conf /etc/nginx/sites-enabled/
-
-# Remove default
 rm -f /etc/nginx/sites-enabled/default
 
-# Increase worker connections for WebSocket
 sed -i 's/worker_connections .*/worker_connections 1024;/' /etc/nginx/nginx.conf
 
 nginx -t

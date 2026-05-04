@@ -35,7 +35,6 @@ locals {
   qemu_binary = var.arch == "arm64" ? "qemu-aarch64" : "qemu-x86_64"
   cpu_model   = var.arch == "arm64" ? "cortex-a72" : "host"
 
-  # VM: qcow2, RPi: raw SD card image
   disk_format   = local.is_vm ? "qcow2" : "raw"
   disk_size     = local.is_vm ? "8192" : "4096"
   machine_type  = local.is_rpi ? "raspi3b" : "pc"
@@ -62,7 +61,7 @@ source "qemu" "cupcake" {
   qemu_binary = local.qemu_binary
   cpu_model   = local.cpu_model
 
-  http_directory = "http"
+  http_directory = "packer/http"
   boot_wait      = "5s"
 
   ssh_username = "cupcake"
@@ -87,20 +86,14 @@ build {
       "VANILLA_NG_REF=${var.vanilla_ng_ref}",
     ]
     scripts = [
-      "scripts/01-base.sh",
-      "scripts/02-postgresql.sh",
-      "scripts/03-redis.sh",
-      "scripts/04-backend.sh",
-      "scripts/05-frontend.sh",
-      "scripts/06-nginx.sh",
-      "scripts/07-mdns.sh",
-      "scripts/08-cleanup.sh",
-    ]
-  }
-
-  post-processor "shell-local" {
-    inline = [
-      "echo Build complete: ${var.output_dir}/cupcake-${var.image_type}-${var.arch}",
+      "packer/scripts/01-base.sh",
+      "packer/scripts/02-postgresql.sh",
+      "packer/scripts/03-redis.sh",
+      "packer/scripts/04-backend.sh",
+      "packer/scripts/05-frontend.sh",
+      "packer/scripts/06-nginx.sh",
+      "packer/scripts/07-mdns.sh",
+      "packer/scripts/08-cleanup.sh",
     ]
   }
 }

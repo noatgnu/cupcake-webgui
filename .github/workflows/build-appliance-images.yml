@@ -80,48 +80,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Checkout backend
-        uses: actions/checkout@v4
-        with:
-          repository: noatgnu/cupcake_vanilla
-          ref: ${{ inputs.backend_ref || 'master' }}
-          path: backend
-
-      - name: Build RPi image via pi-gen
+      - name: Install Packer
         run: |
-          cd backend/raspberry-pi
-          if [ -f "docker-build/Dockerfile.cupcake-builder" ]; then
-            docker buildx build \
-              --platform linux/arm64 \
-              --load \
-              -t cupcake-pi-builder:latest \
-              -f docker-build/Dockerfile.cupcake-builder .
-          fi
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update
+          sudo apt-get install -y packer qemu-system-arm qemu-utils qemu-efi-aarch64
 
-      - name: Extract and compress image
+      - name: Install Packer QEMU plugin
+        run: packer plugins install github.com/hashicorp/qemu
+
+      - name: Validate Packer template
+        run: packer validate packer/cupcake-appliance.pkr.hcl
+
+      - name: Build RPi image (emulated ARM64)
+        timeout-minutes: 120
         run: |
-          mkdir -p output
-          # pi-gen outputs an .img file; compress it
-          if [ -f backend/raspberry-pi/output/*.img ]; then
-            xz -z backend/raspberry-pi/output/*.img
-            mv backend/raspberry-pi/output/*.img.xz output/cupcake-rpi-arm64.img.xz
-          else
-            echo "No RPi image found; check pi-gen output"
-          fi
+          packer build \
+            -var "arch=arm64" \
+            -var "image_type=rpi" \
+            -var "output_dir=${{ runner.temp }}/output" \
+            -var "backend_ref=${{ inputs.backend_ref || 'master' }}" \
+            -var "webgui_ref=${{ inputs.webgui_ref || 'master' }}" \
+            -var "vanilla_ng_ref=${{ inputs.vanilla_ng_ref || 'master' }}" \
+            packer/cupcake-appliance.pkr.hcl
+
+      - name: Compress RPi image
+        run: |
+          mkdir -p ${{ runner.temp }}/output/compressed
+          xz -z -k ${{ runner.temp }}/output/cupcake-rpi-arm64/cupcake-rpi-arm64
+          mv ${{ runner.temp }}/output/cupcake-rpi-arm64/cupcake-rpi-arm64.xz ${{ runner.temp }}/output/compressed/
 
       - name: Upload RPi image
         uses: actions/upload-artifact@v4
         with:
           name: cupcake-rpi-arm64
-          path: output/
+          path: ${{ runner.temp }}/output/compressed/
           retention-days: 7
           if-no-files-found: warn
 

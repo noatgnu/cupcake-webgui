@@ -2,7 +2,53 @@
 set -eux
 
 # Deploy systemd units
-cp /tmp/packer-systemd/*.service /etc/systemd/system/
+
+cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
+[Unit]
+Description=Cupcake Django Backend (Gunicorn)
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=cupcake
+Group=cupcake
+WorkingDirectory=/opt/cupcake/backend
+EnvironmentFile=/opt/cupcake/.env
+ExecStart=/opt/cupcake/venv/bin/gunicorn cupcake_vanilla.asgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --timeout 300 \
+    -k uvicorn.workers.UvicornWorker \
+    --log-level info \
+    --access-logfile /var/log/cupcake/gunicorn-access.log \
+    --error-logfile /var/log/cupcake/gunicorn-error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
+cat > /etc/systemd/system/cupcake-rqworker.service << 'UNITEOF'
+[Unit]
+Description=Cupcake RQ Worker
+After=cupcake-backend.service
+Requires=cupcake-backend.service
+
+[Service]
+Type=simple
+User=cupcake
+Group=cupcake
+WorkingDirectory=/opt/cupcake/backend
+EnvironmentFile=/opt/cupcake/.env
+ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
 
 systemctl daemon-reload
 systemctl enable cupcake-backend.service
@@ -14,5 +60,4 @@ apt-get autoremove -y
 rm -rf /var/lib/apt/lists/*
 rm -rf /tmp/*
 
-# Remove packer SSH key
 rm -f /home/cupcake/.ssh/authorized_keys
