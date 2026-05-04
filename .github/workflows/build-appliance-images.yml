@@ -85,7 +85,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client python3
 
       - name: Fix /dev/kvm permissions
         run: sudo chmod 666 /dev/kvm 2>/dev/null || true
@@ -112,15 +112,23 @@ jobs:
       - name: Boot VM and wait for SSH
         timeout-minutes: 20
         run: |
+          # Extract kernel and initrd from ISO for explicit autoinstall boot
+          mkdir -p /tmp/iso
+          sudo mount ubuntu.iso /tmp/iso
+          cp /tmp/iso/casper/vmlinuz .
+          cp /tmp/iso/casper/initrd .
+          sudo umount /tmp/iso
+
           qemu-system-x86_64 \
             -m 4096 -smp 2 \
+            -kernel vmlinuz -initrd initrd \
+            -append "autoinstall ds=nocloud console=ttyS0" \
             -drive file=disk.qcow2,format=qcow2,if=virtio \
-            -cdrom ubuntu.iso \
             -drive file=seed.iso,format=raw,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=net0 \
             -machine type=pc,accel=kvm -cpu host \
-            -display none -serial none -no-reboot &
+            -display none -serial file:serial.log -no-reboot &
           QEMU_PID=$!
           echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
 
@@ -132,7 +140,8 @@ jobs:
             sleep 5
           done
           kill $QEMU_PID 2>/dev/null || true
-          echo "SSH never came up"
+          echo "=== SSH never came up. Serial console output: ==="
+          cat serial.log 2>/dev/null | tail -50
           exit 1
 
       - name: Provision base
@@ -216,13 +225,12 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt debootstrap zerofree zip dosfstools \
             libarchive-tools rsync xz-utils file git curl bc gpg pigz \
-            qemu-user-static binfmt-support
+            qemu-user-static binfmt-support qemu-user-binfmt arch-test
 
       - name: Enable ARM64 emulation
         run: |
           sudo modprobe binfmt_misc
           sudo update-binfmts --enable qemu-aarch64 || true
-          echo ':aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F' | sudo tee /proc/sys/fs/binfmt_misc/register || true
           /usr/bin/qemu-aarch64-static --version
 
       - name: Clone pi-gen
