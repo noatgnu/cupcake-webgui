@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -8,9 +8,10 @@ import type { MaintenanceLog } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-maintenance-log-edit-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './maintenance-log-edit-modal.html',
-  styleUrl: './maintenance-log-edit-modal.scss'
+  styleUrl: './maintenance-log-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MaintenanceLogEditModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -69,8 +70,7 @@ export class MaintenanceLogEditModal implements OnInit {
         this.filteredTemplates.set(response.results);
         this.loadingTemplates.set(false);
       },
-      error: (err) => {
-        console.error('Error loading templates:', err);
+      error: () => {
         this.loadingTemplates.set(false);
       }
     });
@@ -137,7 +137,6 @@ export class MaintenanceLogEditModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to update maintenance log');
-          console.error('Error updating maintenance log:', err);
           this.saving.set(false);
         }
       });
@@ -158,7 +157,6 @@ export class MaintenanceLogEditModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to create maintenance log');
-          console.error('Error creating maintenance log:', err);
           this.saving.set(false);
         }
       });

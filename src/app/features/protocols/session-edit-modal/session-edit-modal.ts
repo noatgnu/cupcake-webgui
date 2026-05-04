@@ -1,5 +1,5 @@
 import { Component, inject, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService } from '@noatgnu/cupcake-red-velvet';
@@ -8,7 +8,7 @@ import { ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-session-edit-modal',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './session-edit-modal.html',
   styleUrl: './session-edit-modal.scss'
 })
@@ -61,7 +61,6 @@ export class SessionEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update session');
-        console.error('Error updating session:', err);
         this.saving = false;
       }
     });

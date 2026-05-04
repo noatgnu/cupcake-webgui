@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -8,9 +8,10 @@ import type { Instrument, InstrumentDetail, InstrumentUsage } from '@noatgnu/cup
 
 @Component({
   selector: 'app-instrument-usage-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './instrument-usage-modal.html',
-  styleUrl: './instrument-usage-modal.scss'
+  styleUrl: './instrument-usage-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentUsageModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -79,7 +80,6 @@ export class InstrumentUsageModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to update booking');
-          console.error('Error updating instrument usage:', err);
           this.saving.set(false);
         }
       });
@@ -99,7 +99,6 @@ export class InstrumentUsageModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to create booking');
-          console.error('Error creating instrument usage:', err);
           this.saving.set(false);
         }
       });

@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal, ElementRef, ViewChild, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ElementRef, ViewChild, effect } from '@angular/core';
+
 import { Router } from '@angular/router';
 import { MessageThreadService } from '@noatgnu/cupcake-mint-chocolate';
 import type { MessageThread } from '@noatgnu/cupcake-mint-chocolate';
@@ -7,9 +7,10 @@ import { DropdownCoordinator } from '../../services/dropdown-coordinator';
 
 @Component({
   selector: 'app-messaging-dropdown',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './messaging-dropdown.html',
-  styleUrl: './messaging-dropdown.scss'
+  styleUrl: './messaging-dropdown.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MessagingDropdown implements OnInit {
   private messageThreadService = inject(MessageThreadService);
@@ -46,8 +47,7 @@ export class MessagingDropdown implements OnInit {
         this.unreadCount.set(totalUnread);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading message threads:', err);
+      error: () => {
         this.loading.set(false);
       }
     });

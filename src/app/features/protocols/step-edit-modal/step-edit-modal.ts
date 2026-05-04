@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, Input, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
@@ -12,7 +12,7 @@ import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
 
 @Component({
   selector: 'app-step-edit-modal',
-  imports: [CommonModule, ReactiveFormsModule, DurationInput, QuillModule, StepTemplatePipe],
+  imports: [ReactiveFormsModule, DurationInput, QuillModule, StepTemplatePipe],
   templateUrl: './step-edit-modal.html',
   styleUrl: './step-edit-modal.scss'
 })
@@ -74,8 +74,7 @@ export class StepEditModal implements OnInit {
         this.reagents = response.results;
         this.filteredReagents = [...this.reagents];
       },
-      error: (err) => {
-        console.error('Error loading step reagents:', err);
+      error: () => {
       }
     });
   }
@@ -96,8 +95,6 @@ export class StepEditModal implements OnInit {
     this.currentCursorIndex = index;
     const text = event.text || '';
 
-    console.log('Content changed:', { index, text: text.substring(Math.max(0, index - 5), index + 5), char: text[index - 1] });
-
     let searchStart = -1;
     for (let i = index - 1; i >= 0; i--) {
       const char = text[i];
@@ -115,11 +112,8 @@ export class StepEditModal implements OnInit {
       }
     }
 
-    console.log('Search start:', searchStart, 'Reagents:', this.reagents.length, 'Filtered:', this.filteredReagents.length);
-
     if (searchStart >= 0 && searchStart <= index) {
       const searchTerm = text.substring(searchStart, index).toLowerCase();
-      console.log('Showing dropdown with search term:', searchTerm);
       this.filterReagents(searchTerm);
       this.showDropdownAtCursor();
     } else {
@@ -148,24 +142,14 @@ export class StepEditModal implements OnInit {
   }
 
   showDropdownAtCursor(): void {
-    console.log('showDropdownAtCursor called', {
-      hasEditor: !!this.quillEditor,
-      hasDropdown: !!this.dropdownMenu?.nativeElement,
-      currentCursorIndex: this.currentCursorIndex
-    });
-
     if (!this.quillEditor || !this.dropdownMenu?.nativeElement) {
-      console.log('Missing editor or dropdown element');
       return;
     }
 
     const bounds = this.quillEditor.getBounds(this.currentCursorIndex);
     if (!bounds) {
-      console.log('No bounds found for cursor position');
       return;
     }
-
-    console.log('Bounds:', bounds);
 
     const editorContainer = this.quillEditor.container;
     const editorRect = editorContainer.getBoundingClientRect();
@@ -176,13 +160,6 @@ export class StepEditModal implements OnInit {
     menuEl.style.left = `${editorRect.left + bounds.left}px`;
     menuEl.style.top = `${editorRect.top + bounds.bottom + 5}px`;
     menuEl.style.display = 'block';
-
-    console.log('Dropdown should now be visible at', {
-      left: menuEl.style.left,
-      top: menuEl.style.top,
-      bounds,
-      editorRect
-    });
   }
 
   hasScalableReagents(): boolean {
@@ -208,7 +185,6 @@ export class StepEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update step');
-        console.error('Error updating step:', err);
         this.saving = false;
       }
     });

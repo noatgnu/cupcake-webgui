@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ContactService, ExternalContact } from '@noatgnu/cupcake-macaron';
@@ -8,9 +8,10 @@ import { ExternalContactModal } from '../external-contact-modal/external-contact
 
 @Component({
   selector: 'app-contacts-management-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './contacts-management-modal.html',
-  styleUrl: './contacts-management-modal.scss'
+  styleUrl: './contacts-management-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ContactsManagementModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -34,7 +35,6 @@ export class ContactsManagementModal implements OnInit {
         this.loading.set(false);
       },
       error: (error) => {
-        console.error('Error loading contacts:', error);
         this.toastService.error('Failed to load contacts');
         this.loading.set(false);
       }
@@ -68,7 +68,6 @@ export class ContactsManagementModal implements OnInit {
           this.loadContacts();
         },
         error: (error) => {
-          console.error('Error deleting contact:', error);
           this.toastService.error('Failed to delete contact');
         }
       });

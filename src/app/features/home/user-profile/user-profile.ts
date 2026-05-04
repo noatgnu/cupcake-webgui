@@ -1,20 +1,21 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { AuthService, ToastService, User, UserManagementService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-user-profile',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './user-profile.html',
-  styleUrl: './user-profile.scss'
+  styleUrl: './user-profile.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserProfile implements OnInit {
   private authService = inject(AuthService);
   private userManagementService = inject(UserManagementService);
   private toastService = inject(ToastService);
 
-  currentUser = signal<User | null>(null);
+  currentUser = signal<User | null>(this.authService.currentUser());
   editMode = signal(false);
   changePasswordMode = signal(false);
 
@@ -30,22 +31,12 @@ export class UserProfile implements OnInit {
   changingPassword = signal(false);
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
-    this.currentUser.set(user);
+    const user = this.authService.currentUser();
     if (user) {
       this.firstName = user.firstName || '';
       this.lastName = user.lastName || '';
       this.email = user.email || '';
     }
-
-    this.authService.currentUser$.subscribe(updatedUser => {
-      this.currentUser.set(updatedUser);
-      if (updatedUser) {
-        this.firstName = updatedUser.firstName || '';
-        this.lastName = updatedUser.lastName || '';
-        this.email = updatedUser.email || '';
-      }
-    });
   }
 
   toggleEditMode(): void {
@@ -99,7 +90,6 @@ export class UserProfile implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update profile');
-        console.error('Error updating profile:', err);
         this.saving.set(false);
       }
     });
@@ -142,7 +132,6 @@ export class UserProfile implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to change password');
-        console.error('Error changing password:', err);
         this.changingPassword.set(false);
       }
     });

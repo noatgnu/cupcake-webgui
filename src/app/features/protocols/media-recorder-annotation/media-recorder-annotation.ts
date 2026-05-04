@@ -1,14 +1,15 @@
-import { Component, OnInit, OnDestroy, signal, Output, EventEmitter, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, signal, Output, EventEmitter, inject, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '@noatgnu/cupcake-core';
 import { AudioVisualizer } from '../../../shared/components/audio-visualizer/audio-visualizer';
 
 @Component({
   selector: 'app-media-recorder-annotation',
-  imports: [CommonModule, FormsModule, AudioVisualizer],
+  imports: [FormsModule, AudioVisualizer],
   templateUrl: './media-recorder-annotation.html',
-  styleUrl: './media-recorder-annotation.scss'
+  styleUrl: './media-recorder-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MediaRecorderAnnotation implements OnInit, OnDestroy {
   private toastService = inject(ToastService);
@@ -55,7 +56,6 @@ export class MediaRecorderAnnotation implements OnInit, OnDestroy {
         this.selectedVideoDevice.set(videoInputs[0].deviceId);
       }
     } catch (error) {
-      console.error('Error enumerating devices:', error);
       this.toastService.error('Failed to access media devices');
     }
   }
@@ -72,7 +72,6 @@ export class MediaRecorderAnnotation implements OnInit, OnDestroy {
         await this.startScreenRecording();
       }
     } catch (error) {
-      console.error('Error starting recording:', error);
       this.toastService.error('Failed to start recording');
     }
   }
@@ -117,7 +116,6 @@ export class MediaRecorderAnnotation implements OnInit, OnDestroy {
         const audioStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
         tracks.push(...audioStream.getAudioTracks());
       } catch (error) {
-        console.warn('Could not access microphone for screen recording:', error);
       }
     }
 
@@ -160,7 +158,6 @@ export class MediaRecorderAnnotation implements OnInit, OnDestroy {
       this.recording.set(true);
       this.startDurationTimer();
     } catch (error) {
-      console.error('Error starting MediaRecorder:', error);
       this.toastService.error('Failed to start recording');
       this.stopMediaStream();
     }

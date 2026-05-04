@@ -1,14 +1,15 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { StoredReagent, ReagentService } from '@noatgnu/cupcake-macaron';
 import { LabGroup, LabGroupService, User, UserManagementService, ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-stored-reagent-access-modal',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './stored-reagent-access-modal.html',
-  styleUrl: './stored-reagent-access-modal.scss'
+  styleUrl: './stored-reagent-access-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StoredReagentAccessModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -63,7 +64,6 @@ export class StoredReagentAccessModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load lab groups');
-        console.error('Error loading lab groups:', err);
         this.loading.set(false);
       }
     });
@@ -80,7 +80,6 @@ export class StoredReagentAccessModal implements OnInit {
       },
       error: (err: any) => {
         this.toastService.error('Failed to load users');
-        console.error('Error loading users:', err);
         this.loading.set(false);
       }
     });
@@ -175,7 +174,6 @@ export class StoredReagentAccessModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update access permissions');
-        console.error('Error updating access permissions:', err);
         this.saving.set(false);
       }
     });

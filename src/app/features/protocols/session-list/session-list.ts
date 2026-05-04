@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -12,7 +12,8 @@ import { SessionEditModal } from '../session-edit-modal/session-edit-modal';
   selector: 'app-session-list',
   imports: [CommonModule, FormsModule],
   templateUrl: './session-list.html',
-  styleUrl: './session-list.scss'
+  styleUrl: './session-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionList implements OnInit {
   private sessionService = inject(SessionService);
@@ -77,7 +78,6 @@ export class SessionList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load sessions');
-        console.error('Error loading sessions:', err);
         this.loading.set(false);
       }
     });
@@ -110,7 +110,6 @@ export class SessionList implements OnInit {
         this.loadingProtocols.set(false);
       })
       .catch(err => {
-        console.error('Error loading protocols:', err);
         this.toastService.error('Failed to load session protocols');
         this.loadingProtocols.set(false);
       });
@@ -149,7 +148,6 @@ export class SessionList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete session');
-        console.error('Error deleting session:', err);
       }
     });
   }
@@ -166,7 +164,6 @@ export class SessionList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update session');
-        console.error('Error updating session:', err);
       }
     });
   }

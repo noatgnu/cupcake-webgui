@@ -1,4 +1,4 @@
-import { Component, Input, inject, signal, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, inject, signal, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Project } from '@noatgnu/cupcake-red-velvet';
@@ -9,7 +9,8 @@ import { SessionService, Session } from '@noatgnu/cupcake-red-velvet';
   selector: 'app-project-detail',
   imports: [CommonModule],
   templateUrl: './project-detail.html',
-  styleUrl: './project-detail.scss'
+  styleUrl: './project-detail.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectDetail implements OnInit, OnChanges {
   @Input() project!: Project;
@@ -46,8 +47,7 @@ export class ProjectDetail implements OnInit, OnChanges {
         this.jobs.set(response.results);
         this.loadingJobs.set(false);
       },
-      error: (err) => {
-        console.error('Error loading jobs:', err);
+      error: () => {
         this.loadingJobs.set(false);
       }
     });
@@ -60,8 +60,7 @@ export class ProjectDetail implements OnInit, OnChanges {
         this.sessions.set(response.results);
         this.loadingSessions.set(false);
       },
-      error: (err) => {
-        console.error('Error loading sessions:', err);
+      error: () => {
         this.loadingSessions.set(false);
       }
     });

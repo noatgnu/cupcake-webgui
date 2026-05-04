@@ -1,9 +1,8 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { InstrumentJobService, InstrumentJob, Status } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService } from '@noatgnu/cupcake-core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { MetadataTableEditor } from '../../metadata/metadata-table-editor/metadata-table-editor';
 import { JobAnnotationsSection } from './job-annotations-section/job-annotations-section';
@@ -13,7 +12,8 @@ import { JobEditModal } from '../job-edit-modal/job-edit-modal';
   selector: 'app-job-detail',
   imports: [CommonModule, MetadataTableEditor, JobAnnotationsSection],
   templateUrl: './job-detail.html',
-  styleUrl: './job-detail.scss'
+  styleUrl: './job-detail.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobDetail implements OnInit {
   private instrumentJobService = inject(InstrumentJobService);
@@ -26,7 +26,7 @@ export class JobDetail implements OnInit {
   job = signal<InstrumentJob | null>(null);
   loading = signal(false);
 
-  currentUser = toSignal(this.authService.currentUser$);
+  currentUser = this.authService.currentUser;
 
   canEdit = computed(() => {
     const jobValue = this.job();
@@ -98,7 +98,6 @@ export class JobDetail implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading job:', err);
         this.toastService.error('Failed to load job');
         this.loading.set(false);
         this.router.navigate(['/jobs']);

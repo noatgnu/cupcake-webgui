@@ -1,8 +1,7 @@
-import { Component, inject, Input, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 import { ReagentService, StoredReagent, ReagentAlertType, ReagentAlertTypeLabels } from '@noatgnu/cupcake-macaron';
 import { ImageUpload } from '../../../shared/components/image-upload/image-upload';
@@ -10,9 +9,10 @@ import { BarcodeInput } from '../../../shared/components/barcode-input/barcode-i
 
 @Component({
   selector: 'app-stored-reagent-edit-modal',
-  imports: [CommonModule, FormsModule, ImageUpload, BarcodeInput],
+  imports: [FormsModule, ImageUpload, BarcodeInput],
   templateUrl: './stored-reagent-edit-modal.html',
-  styleUrl: './stored-reagent-edit-modal.scss'
+  styleUrl: './stored-reagent-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StoredReagentEditModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -41,7 +41,7 @@ export class StoredReagentEditModal implements OnInit {
   readonly ReagentAlertType = ReagentAlertType;
   readonly reagentAlertTypeLabels = ReagentAlertTypeLabels;
 
-  currentUser = toSignal(this.authService.currentUser$);
+  currentUser = this.authService.currentUser;
   isStaffOrAdmin = computed(() => {
     const user = this.currentUser();
     return user?.isStaff || user?.isSuperuser || false;
@@ -104,7 +104,6 @@ export class StoredReagentEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update stored reagent');
-        console.error('Error updating stored reagent:', err);
         this.saving.set(false);
       }
     });
@@ -134,7 +133,6 @@ export class StoredReagentEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error(err.error?.error || 'Failed to send test notification');
-        console.error('Error sending test notification:', err);
         this.sendingNotification.set(false);
       }
     });

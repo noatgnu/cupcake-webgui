@@ -4,7 +4,7 @@
     <div class="d-flex align-items-center gap-2">
       <img src="cupcake_logo.png" alt="Cupcake" class="sidebar-logo" style="height: 32px;">
       @if (!isCollapsed()) {
-        <h5 class="mb-0 fw-bold">{{ (siteConfig$ | async)?.siteName || 'Cupcake' }}</h5>
+        <h5 class="mb-0 fw-bold">{{ siteConfig()?.siteName || 'Cupcake' }}</h5>
       }
     </div>
   </div>
@@ -79,7 +79,7 @@
 
   <!-- Sidebar Footer -->
   <div class="sidebar-footer p-3 border-top">
-    @if (currentUser$ | async; as user) {
+    @if (currentUser(); as user) {
       @if (isCollapsed()) {
         <div class="d-flex flex-column align-items-center gap-2 mb-2">
           <i class="bi bi-person-circle fs-4"></i>
@@ -141,7 +141,7 @@
         <i class="bi bi-info-circle"></i>
         <span>Version 1.0.0</span>
       </div>
-      @if ((siteConfig$ | async)?.showPoweredBy !== false) {
+      @if (siteConfig()?.showPoweredBy !== false) {
         <div class="d-flex align-items-center gap-2 text-muted small justify-content-center mt-1">
           <i class="bi bi-lightning-charge text-warning"></i>
           <span style="font-size: 0.7rem;">Powered by <strong>CUPCAKE</strong></span>

@@ -1,4 +1,4 @@
-import { Component, Input, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
@@ -17,7 +17,6 @@ import {
 } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { AddAnnotationModal } from './add-annotation-modal/add-annotation-modal';
 import { WebvttEditor } from '../../protocols/webvtt-editor/webvtt-editor';
 import { Subscription } from 'rxjs';
@@ -27,6 +26,7 @@ import { Subscription } from 'rxjs';
   imports: [CommonModule, FormsModule, NgbModule, WebvttEditor],
   templateUrl: './job-annotations.html',
   styleUrl: './job-annotations.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobAnnotations implements OnInit, OnDestroy {
   private annotationService = inject(InstrumentJobAnnotationService);
@@ -58,7 +58,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
   userAnnotations = signal<InstrumentJobAnnotation[]>([]);
   staffAnnotations = signal<InstrumentJobAnnotation[]>([]);
   loading = signal(false);
-  currentUser = toSignal(this.authService.currentUser$);
+  currentUser = this.authService.currentUser;
   activeTab = signal<'user' | 'staff'>('user');
   searchQuery = signal('');
   selectedTypeFilter = signal<string>('all');
@@ -214,19 +214,14 @@ export class JobAnnotations implements OnInit, OnDestroy {
   }
 
   private handleTranscriptionCompleted(annotationId: number): void {
-    console.log('JobAnnotations: handleTranscriptionCompleted called for annotation:', annotationId);
     const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
     const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
     const annotation = userAnnotation || staffAnnotation;
 
-    console.log('JobAnnotations: Found annotation:', annotation?.id, 'User:', !!userAnnotation, 'Staff:', !!staffAnnotation);
-
     if (annotation && annotation.id) {
       const transcribing = this.transcribingAnnotations();
-      console.log('JobAnnotations: Current transcribing set before delete:', Array.from(transcribing));
       transcribing.delete(annotationId);
       this.transcribingAnnotations.set(new Set(transcribing));
-      console.log('JobAnnotations: Current transcribing set after delete:', Array.from(transcribing));
 
       const progress = this.transcriptionProgress();
       progress.delete(annotationId);
@@ -236,44 +231,33 @@ export class JobAnnotations implements OnInit, OnDestroy {
 
       this.annotationService.getInstrumentJobAnnotation(annotation.id).subscribe({
         next: (updatedAnnotation) => {
-          console.log('JobAnnotations: Received updated annotation:', updatedAnnotation.id);
           if (userAnnotation) {
             this.userAnnotations.update(annotations =>
               annotations.map(a => a.id === annotation.id ? updatedAnnotation : a)
             );
-            console.log('JobAnnotations: Updated user annotations');
           } else if (staffAnnotation) {
             this.staffAnnotations.update(annotations =>
               annotations.map(a => a.id === annotation.id ? updatedAnnotation : a)
             );
-            console.log('JobAnnotations: Updated staff annotations');
           }
         },
-        error: (err) => {
-          console.error('JobAnnotations: Error fetching updated annotation after transcription:', err);
-        }
+        error: () => {}
       });
-    } else {
-      console.log('JobAnnotations: No annotation found to update for ID:', annotationId);
     }
   }
 
   private handleAsyncTaskUpdate(message: any): void {
-    console.log('JobAnnotations: handleAsyncTaskUpdate received message:', message);
     const task = message as AsyncTaskStatus;
 
-    if (!task || !task.result || !task.result.annotation_id) {
-      console.log('JobAnnotations: No annotation_id in task result');
+    if (!task || !task.result || !task.result['annotation_id']) {
       return;
     }
 
     if (task.taskType !== TaskType.TRANSCRIBE_AUDIO && task.taskType !== TaskType.TRANSCRIBE_VIDEO) {
-      console.log('JobAnnotations: Task is not transcription type:', task.taskType);
       return;
     }
 
-    const annotationId = task.result.annotation_id;
-    console.log('JobAnnotations: Processing transcription update for annotation:', annotationId);
+    const annotationId = task.result['annotation_id'] as number;
     const userAnnotation = this.userAnnotations().find(a => a.annotation === annotationId);
     const staffAnnotation = this.staffAnnotations().find(a => a.annotation === annotationId);
 
@@ -284,9 +268,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         description: task.progressDescription || ''
       });
       this.transcriptionProgress.set(new Map(progress));
-      console.log('JobAnnotations: Updated transcription progress:', annotationId, task.progressPercentage);
-    } else {
-      console.log('JobAnnotations: Annotation not found in current lists');
     }
   }
 
@@ -313,7 +294,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading user annotations:', err);
         this.toastService.error('Failed to load user annotations');
         this.loading.set(false);
       }
@@ -337,7 +317,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading staff annotations:', err);
         this.toastService.error('Failed to load staff annotations');
         this.loading.set(false);
       }
@@ -428,7 +407,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error creating text annotation:', err);
         this.toastService.error('Failed to add text annotation');
       }
     });
@@ -464,7 +442,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error uploading file:', err);
         this.toastService.error('Failed to upload file');
       }
     });
@@ -500,21 +477,18 @@ export class JobAnnotations implements OnInit, OnDestroy {
                 this.loading.set(false);
               },
               error: (err) => {
-                console.error('Error linking booking to annotation:', err);
                 this.toastService.error('Failed to link booking to annotation');
                 this.loading.set(false);
               }
             });
           },
           error: (err) => {
-            console.error('Error creating job annotation for booking:', err);
             this.toastService.error('Failed to create job annotation for booking');
             this.loading.set(false);
           }
         });
       },
       error: (err) => {
-        console.error('Error creating instrument booking:', err);
         this.toastService.error('Failed to create instrument booking');
         this.loading.set(false);
       }
@@ -544,7 +518,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error creating calculator annotation:', err);
         this.toastService.error('Failed to add calculator annotation');
       }
     });
@@ -573,7 +546,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error creating molarity annotation:', err);
         this.toastService.error('Failed to add molarity annotation');
       }
     });
@@ -609,7 +581,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error updating annotation:', err);
         this.toastService.error('Failed to update annotation');
       }
     });
@@ -642,7 +613,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error deleting annotation:', err);
         this.toastService.error('Failed to delete annotation');
       }
     });
@@ -707,7 +677,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
           this.transcribingAnnotations.set(new Set(transcribing));
         },
         error: (err) => {
-          console.error('Error retriggering transcription:', err);
           this.toastService.error(err.error?.error || 'Failed to retrigger transcription');
         }
       });
@@ -773,8 +742,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
                 this.loadInstrumentData(usage.instrument);
               }
             },
-            error: (err) => {
-              console.error(`Error loading booking data for usage ${link.instrumentUsage}:`, err);
+            error: () => {
               this.loadingBookings.update(loading => {
                 const newSet = new Set(loading);
                 newSet.delete(annotationId);
@@ -790,8 +758,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
           });
         }
       },
-      error: (err) => {
-        console.error(`Error loading booking link for annotation ${annotationId}:`, err);
+      error: () => {
         this.loadingBookings.update(loading => {
           const newSet = new Set(loading);
           newSet.delete(annotationId);
@@ -826,8 +793,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
           return newSet;
         });
       },
-      error: (err) => {
-        console.error(`Error loading instrument metadata ${instrumentId}:`, err);
+      error: () => {
         this.loadingInstrumentMetadata.update(loading => {
           const newSet = new Set(loading);
           newSet.delete(instrumentId);
@@ -876,7 +842,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error updating transcription:', err);
         this.toastService.error(err.error?.error || 'Failed to update transcription');
       }
     });
@@ -900,7 +865,6 @@ export class JobAnnotations implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Error fetching fresh download URL:', err);
         this.toastService.error('Failed to download file');
       }
     });

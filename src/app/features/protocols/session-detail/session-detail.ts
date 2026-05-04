@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed, OnDestroy, AfterViewInit, ViewChildren, QueryList, ElementRef } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, OnDestroy, AfterViewInit, ViewChildren, QueryList, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -8,7 +8,6 @@ import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepSe
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
-import type { SiteConfig } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
@@ -34,7 +33,8 @@ interface MolarityHistoryData {
   selector: 'app-session-detail',
   imports: [CommonModule, FormsModule, RouterLink, DurationFormatPipe, StepTemplatePipe, WebvttEditor, SessionWebrtcPanel],
   templateUrl: './session-detail.html',
-  styleUrl: './session-detail.scss'
+  styleUrl: './session-detail.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   @ViewChildren('sketchCanvas') sketchCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
@@ -69,7 +69,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   readonly AnnotationType = AnnotationType;
   readonly PeerRole = PeerRole;
 
-  siteConfig = signal<SiteConfig | null>(null);
+  siteConfig = this.siteConfigService.siteConfig;
   session = signal<Session | null>(null);
   protocols = signal<ProtocolModel[]>([]);
   selectedProtocolIndex = signal(0);
@@ -77,7 +77,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
 
   webrtcRole = computed(() => {
     const currentSession = this.session();
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.currentUser();
 
     if (!currentSession || !currentUser) {
       return PeerRole.PARTICIPANT;
@@ -223,7 +223,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
 
   canDeleteAnnotations = computed(() => {
     const currentSession = this.session();
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.currentUser();
 
     if (!currentUser || !currentSession) return false;
 
@@ -243,9 +243,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   });
 
   ngOnInit(): void {
-    this.siteConfigService.config$.pipe(takeUntil(this.destroy$)).subscribe(config => {
-      this.siteConfig.set(config);
-    });
 
     const id = this.route.snapshot.paramMap.get('id');
 
@@ -347,13 +344,13 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   private handleAsyncTaskUpdate(message: any): void {
     const task = message as AsyncTaskStatus;
 
-    if (!task || !task.result || !task.result.annotation_id) return;
+    if (!task || !task.result || !task.result['annotation_id']) return;
 
     if (task.taskType !== TaskType.TRANSCRIBE_AUDIO && task.taskType !== TaskType.TRANSCRIBE_VIDEO) {
       return;
     }
 
-    const annotationId = task.result.annotation_id;
+    const annotationId = task.result['annotation_id'] as number;
     const stepAnns = this.stepAnnotations();
     const stepAnn = stepAnns.find(sa => sa.annotation === annotationId);
 
@@ -379,8 +376,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           );
           this.stepAnnotations.set(updated);
         },
-        error: (err) => {
-          console.error('Failed to refresh step annotation:', err);
+        error: () => {
         }
       });
     }
@@ -429,7 +425,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
                 }
               },
               error: (err: any) => {
-                console.error('Error finding annotation index:', err);
                 this.toastService.error('Failed to navigate to annotation');
                 this.annotationsOffset.set(0);
                 this.annotationsLimit.set(1);
@@ -438,13 +433,11 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
             });
           },
           error: (err: any) => {
-            console.error('Error loading step details:', err);
             this.toastService.error('Failed to load step details');
           }
         });
       },
       error: (err: any) => {
-        console.error('Error loading annotation:', err);
         this.toastService.error('Failed to load annotation');
       }
     });
@@ -464,7 +457,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load session');
-        console.error('Error loading session:', err);
         this.router.navigate(['/protocols/sessions']);
       }
     });
@@ -491,7 +483,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load session');
-        console.error('Error loading session:', err);
         this.router.navigate(['/protocols/sessions']);
         this.loading.set(false);
       }
@@ -514,7 +505,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         }
       })
       .catch(err => {
-        console.error('Error loading protocols:', err);
         this.toastService.error('Failed to load protocols');
         this.loading.set(false);
       });
@@ -542,7 +532,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load sections');
-        console.error('Error loading sections:', err);
         this.loadingSections.set(false);
       }
     });
@@ -583,7 +572,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.loadStepAnnotations();
       })
       .catch(err => {
-        console.error('Error loading steps:', err);
         this.toastService.error('Failed to load steps');
         this.loadingSteps.set(false);
       });
@@ -596,8 +584,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         reagentsMap.set(stepId, response.results);
         this.stepReagents.set(reagentsMap);
       },
-      error: (err) => {
-        console.error('Error loading step reagents:', err);
+      error: () => {
       }
     });
   }
@@ -619,8 +606,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           }
         });
       },
-      error: (err) => {
-        console.error('Error loading reagent actions:', err);
+      error: () => {
       }
     });
   }
@@ -669,7 +655,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.toastService.success('Reagent booking deleted');
       },
       error: (err) => {
-        console.error('Error deleting reagent action:', err);
         const errorMsg = err.error?.detail || err.error?.message || 'Failed to delete reagent booking';
         this.toastService.error(errorMsg);
       }
@@ -743,19 +728,16 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     this.toastService.info('Generating export URL...');
     this.sessionService.getExportUrl(sessionValue.id).subscribe({
       next: (response) => {
-        console.log('Export URL response:', response);
         if (response && response.downloadUrl) {
           const opened = window.open(response.downloadUrl, '_blank');
           if (!opened) {
             this.toastService.warning('Please allow popups to download the export');
           }
         } else {
-          console.error('Invalid response format:', response);
           this.toastService.error('Invalid export URL response');
         }
       },
       error: (err) => {
-        console.error('Error getting export URL:', err);
         const errorMsg = err.error?.detail || err.error?.message || 'Failed to get export URL';
         this.toastService.error(errorMsg);
       }
@@ -795,7 +777,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to start session');
-        console.error('Error starting session:', err);
       }
     });
   }
@@ -815,7 +796,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to end session');
-        console.error('Error ending session:', err);
       }
     });
   }
@@ -859,8 +839,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           }
         });
       },
-      error: (err) => {
-        console.error('Error loading step annotations:', err);
+      error: () => {
         this.loadingAnnotations.set(false);
       }
     });
@@ -1023,8 +1002,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           }
         });
       },
-      error: (err) => {
-        console.error('Error loading timers:', err);
+      error: () => {
       }
     });
   }
@@ -1062,7 +1040,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (err) => {
           this.toastService.error('Failed to start timer');
-          console.error('Error starting timer:', err);
         }
       });
     } else if (remoteTimer.started) {
@@ -1087,7 +1064,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (err) => {
           this.toastService.error('Failed to start timer');
-          console.error('Error starting timer:', err);
         }
       });
     }
@@ -1105,7 +1081,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (err) => {
           this.toastService.error('Failed to pause timer');
-          console.error('Error pausing timer:', err);
         }
       });
     }
@@ -1129,7 +1104,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (err) => {
           this.toastService.error('Failed to reset timer on server');
-          console.error('Error resetting timer:', err);
         }
       });
     }
@@ -1198,21 +1172,18 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
               },
               error: (err) => {
                 this.toastService.error('Failed to link booking to step annotation');
-                console.error('Error linking booking:', err);
                 this.uploading.set(false);
               }
             });
           },
           error: (err) => {
             this.toastService.error('Failed to create step annotation for booking');
-            console.error('Error creating step annotation:', err);
             this.uploading.set(false);
           }
         });
       },
       error: (err) => {
         this.toastService.error('Failed to create instrument booking');
-        console.error('Error creating booking:', err);
         this.uploading.set(false);
       }
     });
@@ -1244,7 +1215,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to save calculator annotation');
-        console.error('Error saving calculator annotation:', err);
         this.uploading.set(false);
       }
     });
@@ -1276,7 +1246,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to save molarity annotation');
-        console.error('Error saving molarity annotation:', err);
         this.uploading.set(false);
       }
     });
@@ -1316,7 +1285,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to add annotation');
-        console.error('Error adding annotation:', err);
         this.uploading.set(false);
         this.uploadProgress.set(0);
       }
@@ -1343,7 +1311,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         }
       },
       error: (err) => {
-        console.error('Error updating transcription:', err);
         this.toastService.error('Failed to update transcription');
       }
     });
@@ -1369,7 +1336,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         }
       },
       error: (err) => {
-        console.error('Error updating translation:', err);
         this.toastService.error('Failed to update translation');
       }
     });
@@ -1390,7 +1356,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to toggle scratch status');
-        console.error('Error toggling scratch:', err);
       }
     });
   }
@@ -1400,7 +1365,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     try {
       return JSON.parse(annotationText);
     } catch (err) {
-      console.error('Error parsing calculator history:', err);
       return [];
     }
   }
@@ -1446,8 +1410,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           this.loadInstrumentData(booking.instrument);
         }
       },
-      error: (err) => {
-        console.error(`Error loading booking ${bookingId}:`, err);
+      error: () => {
         this.loadingBookings.update(loading => {
           const newSet = new Set(loading);
           newSet.delete(bookingId);
@@ -1482,8 +1445,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           return newSet;
         });
       },
-      error: (err) => {
-        console.error(`Error loading instrument metadata ${instrumentId}:`, err);
+      error: () => {
         this.loadingInstrumentMetadata.update(loading => {
           const newSet = new Set(loading);
           newSet.delete(instrumentId);
@@ -1522,8 +1484,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           return newSet;
         });
       },
-      error: (err) => {
-        console.error(`Error loading stored reagent metadata ${storedReagentId}:`, err);
+      error: () => {
         this.loadingReagentMetadata.update(loading => {
           const newSet = new Set(loading);
           newSet.delete(storedReagentId);
@@ -1550,8 +1511,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
           return newCache;
         });
       },
-      error: (err) => {
-        console.error(`Error loading stored reagent ${storedReagentId}:`, err);
+      error: () => {
       }
     });
   }
@@ -1587,7 +1547,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.toastService.success('Entry updated');
       },
       error: (err) => {
-        console.error('Error updating history entry:', err);
         this.toastService.error('Failed to update entry');
       }
     });
@@ -1653,7 +1612,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     navigator.clipboard.writeText(url).then(() => {
       this.toastService.success('Annotation link copied to clipboard');
     }).catch(err => {
-      console.error('Failed to copy URL:', err);
       this.toastService.error('Failed to copy link');
     });
   }
@@ -1675,7 +1633,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.loadStepAnnotations();
       },
       error: (err) => {
-        console.error('Error deleting annotation:', err);
         this.toastService.error('Failed to delete annotation');
       }
     });
@@ -1714,7 +1671,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         }
       },
       error: (err) => {
-        console.error('Error fetching fresh download URL:', err);
         this.toastService.error('Failed to download file');
       }
     });
@@ -1760,7 +1716,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       })
       .catch(error => {
         this.toastService.error('Failed to export SVG');
-        console.error('SVG export error:', error);
       });
   }
 
@@ -1797,7 +1752,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       })
       .catch(error => {
         this.toastService.error('Failed to export high-resolution image');
-        console.error('High-res export error:', error);
       });
   }
 
@@ -1903,7 +1857,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.renderSketchOnCanvas(canvas, vectorDataString);
       })
       .catch(error => {
-        console.error('Error loading sketch JSON:', error);
       });
   }
 
@@ -1965,7 +1918,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
 
       ctx.globalCompositeOperation = 'source-over';
     } catch (error) {
-      console.error('Error rendering sketch:', error);
     }
   }
 

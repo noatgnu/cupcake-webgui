@@ -1,5 +1,5 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, signal, inject, DOCUMENT, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ElementRef, ViewChild, AfterViewInit, signal, inject, DOCUMENT, effect, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ThemeService } from '@noatgnu/cupcake-core';
 
@@ -16,9 +16,10 @@ interface Stroke {
 
 @Component({
   selector: 'app-sketch-annotation',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './sketch-annotation.html',
   styleUrl: './sketch-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SketchAnnotation implements AfterViewInit {
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -37,6 +38,13 @@ export class SketchAnnotation implements AfterViewInit {
   canUndo = signal(false);
   canRedo = signal(false);
   useColorCorrection = signal(true);
+
+  private readonly colorCorrectionEffect = effect(() => {
+    this.useColorCorrection();
+    if (this.ctx) {
+      this.redrawCanvas();
+    }
+  });
 
   colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'];
   widths = [1, 2, 4, 8, 12];
@@ -81,7 +89,6 @@ export class SketchAnnotation implements AfterViewInit {
     const canvas = this.canvasRef.nativeElement;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error('Could not get canvas context');
       return;
     }
     this.ctx = ctx;
@@ -91,11 +98,6 @@ export class SketchAnnotation implements AfterViewInit {
 
     this.fillBackground();
     this.setupEventListeners();
-
-    effect(() => {
-      this.useColorCorrection();
-      this.redrawCanvas();
-    });
   }
 
   private fillBackground(): void {

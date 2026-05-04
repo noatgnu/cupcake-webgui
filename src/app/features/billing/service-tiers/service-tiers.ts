@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbPaginationModule, NgbTooltipModule, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -13,6 +13,7 @@ import { ServiceTierFormModal } from '../service-tier-form-modal/service-tier-fo
   imports: [BillingNavbar, CommonModule, FormsModule, NgbPaginationModule, NgbTooltipModule],
   templateUrl: './service-tiers.html',
   styleUrl: './service-tiers.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ServiceTiers implements OnInit {
   private serviceTierService = inject(ServiceTierService);
@@ -36,7 +37,7 @@ export class ServiceTiers implements OnInit {
   }
 
   isAdmin(): boolean {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user ? (user.isStaff || user.isSuperuser) : false;
   }
 
@@ -62,7 +63,6 @@ export class ServiceTiers implements OnInit {
         this.loading.set(false);
       },
       error: (err: any) => {
-        console.error('Error loading service tiers:', err);
         this.toastService.error('Failed to load service tiers');
         this.loading.set(false);
       }
@@ -139,7 +139,6 @@ export class ServiceTiers implements OnInit {
         this.loadServiceTiers();
       },
       error: (err) => {
-        console.error('Error deleting service tier:', err);
         this.toastService.error('Failed to delete service tier');
       }
     });

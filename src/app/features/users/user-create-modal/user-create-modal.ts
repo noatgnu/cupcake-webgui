@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -7,7 +7,7 @@ import { UserManagementService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-user-create-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './user-create-modal.html',
   styleUrl: './user-create-modal.scss'
 })
@@ -67,7 +67,6 @@ export class UserCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create user');
-        console.error('Error creating user:', err);
         this.saving = false;
       }
     });

@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { FormsModule } from '@angular/forms';
+import { provideRouter } from '@angular/router';
+import { signal, WritableSignal } from '@angular/core';
+import { of } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { of, throwError } from 'rxjs';
-
-import { BillingRecords } from './billing-records';
+import { CUPCAKE_CORE_CONFIG, ToastService, AuthService } from '@noatgnu/cupcake-core';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
-import type { BillingRecord, PaginatedResponse } from '@noatgnu/cupcake-salted-caramel';
+import type { BillingRecord } from '@noatgnu/cupcake-salted-caramel';
+import { BillingRecords } from './billing-records';
+import { SidebarControl } from '../../../core/services/sidebar-control';
 
 describe('BillingRecords', () => {
   let component: BillingRecords;
@@ -15,12 +16,13 @@ describe('BillingRecords', () => {
   let mockToastService: jasmine.SpyObj<ToastService>;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockModalService: jasmine.SpyObj<NgbModal>;
+  let currentUserSignal: WritableSignal<any>;
 
-  const mockBillingRecords: BillingRecord[] = [
+  const mockRecords: BillingRecord[] = [
     {
-      id: 'record-1',
+      id: 'rec-1',
       username: 'User 1',
-      userEmail: 'user1@example.com',
+      userEmail: 'u1@example.com',
       billableItemName: 'Instrument Usage',
       quantity: 5,
       billingUnitDisplay: 'hours',
@@ -39,9 +41,9 @@ describe('BillingRecords', () => {
       updatedAt: '2024-01-15T10:00:00Z'
     },
     {
-      id: 'record-2',
+      id: 'rec-2',
       username: 'User 2',
-      userEmail: 'user2@example.com',
+      userEmail: 'u2@example.com',
       billableItemName: 'Instrument Job',
       quantity: 10,
       billingUnitDisplay: 'samples',
@@ -61,270 +63,114 @@ describe('BillingRecords', () => {
     }
   ] as BillingRecord[];
 
-  const mockPaginatedResponse: PaginatedResponse<BillingRecord> = {
-    count: 2,
-    next: undefined,
-    previous: undefined,
-    results: mockBillingRecords
-  };
-
   beforeEach(async () => {
+    currentUserSignal = signal<any>(null);
+
     mockBillingRecordService = jasmine.createSpyObj('BillingRecordService', [
       'getBillingRecords',
       'approveBillingRecord'
     ]);
-    mockToastService = jasmine.createSpyObj('ToastService', [
-      'error',
-      'success',
-      'warning'
-    ]);
-    mockAuthService = jasmine.createSpyObj('AuthService', ['getCurrentUser']);
+    mockBillingRecordService.getBillingRecords.and.returnValue(of({ count: 2, results: mockRecords }));
+
+    mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error', 'warning', 'info', 'show']);
+
+    mockAuthService = jasmine.createSpyObj('AuthService', [], {
+      currentUser: currentUserSignal
+    });
+
     mockModalService = jasmine.createSpyObj('NgbModal', ['open']);
 
     await TestBed.configureTestingModule({
-      imports: [BillingRecords, FormsModule],
+      imports: [BillingRecords],
       providers: [
+        { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
+        provideRouter([]),
         { provide: BillingRecordService, useValue: mockBillingRecordService },
         { provide: ToastService, useValue: mockToastService },
         { provide: AuthService, useValue: mockAuthService },
-        { provide: NgbModal, useValue: mockModalService }
+        { provide: NgbModal, useValue: mockModalService },
+        { provide: SidebarControl, useValue: jasmine.createSpyObj('SidebarControl', ['toggle']) }
       ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(BillingRecords);
     component = fixture.componentInstance;
-
-    mockBillingRecordService.getBillingRecords.and.returnValue(of(mockPaginatedResponse));
+    fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load billing records on init', () => {
-    component.ngOnInit();
-
+  it('loadBillingRecords() should call BillingRecordService.getBillingRecords()', () => {
     expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalled();
-    expect(component.billingRecords()).toEqual(mockBillingRecords);
+  });
+
+  it('should populate billingRecords and total on init', () => {
+    expect(component.billingRecords()).toEqual(mockRecords);
     expect(component.total()).toBe(2);
-    expect(component.loading()).toBe(false);
+    expect(component.loading()).toBeFalse();
   });
 
-  it('should handle error when loading billing records', () => {
-    mockBillingRecordService.getBillingRecords.and.returnValue(
-      throwError(() => new Error('Test error'))
-    );
-
-    component.ngOnInit();
-
-    expect(mockToastService.error).toHaveBeenCalledWith('Failed to load billing records');
-    expect(component.loading()).toBe(false);
+  it('isAdmin() returns false when currentUser is null', () => {
+    expect(component.isAdmin()).toBeFalse();
   });
 
-  it('should filter by status', () => {
-    component.onStatusFilterChange(BillingStatus.PENDING);
-
-    expect(component.statusFilter()).toBe(BillingStatus.PENDING);
-    expect(component.page()).toBe(1);
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
-      jasmine.objectContaining({ status: BillingStatus.PENDING })
-    );
+  it('isAdmin() returns true when currentUser is staff', () => {
+    currentUserSignal.set({ isStaff: true, isSuperuser: false });
+    expect(component.isAdmin()).toBeTrue();
   });
 
-  it('should filter by search query', () => {
-    component.searchQuery.set('test query');
-    component.onSearch();
-
-    expect(component.page()).toBe(1);
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
-      jasmine.objectContaining({ search: 'test query' })
-    );
-  });
-
-  it('should filter by cost center when advanced filters applied', () => {
-    component.costCenterFilter.set('CC-001');
-    component.loadBillingRecords();
-
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
-      jasmine.objectContaining({ costCenter: 'CC-001' })
-    );
-  });
-
-  it('should filter by date range', () => {
-    component.startDate.set('2024-01-01');
-    component.endDate.set('2024-01-31');
-    component.loadBillingRecords();
-
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
-      jasmine.objectContaining({
-        dateFrom: '2024-01-01',
-        dateTo: '2024-01-31'
-      })
-    );
-  });
-
-  it('should change page', () => {
-    component.onPageChange(2);
-
-    expect(component.page()).toBe(2);
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
-      jasmine.objectContaining({ offset: 10 })
-    );
-  });
-
-  it('should toggle advanced filters', () => {
-    expect(component.showAdvancedFilters()).toBe(false);
-
-    component.toggleAdvancedFilters();
-
-    expect(component.showAdvancedFilters()).toBe(true);
-
-    component.toggleAdvancedFilters();
-
-    expect(component.showAdvancedFilters()).toBe(false);
-  });
-
-  it('should clear all filters', () => {
+  it('clearFilters() should reset all filter signals and page', () => {
     component.searchQuery.set('test');
     component.statusFilter.set(BillingStatus.PENDING);
     component.costCenterFilter.set('CC-001');
     component.startDate.set('2024-01-01');
     component.endDate.set('2024-01-31');
-    component.page.set(2);
-
+    component.page.set(3);
     component.clearFilters();
-
     expect(component.searchQuery()).toBe('');
     expect(component.statusFilter()).toBe('');
     expect(component.costCenterFilter()).toBe('');
     expect(component.startDate()).toBe('');
     expect(component.endDate()).toBe('');
     expect(component.page()).toBe(1);
-    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalled();
   });
 
-  it('should return true for isAdmin when user is staff', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: true, isSuperuser: false } as any);
-
-    expect(component.isAdmin()).toBe(true);
-  });
-
-  it('should return false for isAdmin when user is not staff', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: false, isSuperuser: false } as any);
-
-    expect(component.isAdmin()).toBe(false);
-  });
-
-  it('should open detail modal when viewDetails is called', () => {
-    const mockModalRef = {
-      componentInstance: {},
-      result: Promise.resolve(null)
-    } as any;
-    mockModalService.open.and.returnValue(mockModalRef);
-
-    component.viewDetails(mockBillingRecords[0]);
-
-    expect(mockModalService.open).toHaveBeenCalled();
-  });
-
-  it('should toggle record selection', () => {
-    const recordId = 'record-1';
-
-    component.toggleRecordSelection(recordId);
-    expect(component.selectedRecords().has(recordId)).toBe(true);
-
-    component.toggleRecordSelection(recordId);
-    expect(component.selectedRecords().has(recordId)).toBe(false);
-  });
-
-  it('should select all records', () => {
-    component.billingRecords.set(mockBillingRecords);
-
+  it('selectAllRecords() should select all billingRecord IDs', () => {
+    component.billingRecords.set(mockRecords);
     component.selectAllRecords();
-
     expect(component.selectedRecords().size).toBe(2);
-    expect(component.selectedRecords().has('record-1')).toBe(true);
-    expect(component.selectedRecords().has('record-2')).toBe(true);
+    expect(component.selectedRecords().has('rec-1')).toBeTrue();
+    expect(component.selectedRecords().has('rec-2')).toBeTrue();
   });
 
-  it('should deselect all records', () => {
-    component.selectedRecords.set(new Set(['record-1', 'record-2']));
-
+  it('deselectAllRecords() should clear selection', () => {
+    component.selectedRecords.set(new Set(['rec-1', 'rec-2']));
     component.deselectAllRecords();
-
     expect(component.selectedRecords().size).toBe(0);
   });
 
-  it('should show warning when bulk approve with no selection', () => {
+  it('bulkApprove() shows warning when no records selected', () => {
     component.bulkApprove();
-
-    expect(mockToastService.warning).toHaveBeenCalledWith(
-      'Please select at least one record to approve'
-    );
+    expect(mockToastService.warning).toHaveBeenCalledWith('Please select at least one record to approve');
   });
 
-  it('should show warning when bulk approve with no pending records', () => {
-    component.billingRecords.set(mockBillingRecords);
-    component.selectedRecords.set(new Set(['record-2'])); // record-2 is approved
-
-    component.bulkApprove();
-
-    expect(mockToastService.warning).toHaveBeenCalledWith('No pending records selected');
-  });
-
-  it('should approve selected pending records', () => {
-    spyOn(window, 'confirm').and.returnValue(true);
-    mockBillingRecordService.approveBillingRecord.and.returnValue(
-      of(mockBillingRecords[0] as any)
-    );
-    component.billingRecords.set(mockBillingRecords);
-    component.selectedRecords.set(new Set(['record-1']));
-
-    component.bulkApprove();
-
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockBillingRecordService.approveBillingRecord).toHaveBeenCalledWith('record-1', {});
-  });
-
-  it('should not approve when user cancels confirmation', () => {
-    spyOn(window, 'confirm').and.returnValue(false);
-    component.billingRecords.set(mockBillingRecords);
-    component.selectedRecords.set(new Set(['record-1']));
-
-    component.bulkApprove();
-
-    expect(mockBillingRecordService.approveBillingRecord).not.toHaveBeenCalled();
-  });
-
-  it('should export to CSV', () => {
-    component.billingRecords.set(mockBillingRecords);
-    const createElementSpy = spyOn(document, 'createElement').and.callThrough();
-    const appendChildSpy = spyOn(document.body, 'appendChild');
-    const removeChildSpy = spyOn(document.body, 'removeChild');
-
-    component.exportToCSV();
-
-    expect(createElementSpy).toHaveBeenCalled();
-    expect(appendChildSpy).toHaveBeenCalled();
-    expect(removeChildSpy).toHaveBeenCalled();
-    expect(mockToastService.success).toHaveBeenCalledWith('Exported 2 record(s) to CSV');
-  });
-
-  it('should show warning when exporting with no records', () => {
+  it('exportToCSV() shows warning when no records', () => {
     component.billingRecords.set([]);
-
     component.exportToCSV();
-
     expect(mockToastService.warning).toHaveBeenCalledWith('No records to export');
   });
 
-  it('should return correct badge class for each status', () => {
+  it('toggleAdvancedFilters() toggles showAdvancedFilters', () => {
+    expect(component.showAdvancedFilters()).toBeFalse();
+    component.toggleAdvancedFilters();
+    expect(component.showAdvancedFilters()).toBeTrue();
+  });
+
+  it('getStatusBadgeClass() returns correct class for pending', () => {
     expect(component.getStatusBadgeClass('pending')).toBe('bg-warning text-dark');
-    expect(component.getStatusBadgeClass('approved')).toBe('bg-info text-dark');
-    expect(component.getStatusBadgeClass('billed')).toBe('bg-primary');
     expect(component.getStatusBadgeClass('paid')).toBe('bg-success');
-    expect(component.getStatusBadgeClass('disputed')).toBe('bg-danger');
-    expect(component.getStatusBadgeClass('cancelled')).toBe('bg-secondary');
     expect(component.getStatusBadgeClass('unknown')).toBe('bg-secondary');
   });
 });

@@ -1,5 +1,5 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, signal, computed, inject, OnInit } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
@@ -25,7 +25,6 @@ import { MetadataTableEditor } from '../../../features/metadata/metadata-table-e
 @Component({
   selector: 'app-job-submission',
   imports: [
-    CommonModule,
     FormsModule,
     NgbPaginationModule,
     StepOneJobProjectComponent,
@@ -35,10 +34,11 @@ import { MetadataTableEditor } from '../../../features/metadata/metadata-table-e
     StepFiveReviewSubmitComponent,
     StepSixStaffReviewComponent,
     MetadataTableEditor
-  ],
+],
   providers: [JobSubmissionStateService],
   templateUrl: './job-submission.html',
-  styleUrl: './job-submission.scss'
+  styleUrl: './job-submission.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobSubmission implements OnInit {
   private instrumentJobService = inject(InstrumentJobService);
@@ -112,7 +112,6 @@ export class JobSubmission implements OnInit {
         this.state.selectProject(project);
       },
       error: (err) => {
-        console.error('Error loading project:', err);
         this.toastService.error('Failed to load project');
       }
     });
@@ -197,7 +196,6 @@ export class JobSubmission implements OnInit {
         this.state.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading job:', err);
         this.toastService.error('Failed to load draft job');
         this.state.loading.set(false);
         this.router.navigate(['/jobs/submit']);
@@ -225,7 +223,6 @@ export class JobSubmission implements OnInit {
           this.createJobWithProject(project.id);
         },
         error: (err) => {
-          console.error('Error creating project:', err);
           this.toastService.error('Failed to create project');
           this.state.submitting.set(false);
         }
@@ -255,7 +252,6 @@ export class JobSubmission implements OnInit {
         });
       },
       error: (err) => {
-        console.error('Error creating draft job:', err);
         this.toastService.error('Failed to create draft job');
         this.state.submitting.set(false);
       }
@@ -295,7 +291,6 @@ export class JobSubmission implements OnInit {
               this.updateJob(jobIdValue, updateData, step);
             },
             error: (err) => {
-              console.error('Error creating project:', err);
               this.toastService.error('Failed to create project');
               this.state.submitting.set(false);
             }
@@ -333,7 +328,6 @@ export class JobSubmission implements OnInit {
           this.state.submitting.set(false);
         },
         error: (err) => {
-          console.error('Error saving draft:', err);
           this.toastService.error('Failed to save draft');
           this.state.submitting.set(false);
         }
@@ -390,7 +384,6 @@ export class JobSubmission implements OnInit {
         this.state.submitting.set(false);
       },
       error: (err) => {
-        console.error('Error creating metadata table:', err);
         this.toastService.error('Failed to create metadata table');
         this.state.submitting.set(false);
       }
@@ -418,7 +411,6 @@ export class JobSubmission implements OnInit {
         this.router.navigate(['/jobs', jobIdValue]);
       },
       error: (err) => {
-        console.error('Error submitting job:', err);
         this.toastService.error('Failed to submit job');
         this.state.submitting.set(false);
       }

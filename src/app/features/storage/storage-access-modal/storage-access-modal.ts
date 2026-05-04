@@ -1,14 +1,15 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { StorageObject, StorageService } from '@noatgnu/cupcake-macaron';
 import { LabGroup, LabGroupService, ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-storage-access-modal',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './storage-access-modal.html',
-  styleUrl: './storage-access-modal.scss'
+  styleUrl: './storage-access-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StorageAccessModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -46,7 +47,6 @@ export class StorageAccessModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load lab groups');
-        console.error('Error loading lab groups:', err);
         this.loading.set(false);
       }
     });
@@ -92,7 +92,6 @@ export class StorageAccessModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update access permissions');
-        console.error('Error updating access permissions:', err);
         this.saving.set(false);
       }
     });

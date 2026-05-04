@@ -1,7 +1,6 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgbModal, NgbNavModule, NgbTooltipModule, NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
 import { forkJoin, of } from 'rxjs';
@@ -24,7 +23,8 @@ import { InstrumentUsageModal } from '../instrument-usage-modal/instrument-usage
   selector: 'app-instruments',
   imports: [InstrumentsNavbar, CommonModule, FormsModule, NgbNavModule, NgbTooltipModule, NgbPaginationModule],
   templateUrl: './instruments.html',
-  styleUrl: './instruments.scss'
+  styleUrl: './instruments.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Instruments implements OnInit {
   private instrumentService = inject(InstrumentService);
@@ -111,7 +111,7 @@ export class Instruments implements OnInit {
     this.instruments().filter(i => !i.enabled).length
   );
 
-  currentUser = toSignal(this.authService.currentUser$);
+  currentUser = this.authService.currentUser;
   isStaff = computed(() => this.currentUser()?.isStaff || false);
   isStaffOrAdmin = computed(() => {
     const user = this.currentUser();
@@ -174,7 +174,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load instruments');
-        console.error('Error loading instruments:', err);
         this.loading.set(false);
       }
     });
@@ -216,7 +215,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load instrument');
-        console.error('Error loading instrument by ID:', err);
         this.router.navigate(['/instruments']);
       }
     });
@@ -276,14 +274,12 @@ export class Instruments implements OnInit {
                 this.userPermission.set(response.results[0]);
               }
             },
-            error: (err) => {
-              console.error('Error loading user permission:', err);
+            error: () => {
             }
           });
         }
       },
-      error: (err) => {
-        console.error('Error loading instrument details:', err);
+      error: () => {
         this.loadingDetails.set(false);
       }
     });
@@ -297,8 +293,7 @@ export class Instruments implements OnInit {
         this.metadataColumns.set(columns.filter((col: MetadataColumn) => !col.hidden));
         this.loadingMetadata.set(false);
       },
-      error: (err: any) => {
-        console.error('Error loading metadata columns:', err);
+      error: () => {
         this.loadingMetadata.set(false);
       }
     });
@@ -330,7 +325,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete instrument');
-        console.error('Error deleting instrument:', err);
       }
     });
   }
@@ -356,7 +350,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update instrument');
-        console.error('Error updating instrument:', err);
       }
     });
   }
@@ -496,7 +489,6 @@ export class Instruments implements OnInit {
         }
       },
       () => {
-        // Modal dismissed (e.g., backdrop click or ESC)
       }
     );
   }
@@ -560,7 +552,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load maintenance logs');
-        console.error('Error loading maintenance logs:', err);
         this.loadingMaintenanceLogs.set(false);
       }
     });
@@ -584,8 +575,7 @@ export class Instruments implements OnInit {
         });
         this.maintenanceLogDocumentCounts.set(countsMap);
       },
-      error: (err) => {
-        console.error('Error loading document counts:', err);
+      error: () => {
       }
     });
   }
@@ -669,7 +659,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete maintenance log');
-        console.error('Error deleting maintenance log:', err);
       }
     });
   }
@@ -697,7 +686,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load bookings');
-        console.error('Error loading bookings:', err);
         this.loadingBookings.set(false);
       }
     });
@@ -751,7 +739,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to approve booking');
-        console.error('Error approving booking:', err);
       }
     });
   }
@@ -767,7 +754,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to unapprove booking');
-        console.error('Error unapproving booking:', err);
       }
     });
   }
@@ -787,7 +773,6 @@ export class Instruments implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete booking');
-        console.error('Error deleting booking:', err);
       }
     });
   }

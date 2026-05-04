@@ -1,5 +1,5 @@
 import { Component, inject, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal, NgbTypeahead } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -11,7 +11,7 @@ import { debounceTime, map, Observable, of, switchMap } from 'rxjs';
 
 @Component({
   selector: 'app-step-reagent-modal',
-  imports: [CommonModule, ReactiveFormsModule, NgbTypeahead],
+  imports: [ReactiveFormsModule, NgbTypeahead],
   templateUrl: './step-reagent-modal.html',
   styleUrl: './step-reagent-modal.scss'
 })
@@ -162,7 +162,6 @@ export class StepReagentModal implements OnInit {
             ? 'Failed to update step reagent'
             : 'Failed to create step reagent'
         );
-        console.error('Error saving step reagent:', err);
         this.saving = false;
       }
     });

@@ -1,4 +1,4 @@
-import { Component, inject, Input, signal, OnInit, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
@@ -19,7 +19,8 @@ interface AnnotationsByFolder {
   selector: 'app-instrument-annotations-modal',
   imports: [CommonModule, FormsModule, NgbNavModule],
   templateUrl: './instrument-annotations-modal.html',
-  styleUrl: './instrument-annotations-modal.scss'
+  styleUrl: './instrument-annotations-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -127,7 +128,6 @@ export class InstrumentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load folders');
-        console.error('Error loading folders:', err);
         this.loading.set(false);
       }
     });
@@ -145,7 +145,6 @@ export class InstrumentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load annotations');
-        console.error('Error loading annotations:', err);
         this.loadingAnnotations.set(false);
       }
     });
@@ -158,8 +157,7 @@ export class InstrumentAnnotationsModal implements OnInit {
         details.set(annotationId, annotation);
         this.annotationDetails.set(details);
       },
-      error: (err) => {
-        console.error('Error loading annotation details:', err);
+      error: () => {
       }
     });
   }
@@ -232,7 +230,6 @@ export class InstrumentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to upload document');
-        console.error('Error uploading document:', err);
         this.uploading.set(false);
         this.uploadProgress.set(0);
       }
@@ -251,7 +248,6 @@ export class InstrumentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete document');
-        console.error('Error deleting document:', err);
       }
     });
   }

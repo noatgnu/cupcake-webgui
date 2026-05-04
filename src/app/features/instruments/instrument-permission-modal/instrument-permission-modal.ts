@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { InstrumentPermissionService } from '@noatgnu/cupcake-macaron';
@@ -17,9 +17,10 @@ interface UserWithPermission {
 
 @Component({
   selector: 'app-instrument-permission-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './instrument-permission-modal.html',
-  styleUrl: './instrument-permission-modal.scss'
+  styleUrl: './instrument-permission-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentPermissionModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -79,14 +80,12 @@ export class InstrumentPermissionModal implements OnInit {
           },
           error: (err: unknown) => {
             this.toastService.error('Failed to load permissions');
-            console.error('Error loading permissions:', err);
             this.loading.set(false);
           }
         });
       },
       error: (err: unknown) => {
         this.toastService.error('Failed to load users');
-        console.error('Error loading users:', err);
         this.loading.set(false);
       }
     });
@@ -161,7 +160,6 @@ export class InstrumentPermissionModal implements OnInit {
       })
       .catch((err: unknown) => {
         this.toastService.error('Failed to update permissions');
-        console.error('Error updating permissions:', err);
         this.saving.set(false);
       });
   }

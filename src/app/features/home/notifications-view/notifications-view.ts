@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -8,9 +8,10 @@ import type { Notification } from '@noatgnu/cupcake-mint-chocolate';
 
 @Component({
   selector: 'app-notifications-view',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './notifications-view.html',
-  styleUrl: './notifications-view.scss'
+  styleUrl: './notifications-view.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NotificationsView implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
@@ -46,12 +47,8 @@ export class NotificationsView implements OnInit, OnDestroy {
 
   subscribeToWebSocketNotifications(): void {
     this.wsSubscription = this.wsService.newNotifications$.subscribe({
-      next: (event) => {
-        console.log('New notification received via WebSocket:', event);
+      next: () => {
         this.loadNotifications();
-      },
-      error: (err) => {
-        console.error('WebSocket notification error:', err);
       }
     });
   }
@@ -80,8 +77,7 @@ export class NotificationsView implements OnInit, OnDestroy {
         this.total.set(response.count);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading notifications:', err);
+      error: () => {
         this.loading.set(false);
       }
     });
@@ -118,9 +114,6 @@ export class NotificationsView implements OnInit, OnDestroy {
     this.notificationService.markNotificationRead(notification.id, { isRead: true }).subscribe({
       next: () => {
         this.loadNotifications();
-      },
-      error: (err) => {
-        console.error('Error marking notification as read:', err);
       }
     });
   }
@@ -129,9 +122,6 @@ export class NotificationsView implements OnInit, OnDestroy {
     this.notificationService.markAllNotificationsRead().subscribe({
       next: () => {
         this.loadNotifications();
-      },
-      error: (err) => {
-        console.error('Error marking all as read:', err);
       }
     });
   }

@@ -1,4 +1,4 @@
-import { Component, inject, Input, signal, OnInit, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
@@ -19,7 +19,8 @@ interface AnnotationsByFolder {
   selector: 'app-stored-reagent-annotations-modal',
   imports: [CommonModule, FormsModule, NgbNavModule],
   templateUrl: './stored-reagent-annotations-modal.html',
-  styleUrl: './stored-reagent-annotations-modal.scss'
+  styleUrl: './stored-reagent-annotations-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StoredReagentAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -127,7 +128,6 @@ export class StoredReagentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load folders');
-        console.error('Error loading folders:', err);
         this.loading.set(false);
       }
     });
@@ -145,7 +145,6 @@ export class StoredReagentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load annotations');
-        console.error('Error loading annotations:', err);
         this.loadingAnnotations.set(false);
       }
     });
@@ -158,8 +157,7 @@ export class StoredReagentAnnotationsModal implements OnInit {
         details.set(annotationId, annotation);
         this.annotationDetails.set(details);
       },
-      error: (err) => {
-        console.error('Error loading annotation details:', err);
+      error: () => {
       }
     });
   }
@@ -232,7 +230,6 @@ export class StoredReagentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to upload annotation');
-        console.error('Error uploading annotation:', err);
         this.uploading.set(false);
         this.uploadProgress.set(0);
       }
@@ -251,7 +248,6 @@ export class StoredReagentAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete annotation');
-        console.error('Error deleting annotation:', err);
       }
     });
   }

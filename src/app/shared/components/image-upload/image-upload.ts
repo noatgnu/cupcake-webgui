@@ -1,11 +1,12 @@
-import { Component, EventEmitter, Input, Output, signal, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, signal, ViewChild, ElementRef } from '@angular/core';
+
 
 @Component({
   selector: 'app-image-upload',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './image-upload.html',
-  styleUrl: './image-upload.scss'
+  styleUrl: './image-upload.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImageUpload {
   @Input() label = 'Image';
@@ -100,7 +101,6 @@ export class ImageUpload {
         }
       }, 0);
     } catch (err) {
-      console.error('Error accessing camera:', err);
       this.error.set('Unable to access camera. Please check permissions.');
       this.isCameraActive.set(false);
     }

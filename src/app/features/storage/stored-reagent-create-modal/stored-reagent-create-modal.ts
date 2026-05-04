@@ -1,5 +1,5 @@
-import { Component, inject, Input, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbTypeahead, NgbHighlight } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -11,9 +11,10 @@ import { debounceTime, map, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-stored-reagent-create-modal',
-  imports: [CommonModule, FormsModule, ImageUpload, BarcodeInput, NgbTypeahead, NgbHighlight],
+  imports: [FormsModule, ImageUpload, BarcodeInput, NgbTypeahead, NgbHighlight],
   templateUrl: './stored-reagent-create-modal.html',
-  styleUrl: './stored-reagent-create-modal.scss'
+  styleUrl: './stored-reagent-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StoredReagentCreateModal {
   private activeModal = inject(NgbActiveModal);
@@ -111,7 +112,6 @@ export class StoredReagentCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create stored reagent');
-        console.error('Error creating stored reagent:', err);
         this.saving.set(false);
       }
     });

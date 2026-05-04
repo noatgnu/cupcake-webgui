@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbPaginationModule, NgbTooltipModule, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -13,6 +13,7 @@ import { BillingRecordDetailModal } from '../billing-record-detail-modal/billing
   imports: [BillingNavbar, CommonModule, FormsModule, NgbPaginationModule, NgbTooltipModule],
   templateUrl: './billing-records.html',
   styleUrl: './billing-records.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BillingRecords implements OnInit {
   private billingRecordService = inject(BillingRecordService);
@@ -41,7 +42,7 @@ export class BillingRecords implements OnInit {
   }
 
   isAdmin(): boolean {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user ? (user.isStaff || user.isSuperuser) : false;
   }
 
@@ -78,8 +79,7 @@ export class BillingRecords implements OnInit {
         this.total.set(response.count);
         this.loading.set(false);
       },
-      error: (err: any) => {
-        console.error('Error loading billing records:', err);
+      error: () => {
         this.toastService.error('Failed to load billing records');
         this.loading.set(false);
       }
@@ -189,8 +189,7 @@ export class BillingRecords implements OnInit {
             this.handleBulkApproveComplete(completed, errors);
           }
         },
-        error: (err) => {
-          console.error('Error approving record:', err);
+        error: () => {
           errors++;
           if (completed + errors === pendingRecords.length) {
             this.handleBulkApproveComplete(completed, errors);

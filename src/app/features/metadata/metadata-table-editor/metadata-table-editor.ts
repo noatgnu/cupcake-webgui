@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, Input, signal, computed, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, Input, signal, computed, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+
 import { NgbModal, NgbDropdown, NgbDropdownToggle, NgbDropdownMenu } from '@ng-bootstrap/ng-bootstrap';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -34,9 +34,10 @@ import { ToastService, MetadataExportRequest, MetadataValidationConfig, SiteConf
 @Component({
   selector: 'app-metadata-table-editor',
   standalone: true,
-  imports: [CommonModule, NgbDropdown, NgbDropdownToggle, NgbDropdownMenu],
+  imports: [NgbDropdown, NgbDropdownToggle, NgbDropdownMenu],
   templateUrl: './metadata-table-editor.html',
-  styleUrl: './metadata-table-editor.scss'
+  styleUrl: './metadata-table-editor.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MetadataTableEditor implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -193,7 +194,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe((refreshedTableId: number) => {
       if (refreshedTableId === tableId) {
-        console.log(`Import task completed for table ${refreshedTableId}, refreshing table`);
         this.toastService.info('Table data refreshed after import completion');
         this.loadTable(tableId);
       }
@@ -208,7 +208,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.isLoading.set(false);
       },
       error: (err) => {
-        console.error('Error loading metadata table:', err);
         this.toastService.error('Failed to load metadata table');
         this.isLoading.set(false);
       }
@@ -309,7 +308,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           modalRef.componentInstance.onClose();
         },
         error: (error) => {
-          console.error('Error updating cell value:', error);
           this.toastService.error('Failed to update cell value');
         }
       });
@@ -375,7 +373,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(this.tableId);
       },
       error: (error: any) => {
-        console.error('Error toggling column visibility:', error);
         this.toastService.error('Failed to toggle column visibility');
       }
     });
@@ -431,7 +428,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(this.tableId);
       },
       error: (error: any) => {
-        console.error('Error updating column settings:', error);
         this.toastService.error('Failed to update column settings');
       }
     });
@@ -479,7 +475,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(this.tableId);
       },
       error: (error) => {
-        console.error('Error bulk updating columns:', error);
         this.toastService.error('Failed to update columns');
       }
     });
@@ -514,7 +509,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(this.tableId);
       },
       error: (error) => {
-        console.error('Error bulk deleting columns:', error);
         this.toastService.error('Failed to delete columns');
       }
     });
@@ -533,7 +527,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(this.tableId);
       },
       error: (error: any) => {
-        console.error('Error removing column:', error);
         this.toastService.error('Failed to remove column');
       }
     });
@@ -581,7 +574,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.loadTable(currentTable.id);
       },
       error: (error: any) => {
-        console.error('Error adding column:', error);
         this.toastService.error('Failed to add column');
       },
       complete: () => {
@@ -624,9 +616,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           metadataTableId: this.tableId,
           createPools: true,
           replaceExisting: false,
-          onProgress: (progress: number) => {
-            console.log(`SDRF upload progress: ${Math.round(progress)}%`);
-          }
+          onProgress: (_progress: number) => {}
         }
       ).subscribe({
         next: (result: any) => {
@@ -642,7 +632,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         },
         error: (error: any) => {
           this.isLoading.set(false);
-          console.error('Error importing SDRF:', error);
           const errorMsg = error?.error?.detail || error?.error?.message || 'Failed to import SDRF file';
           this.toastService.error(errorMsg);
         }
@@ -678,9 +667,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           metadataTableId: this.tableId,
           createPools: true,
           replaceExisting: false,
-          onProgress: (progress: number) => {
-            console.log(`Excel upload progress: ${Math.round(progress)}%`);
-          }
+          onProgress: (_progress: number) => {}
         }
       ).subscribe({
         next: (result: any) => {
@@ -696,7 +683,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         },
         error: (error: any) => {
           this.isLoading.set(false);
-          console.error('Error importing Excel:', error);
           const errorMsg = error?.error?.detail || error?.error?.message || 'Failed to import Excel file';
           this.toastService.error(errorMsg);
         }
@@ -731,7 +717,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
         this.toastService.success(`SDRF export queued successfully! Task ID: ${result.taskId}`);
       },
       error: (error: any) => {
-        console.error('Error exporting SDRF:', error);
         this.toastService.error('Failed to export SDRF');
       }
     });
@@ -766,7 +751,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
             this.toastService.success(`Excel export queued successfully! Task ID: ${result.taskId}`);
           },
           error: (error: any) => {
-            console.error('Error exporting Excel:', error);
             this.toastService.error('Failed to export Excel');
           }
         });
@@ -852,7 +836,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.isLoading.set(false);
-        console.error('Error performing search and replace:', error);
         this.toastService.error('Failed to perform search and replace');
       }
     });
@@ -986,7 +969,6 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
           this.toastService.success(`Pool "${pool.poolName}" deleted successfully!`);
         },
         error: (error) => {
-          console.error('Error deleting pool:', error);
           this.toastService.error(`Failed to delete pool "${pool.poolName}"`);
         }
       });

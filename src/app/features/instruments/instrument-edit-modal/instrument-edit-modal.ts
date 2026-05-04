@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -7,9 +7,10 @@ import { InstrumentService, Instrument } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-instrument-edit-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './instrument-edit-modal.html',
-  styleUrl: './instrument-edit-modal.scss'
+  styleUrl: './instrument-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentEditModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -136,7 +137,6 @@ export class InstrumentEditModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to update instrument');
-          console.error('Error updating instrument:', err);
           this.saving.set(false);
         }
       });
@@ -176,7 +176,6 @@ export class InstrumentEditModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to create instrument');
-          console.error('Error creating instrument:', err);
           this.saving.set(false);
         }
       });

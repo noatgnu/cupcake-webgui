@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, effect } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -9,9 +9,10 @@ import type { MessageThread, Message } from '@noatgnu/cupcake-mint-chocolate';
 
 @Component({
   selector: 'app-messages-view',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './messages-view.html',
-  styleUrl: './messages-view.scss'
+  styleUrl: './messages-view.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MessagesView implements OnInit {
   private messageThreadService = inject(MessageThreadService);
@@ -80,8 +81,7 @@ export class MessagesView implements OnInit {
         this.threadsTotal.set(response.count);
         this.loadingThreads.set(false);
       },
-      error: (err) => {
-        console.error('Error loading threads:', err);
+      error: () => {
         this.loadingThreads.set(false);
       }
     });
@@ -94,8 +94,7 @@ export class MessagesView implements OnInit {
         this.messagesPage.set(1);
         this.loadMessages(threadId);
       },
-      error: (err) => {
-        console.error('Error loading thread:', err);
+      error: () => {
       }
     });
   }
@@ -121,8 +120,7 @@ export class MessagesView implements OnInit {
         this.loadingMessages.set(false);
         setTimeout(() => this.scrollToBottom(), 100);
       },
-      error: (err) => {
-        console.error('Error loading messages:', err);
+      error: () => {
         this.loadingMessages.set(false);
       }
     });
@@ -145,8 +143,7 @@ export class MessagesView implements OnInit {
         this.loadThreads();
         this.sendingMessage.set(false);
       },
-      error: (err) => {
-        console.error('Error sending message:', err);
+      error: () => {
         this.sendingMessage.set(false);
       }
     });

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SiteConfigService, ToastService, AuthService } from '@noatgnu/cupcake-core';
 import type { WorkerStatusResponse, Worker, QueueStats } from '@noatgnu/cupcake-core';
@@ -9,6 +9,7 @@ import { AdminNavbar } from '../admin-navbar/admin-navbar';
   imports: [CommonModule, AdminNavbar],
   templateUrl: './worker-status.html',
   styleUrl: './worker-status.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WorkerStatus implements OnInit {
   private siteConfigService = inject(SiteConfigService);
@@ -45,8 +46,7 @@ export class WorkerStatus implements OnInit {
         this.workerStatus.set(response);
         this.loading.set(false);
       },
-      error: (err: any) => {
-        console.error('Error loading worker status:', err);
+      error: () => {
         this.toastService.error('Failed to load worker status');
         this.loading.set(false);
       }

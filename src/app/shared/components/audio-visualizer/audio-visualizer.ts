@@ -1,11 +1,12 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, signal, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, signal, effect } from '@angular/core';
+
 
 @Component({
   selector: 'app-audio-visualizer',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './audio-visualizer.html',
   styleUrl: './audio-visualizer.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AudioVisualizer implements OnInit, OnDestroy {
   @ViewChild('canvas', { static: true }) canvas!: ElementRef<HTMLCanvasElement>;
@@ -63,7 +64,6 @@ export class AudioVisualizer implements OnInit, OnDestroy {
       this.isActive.set(true);
       this.draw();
     } catch (error) {
-      console.error('Error starting audio visualization:', error);
     }
   }
 

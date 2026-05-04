@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -8,9 +8,10 @@ import { StorageLocationTypeahead } from '../../../shared/components/storage-loc
 
 @Component({
   selector: 'app-support-information-modal',
-  imports: [CommonModule, FormsModule, StorageLocationTypeahead],
+  imports: [FormsModule, StorageLocationTypeahead],
   templateUrl: './support-information-modal.html',
-  styleUrl: './support-information-modal.scss'
+  styleUrl: './support-information-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SupportInformationModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -75,7 +76,6 @@ export class SupportInformationModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to update support information');
-          console.error('Error updating support information:', err);
           this.saving.set(false);
         }
       });
@@ -96,21 +96,18 @@ export class SupportInformationModal implements OnInit {
                 },
                 error: (err) => {
                   this.toastService.error('Failed to link support information to instrument');
-                  console.error('Error linking support information:', err);
                   this.saving.set(false);
                 }
               });
             },
             error: (err) => {
               this.toastService.error('Failed to fetch instrument details');
-              console.error('Error fetching instrument:', err);
               this.saving.set(false);
             }
           });
         },
         error: (err) => {
           this.toastService.error('Failed to create support information');
-          console.error('Error creating support information:', err);
           this.saving.set(false);
         }
       });

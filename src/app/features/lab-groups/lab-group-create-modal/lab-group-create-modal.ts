@@ -1,14 +1,15 @@
-import { Component, inject, Input, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, signal, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { LabGroupService, ToastService, LabGroup, AuthService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-lab-group-create-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './lab-group-create-modal.html',
-  styleUrl: './lab-group-create-modal.scss'
+  styleUrl: './lab-group-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LabGroupCreateModal {
   private activeModal = inject(NgbActiveModal);
@@ -25,7 +26,7 @@ export class LabGroupCreateModal {
   saving = false;
 
   isStaff = computed(() => {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user?.isStaff ?? false;
   });
 
@@ -58,7 +59,6 @@ export class LabGroupCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create lab group');
-        console.error('Error creating lab group:', err);
         this.saving = false;
       }
     });

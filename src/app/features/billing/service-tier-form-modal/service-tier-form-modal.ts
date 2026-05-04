@@ -1,5 +1,5 @@
-import { Component, inject, input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
+
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ServiceTierService } from '@noatgnu/cupcake-salted-caramel';
@@ -8,9 +8,10 @@ import { ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-service-tier-form-modal',
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [ReactiveFormsModule, FormsModule],
   templateUrl: './service-tier-form-modal.html',
-  styleUrl: './service-tier-form-modal.scss'
+  styleUrl: './service-tier-form-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ServiceTierFormModal implements OnInit {
   activeModal = inject(NgbActiveModal);
@@ -69,8 +70,7 @@ export class ServiceTierFormModal implements OnInit {
         });
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading service tier:', err);
+      error: () => {
         this.toastService.error('Failed to load service tier');
         this.loading.set(false);
         this.activeModal.dismiss();
@@ -116,8 +116,7 @@ export class ServiceTierFormModal implements OnInit {
         this.submitting.set(false);
         this.activeModal.close(tier);
       },
-      error: (err) => {
-        console.error('Error saving service tier:', err);
+      error: () => {
         this.toastService.error(`Failed to ${id ? 'update' : 'create'} service tier`);
         this.submitting.set(false);
       }

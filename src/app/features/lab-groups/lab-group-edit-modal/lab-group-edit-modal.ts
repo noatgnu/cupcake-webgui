@@ -1,14 +1,15 @@
-import { Component, inject, Input, OnInit, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { LabGroup, LabGroupService, ToastService, AuthService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-lab-group-edit-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './lab-group-edit-modal.html',
-  styleUrl: './lab-group-edit-modal.scss'
+  styleUrl: './lab-group-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LabGroupEditModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -26,7 +27,7 @@ export class LabGroupEditModal implements OnInit {
   saving = false;
 
   isStaff = computed(() => {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user?.isStaff ?? false;
   });
 
@@ -59,7 +60,6 @@ export class LabGroupEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update lab group');
-        console.error('Error updating lab group:', err);
         this.saving = false;
       }
     });

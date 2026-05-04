@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbPaginationModule, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -11,7 +11,8 @@ import { ProjectDetail } from '../project-detail/project-detail';
   selector: 'app-projects',
   imports: [CommonModule, FormsModule, NgbPaginationModule, ProjectDetail],
   templateUrl: './projects.html',
-  styleUrl: './projects.scss'
+  styleUrl: './projects.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Projects implements OnInit {
   private projectService = inject(ProjectService);
@@ -51,7 +52,6 @@ export class Projects implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading projects:', err);
         this.toastService.error('Failed to load projects');
         this.loading.set(false);
       }

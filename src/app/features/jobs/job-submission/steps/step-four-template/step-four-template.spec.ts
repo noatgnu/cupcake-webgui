@@ -1,23 +1,58 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
+import { CUPCAKE_CORE_CONFIG, LabGroupService } from '@noatgnu/cupcake-core';
+import { InstrumentJobService } from '@noatgnu/cupcake-macaron';
+import { ProjectService } from '@noatgnu/cupcake-red-velvet';
+import { MetadataTableTemplateService } from '@noatgnu/cupcake-vanilla';
+import { JobSubmissionStateService } from '../../services/job-submission-state';
+import { StepFourTemplateComponent } from './step-four-template';
 
-import { StepFourTemplate } from './step-four-template';
+describe('StepFourTemplateComponent', () => {
+  let component: StepFourTemplateComponent;
+  let fixture: ComponentFixture<StepFourTemplateComponent>;
 
-describe('StepFourTemplate', () => {
-  let component: StepFourTemplate;
-  let fixture: ComponentFixture<StepFourTemplate>;
+  const mockInstrumentJobService = jasmine.createSpyObj('InstrumentJobService', ['getInstrumentJobs']);
+  mockInstrumentJobService.getInstrumentJobs.and.returnValue(of({ count: 0, results: [] }));
+
+  const mockProjectService = jasmine.createSpyObj('ProjectService', ['getProjects']);
+  mockProjectService.getProjects.and.returnValue(of({ count: 0, results: [] }));
+
+  const mockLabGroupService = jasmine.createSpyObj('LabGroupService', ['getLabGroups', 'getLabGroupMembers']);
+  mockLabGroupService.getLabGroups.and.returnValue(of({ count: 0, results: [] }));
+  mockLabGroupService.getLabGroupMembers.and.returnValue(of({ count: 0, results: [] }));
+
+  const mockTemplateService = jasmine.createSpyObj('MetadataTableTemplateService', ['getMetadataTableTemplates']);
+  mockTemplateService.getMetadataTableTemplates.and.returnValue(of({ count: 0, results: [] }));
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [StepFourTemplate]
+      imports: [StepFourTemplateComponent],
+      providers: [
+        { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
+        JobSubmissionStateService,
+        { provide: InstrumentJobService, useValue: mockInstrumentJobService },
+        { provide: ProjectService, useValue: mockProjectService },
+        { provide: LabGroupService, useValue: mockLabGroupService },
+        { provide: MetadataTableTemplateService, useValue: mockTemplateService }
+      ]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(StepFourTemplate);
+    fixture = TestBed.createComponent(StepFourTemplateComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('canGoNext() returns false when selectedTemplateId is null', () => {
+    expect(component.canGoNext()).toBeFalse();
+  });
+
+  it('canGoNext() returns true when selectedTemplateId is set', () => {
+    component.state.selectedTemplateId.set(1);
+    expect(component.canGoNext()).toBeTrue();
   });
 });

@@ -1,11 +1,11 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { MetadataTableEditor } from '../../../../../features/metadata/metadata-table-editor/metadata-table-editor';
 
 @Component({
   selector: 'app-step-six-staff-review',
-  imports: [CommonModule, MetadataTableEditor],
+  imports: [MetadataTableEditor],
   templateUrl: './step-six-staff-review.html',
   styleUrl: './step-six-staff-review.scss'
 })

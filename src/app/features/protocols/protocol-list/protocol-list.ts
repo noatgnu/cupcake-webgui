@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,7 +13,8 @@ import { SessionCreateModal } from '../session-create-modal/session-create-modal
   selector: 'app-protocol-list',
   imports: [CommonModule, FormsModule],
   templateUrl: './protocol-list.html',
-  styleUrl: './protocol-list.scss'
+  styleUrl: './protocol-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProtocolList implements OnInit {
   private protocolService = inject(ProtocolService);
@@ -67,7 +68,6 @@ export class ProtocolList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load protocols');
-        console.error('Error loading protocols:', err);
         this.loading.set(false);
       }
     });
@@ -145,7 +145,6 @@ export class ProtocolList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete protocol');
-        console.error('Error deleting protocol:', err);
       }
     });
   }
@@ -162,7 +161,6 @@ export class ProtocolList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update protocol');
-        console.error('Error updating protocol:', err);
       }
     });
   }

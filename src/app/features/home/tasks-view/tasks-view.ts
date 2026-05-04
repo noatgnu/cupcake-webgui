@@ -1,8 +1,6 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 import { AsyncTaskUIService } from '@noatgnu/cupcake-vanilla';
 import {
   AsyncTaskStatus,
@@ -18,10 +16,9 @@ import {
   imports: [CommonModule, NgbPagination],
   templateUrl: './tasks-view.html',
   styleUrl: './tasks-view.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TasksView implements OnInit, OnDestroy {
-  private destroy$ = new Subject<void>();
-
   allTasks = signal<AsyncTaskStatus[]>([]);
   selectedFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
   currentPage = signal(1);
@@ -65,21 +62,16 @@ export class TasksView implements OnInit, OnDestroy {
   totalTasks = computed(() => this.filteredTasks().length);
   totalPages = computed(() => Math.ceil(this.totalTasks() / this.pageSize));
 
-  constructor(private asyncTaskService: AsyncTaskUIService) {}
-
-  ngOnInit(): void {
-    this.asyncTaskService.tasks$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(tasks => {
-        const taskArray = Array.isArray(tasks) ? tasks : [];
-        this.allTasks.set(taskArray);
-      });
+  constructor(private asyncTaskService: AsyncTaskUIService) {
+    effect(() => {
+      const tasks = this.asyncTaskService.tasks();
+      this.allTasks.set(Array.isArray(tasks) ? tasks : []);
+    });
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
+  ngOnInit(): void {}
+
+  ngOnDestroy(): void {}
 
   setFilter(filter: 'all' | 'active' | 'completed' | 'failed'): void {
     this.selectedFilter.set(filter);
@@ -93,8 +85,7 @@ export class TasksView implements OnInit, OnDestroy {
   cancelTask(taskId: string): void {
     this.asyncTaskService.cancelTask(taskId).subscribe({
       next: () => {},
-      error: (error) => {
-        console.error('Error cancelling task:', error);
+      error: () => {
       }
     });
   }

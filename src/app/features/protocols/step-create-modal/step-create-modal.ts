@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, Input, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
@@ -11,7 +11,7 @@ import type { ContentChange } from 'ngx-quill';
 
 @Component({
   selector: 'app-step-create-modal',
-  imports: [CommonModule, ReactiveFormsModule, DurationInput, QuillModule],
+  imports: [ReactiveFormsModule, DurationInput, QuillModule],
   templateUrl: './step-create-modal.html',
   styleUrl: './step-create-modal.scss'
 })
@@ -78,7 +78,6 @@ export class StepCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create step');
-        console.error('Error creating step:', err);
         this.saving = false;
       }
     });

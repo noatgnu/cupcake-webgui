@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild, effect } from '@angular/core';
+
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NotificationService, CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
@@ -8,9 +8,10 @@ import { DropdownCoordinator } from '../../services/dropdown-coordinator';
 
 @Component({
   selector: 'app-notification-dropdown',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './notification-dropdown.html',
-  styleUrl: './notification-dropdown.scss'
+  styleUrl: './notification-dropdown.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NotificationDropdown implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
@@ -50,12 +51,8 @@ export class NotificationDropdown implements OnInit, OnDestroy {
 
   subscribeToWebSocketNotifications(): void {
     this.wsSubscription = this.wsService.newNotifications$.subscribe({
-      next: (event) => {
-        console.log('New notification received via WebSocket:', event);
+      next: () => {
         this.loadUnreadNotifications();
-      },
-      error: (err) => {
-        console.error('WebSocket notification error:', err);
       }
     });
   }
@@ -68,8 +65,7 @@ export class NotificationDropdown implements OnInit, OnDestroy {
         this.unreadCount.set(response.count);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading notifications:', err);
+      error: () => {
         this.loading.set(false);
       }
     });
@@ -119,9 +115,6 @@ export class NotificationDropdown implements OnInit, OnDestroy {
       this.notificationService.markNotificationRead(notification.id, { isRead: true }).subscribe({
         next: () => {
           this.loadUnreadNotifications();
-        },
-        error: (err) => {
-          console.error('Error marking notification as read:', err);
         }
       });
     }

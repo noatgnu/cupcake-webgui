@@ -1,10 +1,10 @@
 import { Component, inject, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { SidebarControl } from '../../../core/services/sidebar-control';
 
 @Component({
   selector: 'app-home-navbar',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './home-navbar.html',
   styleUrl: './home-navbar.scss'
 })

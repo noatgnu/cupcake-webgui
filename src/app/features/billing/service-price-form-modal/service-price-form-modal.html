@@ -1,1 +1,275 @@
-<p>service-price-form-modal works!</p>
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-currency-dollar me-2"></i>
+    @if (isEditMode()) {
+      Edit Service Price
+    } @else {
+      New Service Price
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label for="billableItemType" class="form-label">
+          Billable Item Type <span class="text-danger">*</span>
+        </label>
+        <select
+          class="form-select"
+          [class.is-invalid]="isFieldInvalid('billableItemType')"
+          id="billableItemType"
+          formControlName="billableItemType">
+          <option [ngValue]="null">Select item type...</option>
+          @for (itemType of billableItemTypes(); track itemType.id) {
+            <option [ngValue]="itemType.id">{{ itemType.name }}</option>
+          }
+        </select>
+        @if (isFieldInvalid('billableItemType')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('billableItemType') }}
+          </div>
+        }
+        @if (isEditMode()) {
+          <small class="form-text text-muted">Item type cannot be changed after creation</small>
+        }
+      </div>
+
+      <div class="col-md-6">
+        <label for="serviceTier" class="form-label">
+          Service Tier <span class="text-danger">*</span>
+        </label>
+        <select
+          class="form-select"
+          [class.is-invalid]="isFieldInvalid('serviceTier')"
+          id="serviceTier"
+          formControlName="serviceTier">
+          <option [ngValue]="null">Select service tier...</option>
+          @for (tier of serviceTiers(); track tier.id) {
+            <option [ngValue]="tier.id">{{ tier.tierName }}</option>
+          }
+        </select>
+        @if (isFieldInvalid('serviceTier')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('serviceTier') }}
+          </div>
+        }
+        @if (isEditMode()) {
+          <small class="form-text text-muted">Service tier cannot be changed after creation</small>
+        }
+      </div>
+
+      <div class="col-md-6">
+        <label for="basePrice" class="form-label">
+          Base Price <span class="text-danger">*</span>
+        </label>
+        <input
+          type="number"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('basePrice')"
+          id="basePrice"
+          formControlName="basePrice"
+          step="0.01"
+          min="0"
+          placeholder="0.00">
+        @if (isFieldInvalid('basePrice')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('basePrice') }}
+          </div>
+        }
+      </div>
+
+      <div class="col-md-6">
+        <label for="currency" class="form-label">
+          Currency <span class="text-danger">*</span>
+        </label>
+        <input
+          type="text"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('currency')"
+          id="currency"
+          formControlName="currency"
+          maxlength="3"
+          placeholder="USD">
+        @if (isFieldInvalid('currency')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('currency') }}
+          </div>
+        }
+        <small class="form-text text-muted">3-letter currency code (e.g., USD, EUR, GBP)</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="billingUnit" class="form-label">
+          Billing Unit <span class="text-danger">*</span>
+        </label>
+        <select
+          class="form-select"
+          [class.is-invalid]="isFieldInvalid('billingUnit')"
+          id="billingUnit"
+          formControlName="billingUnit">
+          @for (unit of billingUnits; track unit) {
+            <option [value]="unit">{{ getBillingUnitDisplay(unit) }}</option>
+          }
+        </select>
+        @if (isFieldInvalid('billingUnit')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('billingUnit') }}
+          </div>
+        }
+      </div>
+
+      <div class="col-md-6">
+        <label for="minimumChargeUnits" class="form-label">
+          Minimum Charge Units <span class="text-danger">*</span>
+        </label>
+        <input
+          type="number"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('minimumChargeUnits')"
+          id="minimumChargeUnits"
+          formControlName="minimumChargeUnits"
+          step="0.01"
+          min="0"
+          placeholder="1">
+        @if (isFieldInvalid('minimumChargeUnits')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('minimumChargeUnits') }}
+          </div>
+        }
+        <small class="form-text text-muted">Minimum units to charge regardless of actual usage</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="setupFee" class="form-label">Setup Fee</label>
+        <input
+          type="number"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('setupFee')"
+          id="setupFee"
+          formControlName="setupFee"
+          step="0.01"
+          min="0"
+          placeholder="0.00">
+        @if (isFieldInvalid('setupFee')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('setupFee') }}
+          </div>
+        }
+        <small class="form-text text-muted">One-time setup fee (optional)</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="bulkThreshold" class="form-label">Bulk Discount Threshold</label>
+        <input
+          type="number"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('bulkThreshold')"
+          id="bulkThreshold"
+          formControlName="bulkThreshold"
+          step="1"
+          min="1"
+          placeholder="Optional">
+        @if (isFieldInvalid('bulkThreshold')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('bulkThreshold') }}
+          </div>
+        }
+        <small class="form-text text-muted">Units required to qualify for bulk discount</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="bulkDiscountPercentage" class="form-label">Bulk Discount %</label>
+        <div class="input-group">
+          <input
+            type="number"
+            class="form-control"
+            [class.is-invalid]="isFieldInvalid('bulkDiscountPercentage')"
+            id="bulkDiscountPercentage"
+            formControlName="bulkDiscountPercentage"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="0">
+          <span class="input-group-text">%</span>
+        </div>
+        @if (isFieldInvalid('bulkDiscountPercentage')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('bulkDiscountPercentage') }}
+          </div>
+        }
+        <small class="form-text text-muted">Discount percentage for bulk orders</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="effectiveFrom" class="form-label">
+          Effective From <span class="text-danger">*</span>
+        </label>
+        <input
+          type="date"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('effectiveFrom')"
+          id="effectiveFrom"
+          formControlName="effectiveFrom">
+        @if (isFieldInvalid('effectiveFrom')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('effectiveFrom') }}
+          </div>
+        }
+        <small class="form-text text-muted">Date when this price becomes effective</small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="effectiveUntil" class="form-label">Effective Until</label>
+        <input
+          type="date"
+          class="form-control"
+          [class.is-invalid]="isFieldInvalid('effectiveUntil')"
+          id="effectiveUntil"
+          formControlName="effectiveUntil">
+        @if (isFieldInvalid('effectiveUntil')) {
+          <div class="invalid-feedback">
+            {{ getFieldError('effectiveUntil') }}
+          </div>
+        }
+        <small class="form-text text-muted">Leave empty for ongoing price</small>
+      </div>
+
+      <div class="col-12">
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="isActive"
+            formControlName="isActive">
+          <label class="form-check-label" for="isActive">
+            <i class="bi bi-check-circle me-1"></i>
+            Active
+          </label>
+        </div>
+        <small class="form-text text-muted">Only active prices can be used for new billing records</small>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="saving()">
+    <i class="bi bi-x-circle me-1"></i>
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || form.invalid">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+    } @else {
+      <i class="bi bi-check-circle me-1"></i>
+    }
+    @if (isEditMode()) {
+      Update
+    } @else {
+      Create
+    }
+  </button>
+</div>

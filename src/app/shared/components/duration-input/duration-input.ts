@@ -1,10 +1,10 @@
 import { Component, forwardRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'app-duration-input',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './duration-input.html',
   styleUrl: './duration-input.scss',
   providers: [

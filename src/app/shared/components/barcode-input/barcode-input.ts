@@ -1,13 +1,14 @@
-import { Component, EventEmitter, Input, Output, signal, ViewChild, ElementRef, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, signal, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import Quagga from '@ericblade/quagga2';
 
 @Component({
   selector: 'app-barcode-input',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './barcode-input.html',
-  styleUrl: './barcode-input.scss'
+  styleUrl: './barcode-input.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BarcodeInput implements OnDestroy {
   @Input() barcode = '';
@@ -76,7 +77,6 @@ export class BarcodeInput implements OnDestroy {
         frequency: 10
       }, (err: any) => {
         if (err) {
-          console.error('Quagga initialization failed:', err);
           this.error.set('Failed to initialize camera. Please check permissions.');
           this.stopScanning();
           return;
@@ -102,7 +102,6 @@ export class BarcodeInput implements OnDestroy {
         Quagga.stop();
         this.quaggaInitialized = false;
       } catch (err) {
-        console.error('Error stopping Quagga:', err);
       }
     }
 

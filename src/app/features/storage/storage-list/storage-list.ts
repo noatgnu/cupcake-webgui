@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { NgbModal, NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
@@ -23,9 +23,10 @@ import { filter, forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-storage-list',
-  imports: [CommonModule, FormsModule, NgbTooltipModule],
+  imports: [FormsModule, NgbTooltipModule],
   templateUrl: './storage-list.html',
-  styleUrl: './storage-list.scss'
+  styleUrl: './storage-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StorageList implements OnInit {
   private storageService = inject(StorageService);
@@ -126,7 +127,6 @@ export class StorageList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load storage object');
-        console.error('Error loading storage object:', err);
         this.router.navigate(['/storage']);
       }
     });
@@ -140,8 +140,7 @@ export class StorageList implements OnInit {
       next: (storage) => {
         this.currentStorage.set(storage);
       },
-      error: (err) => {
-        console.error('Error loading current storage:', err);
+      error: () => {
       }
     });
   }
@@ -163,8 +162,7 @@ export class StorageList implements OnInit {
         }
         this.loadingBreadcrumbs.set(false);
       },
-      error: (err) => {
-        console.error('Error loading breadcrumbs:', err);
+      error: () => {
         this.loadingBreadcrumbs.set(false);
       }
     });
@@ -198,7 +196,6 @@ export class StorageList implements OnInit {
       error: (err) => {
         this.error.set('Failed to load storage objects');
         this.loadingChildren.set(false);
-        console.error('Error loading storage objects:', err);
       }
     });
   }
@@ -272,7 +269,6 @@ export class StorageList implements OnInit {
       error: (err) => {
         this.toastService.error('Failed to load reagents');
         this.loadingReagents.set(false);
-        console.error('Error loading reagents:', err);
       }
     });
   }
@@ -299,8 +295,7 @@ export class StorageList implements OnInit {
         });
         this.reagentStoragePaths.set(pathsMap);
       },
-      error: (err) => {
-        console.error('Error loading storage paths:', err);
+      error: () => {
         this.reagentStoragePaths.set(pathsMap);
       }
     });
@@ -317,7 +312,6 @@ export class StorageList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load shared reagent');
-        console.error('Error loading reagent:', err);
         this.router.navigate(['/storage']);
       }
     });
@@ -392,7 +386,6 @@ export class StorageList implements OnInit {
       error: (err) => {
         this.error.set('Failed to delete storage object');
         this.toastService.error('Failed to delete storage object');
-        console.error('Error deleting storage object:', err);
       }
     });
   }
@@ -416,7 +409,6 @@ export class StorageList implements OnInit {
           },
           error: (err) => {
             this.toastService.error('Failed to create storage object');
-            console.error('Error creating storage object:', err);
           }
         });
       }
@@ -451,7 +443,6 @@ export class StorageList implements OnInit {
           },
           error: (err) => {
             this.toastService.error('Failed to update storage object');
-            console.error('Error updating storage object:', err);
           }
         });
       }
@@ -549,7 +540,6 @@ export class StorageList implements OnInit {
       this.toastService.success('Share link copied to clipboard');
     }).catch(err => {
       this.toastService.error('Failed to copy link');
-      console.error('Failed to copy:', err);
     });
   }
 
@@ -596,8 +586,7 @@ export class StorageList implements OnInit {
         metadataMap.set(reagentId, columns.filter((col: MetadataColumn) => !col.hidden));
         this.reagentMetadata.set(new Map(metadataMap));
       },
-      error: (err) => {
-        console.error('Error loading reagent metadata:', err);
+      error: () => {
       }
     });
   }
@@ -622,7 +611,6 @@ export class StorageList implements OnInit {
         }
       },
       () => {
-        // Modal dismissed (e.g., backdrop click or ESC)
       }
     );
   }

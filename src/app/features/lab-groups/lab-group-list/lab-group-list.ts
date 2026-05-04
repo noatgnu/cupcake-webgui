@@ -1,8 +1,8 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { LabGroup, LabGroupService, ToastService, AuthService, User, LabGroupMember, LabGroupPathItem } from '@noatgnu/cupcake-core';
+import { LabGroup, LabGroupService, ToastService, AuthService, LabGroupMember, LabGroupPathItem } from '@noatgnu/cupcake-core';
 import { LabGroupPermissionsModal } from '../lab-group-permissions-modal/lab-group-permissions-modal';
 import { LabGroupEditModal } from '../lab-group-edit-modal/lab-group-edit-modal';
 import { LabGroupInviteModal } from '../lab-group-invite-modal/lab-group-invite-modal';
@@ -10,9 +10,10 @@ import { LabGroupCreateModal } from '../lab-group-create-modal/lab-group-create-
 
 @Component({
   selector: 'app-lab-group-list',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './lab-group-list.html',
-  styleUrl: './lab-group-list.scss'
+  styleUrl: './lab-group-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LabGroupList implements OnInit {
   private labGroupService = inject(LabGroupService);
@@ -20,7 +21,7 @@ export class LabGroupList implements OnInit {
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
 
-  currentUser = signal<User | null>(null);
+  currentUser = this.authService.currentUser;
   isStaff = computed(() => {
     const user = this.currentUser();
     if (!user) return false;
@@ -53,13 +54,6 @@ export class LabGroupList implements OnInit {
   }
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
-    this.currentUser.set(user);
-
-    this.authService.currentUser$.subscribe(updatedUser => {
-      this.currentUser.set(updatedUser);
-    });
-
     this.loadChildLabGroups();
   }
 
@@ -93,7 +87,6 @@ export class LabGroupList implements OnInit {
       error: (err) => {
         this.error.set('Failed to load lab groups');
         this.loadingChildren.set(false);
-        console.error('Error loading lab groups:', err);
       }
     });
   }
@@ -134,9 +127,6 @@ export class LabGroupList implements OnInit {
         this.loadingMembers.set(false);
       },
       error: (err) => {
-        if (err.status !== 403) {
-          console.error('Error loading members:', err);
-        }
         this.members.set([]);
         this.memberTotal.set(0);
         this.loadingMembers.set(false);

@@ -1,5 +1,5 @@
-import { Component, inject, signal, computed, ViewChild, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, computed, ViewChild, Input, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
@@ -10,9 +10,10 @@ import { MolarityCalculatorAnnotation } from '../../../protocols/molarity-calcul
 
 @Component({
   selector: 'app-add-annotation-modal',
-  imports: [CommonModule, FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation],
+  imports: [FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation],
   templateUrl: './add-annotation-modal.html',
   styleUrl: './add-annotation-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AddAnnotationModal {
   public activeModal = inject(NgbActiveModal);

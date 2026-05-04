@@ -18,7 +18,7 @@
               [(ngModel)]="searchQuery"
               (ngModelChange)="onSearchChange()">
           </div>
-          @if (currentUser$ | async; as user) {
+          @if (authService.currentUser(); as user) {
             @if (user.isStaff) {
               <button class="btn btn-primary btn-sm" (click)="openCreateModal()">
                 <i class="bi bi-plus-lg me-2"></i>
@@ -84,7 +84,7 @@
                           @if (user.isSuperuser) {
                             <span class="badge bg-warning">Superuser</span>
                           }
-                          @if (currentUser$ | async; as currentUser) {
+                          @if (authService.currentUser(); as currentUser) {
                             @if (currentUser.isStaff) {
                               @if (!user.isActive) {
                                 <span class="badge bg-secondary">Inactive</span>
@@ -130,7 +130,7 @@
                     <i class="bi bi-person-badge me-2"></i>
                     {{ getUserDisplayName(selectedUser()!) }}
                   </h6>
-                  @if (currentUser$ | async; as currentUser) {
+                  @if (authService.currentUser(); as currentUser) {
                     @if (currentUser.isStaff) {
                       <button class="btn btn-outline-secondary btn-sm" (click)="openEditModal(selectedUser()!)">
                         <i class="bi bi-pencil"></i> Edit
@@ -157,7 +157,7 @@
                     <dd class="col-sm-9">{{ selectedUser()!.lastName }}</dd>
                   }
 
-                  @if (currentUser$ | async; as currentUser) {
+                  @if (authService.currentUser(); as currentUser) {
                     @if (currentUser.isStaff) {
                       <dt class="col-sm-3">Status</dt>
                       <dd class="col-sm-9">

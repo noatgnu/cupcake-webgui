@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { Observable, of, catchError, debounceTime, distinctUntilChanged, tap, switchMap, map } from 'rxjs';
@@ -24,9 +24,10 @@ import { InstrumentService } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-instrument-metadata-modal',
-  imports: [CommonModule, FormsModule, NgbModule],
+  imports: [FormsModule, NgbModule],
   templateUrl: './instrument-metadata-modal.html',
-  styleUrl: './instrument-metadata-modal.scss'
+  styleUrl: './instrument-metadata-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentMetadataModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -89,7 +90,6 @@ export class InstrumentMetadataModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load metadata');
-        console.error('Error loading metadata:', err);
         this.loading.set(false);
       }
     });
@@ -109,8 +109,7 @@ export class InstrumentMetadataModal implements OnInit {
         this.totalTemplatePages.set(Math.ceil(response.count / this.templatePageSize));
         this.loadingTemplates.set(false);
       },
-      error: (err) => {
-        console.error('Error loading templates:', err);
+      error: () => {
         this.loadingTemplates.set(false);
       }
     });
@@ -381,7 +380,6 @@ export class InstrumentMetadataModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to add metadata field');
-        console.error('Error adding metadata field:', err);
         this.saving.set(false);
       }
     });
@@ -436,7 +434,6 @@ export class InstrumentMetadataModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update metadata');
-        console.error('Error updating metadata:', err);
         this.saving.set(false);
       }
     });
@@ -456,7 +453,6 @@ export class InstrumentMetadataModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete metadata field');
-        console.error('Error deleting metadata field:', err);
       }
     });
   }

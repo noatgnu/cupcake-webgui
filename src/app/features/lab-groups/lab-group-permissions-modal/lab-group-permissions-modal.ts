@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -22,9 +22,10 @@ interface MemberWithPermission {
 
 @Component({
   selector: 'app-lab-group-permissions-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './lab-group-permissions-modal.html',
-  styleUrl: './lab-group-permissions-modal.scss'
+  styleUrl: './lab-group-permissions-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LabGroupPermissionsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -39,7 +40,7 @@ export class LabGroupPermissionsModal implements OnInit {
   saving = signal(false);
 
   isStaff = computed(() => {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user?.isStaff ?? false;
   });
 
@@ -74,14 +75,12 @@ export class LabGroupPermissionsModal implements OnInit {
           },
           error: (err) => {
             this.toastService.error('Failed to load permissions');
-            console.error('Error loading permissions:', err);
             this.loading.set(false);
           }
         });
       },
       error: (err) => {
         this.toastService.error('Failed to load members');
-        console.error('Error loading members:', err);
         this.loading.set(false);
       }
     });
@@ -139,7 +138,6 @@ export class LabGroupPermissionsModal implements OnInit {
       })
       .catch((err) => {
         this.toastService.error('Failed to update permissions');
-        console.error('Error updating permissions:', err);
         this.saving.set(false);
       });
   }

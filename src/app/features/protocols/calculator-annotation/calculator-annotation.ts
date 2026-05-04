@@ -1,5 +1,5 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, signal, computed, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '@noatgnu/cupcake-core';
 
@@ -15,9 +15,10 @@ interface HistoryEntry {
 
 @Component({
   selector: 'app-calculator-annotation',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './calculator-annotation.html',
-  styleUrl: './calculator-annotation.scss'
+  styleUrl: './calculator-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CalculatorAnnotation implements OnInit {
   private toastService = inject(ToastService);

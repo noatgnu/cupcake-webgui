@@ -1,10 +1,10 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 
 @Component({
   selector: 'app-step-four-template',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './step-four-template.html',
   styleUrl: './step-four-template.scss'
 })

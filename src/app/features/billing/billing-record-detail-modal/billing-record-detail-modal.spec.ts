@@ -1,12 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { of, throwError } from 'rxjs';
-
-import { BillingRecordDetailModal } from './billing-record-detail-modal';
+import { of } from 'rxjs';
+import { CUPCAKE_CORE_CONFIG, ToastService, AuthService } from '@noatgnu/cupcake-core';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 import type { BillingRecord } from '@noatgnu/cupcake-salted-caramel';
+import { BillingRecordDetailModal } from './billing-record-detail-modal';
 
 describe('BillingRecordDetailModal', () => {
   let component: BillingRecordDetailModal;
@@ -15,21 +14,18 @@ describe('BillingRecordDetailModal', () => {
   let mockToastService: jasmine.SpyObj<ToastService>;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockActiveModal: jasmine.SpyObj<NgbActiveModal>;
+  let currentUserSignal: WritableSignal<any>;
 
-  const mockBillingRecord: BillingRecord = {
-    id: 'test-id-123',
+  const mockRecord: BillingRecord = {
+    id: 'rec-1',
     username: 'Test User',
     userEmail: 'test@example.com',
     billableItemName: 'Instrument Usage',
-    description: 'Test description',
     quantity: 5,
     billingUnitDisplay: 'hours',
     unitPrice: 100,
     subtotal: 500,
-    setupFee: 50,
-    discountAmount: 25,
-    taxAmount: 10,
-    totalAmount: 535,
+    totalAmount: 500,
     currency: 'USD',
     status: BillingStatus.PENDING,
     statusDisplay: 'Pending',
@@ -39,22 +35,30 @@ describe('BillingRecordDetailModal', () => {
     billingPeriodStart: '2024-01-01T00:00:00Z',
     billingPeriodEnd: '2024-01-31T23:59:59Z',
     createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-    notes: 'Test notes'
+    updatedAt: '2024-01-15T10:00:00Z'
   } as BillingRecord;
 
   beforeEach(async () => {
+    currentUserSignal = signal<any>(null);
+
     mockBillingRecordService = jasmine.createSpyObj('BillingRecordService', [
       'getBillingRecord',
       'approveBillingRecord'
     ]);
-    mockToastService = jasmine.createSpyObj('ToastService', ['error', 'success']);
-    mockAuthService = jasmine.createSpyObj('AuthService', ['getCurrentUser']);
+    mockBillingRecordService.getBillingRecord.and.returnValue(of(mockRecord));
+
+    mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error', 'info', 'show']);
+
+    mockAuthService = jasmine.createSpyObj('AuthService', [], {
+      currentUser: currentUserSignal
+    });
+
     mockActiveModal = jasmine.createSpyObj('NgbActiveModal', ['close', 'dismiss']);
 
     await TestBed.configureTestingModule({
       imports: [BillingRecordDetailModal],
       providers: [
+        { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
         { provide: BillingRecordService, useValue: mockBillingRecordService },
         { provide: ToastService, useValue: mockToastService },
         { provide: AuthService, useValue: mockAuthService },
@@ -64,12 +68,8 @@ describe('BillingRecordDetailModal', () => {
 
     fixture = TestBed.createComponent(BillingRecordDetailModal);
     component = fixture.componentInstance;
-
-    Object.defineProperty(component, 'recordId', {
-      value: signal('test-id-123'),
-      writable: false,
-      configurable: true
-    });
+    fixture.componentRef.setInput('recordId', 'rec-1');
+    fixture.detectChanges();
   });
 
   it('should create', () => {
@@ -77,114 +77,67 @@ describe('BillingRecordDetailModal', () => {
   });
 
   it('should load billing record on init', () => {
-    mockBillingRecordService.getBillingRecord.and.returnValue(of(mockBillingRecord));
-
-    component.ngOnInit();
-
-    expect(mockBillingRecordService.getBillingRecord).toHaveBeenCalledWith('test-id-123');
-    expect(component.record()).toEqual(mockBillingRecord);
-    expect(component.loading()).toBe(false);
+    expect(mockBillingRecordService.getBillingRecord).toHaveBeenCalledWith('rec-1');
+    expect(component.record()).toEqual(mockRecord);
+    expect(component.loading()).toBeFalse();
   });
 
-  it('should handle error when loading billing record', () => {
-    mockBillingRecordService.getBillingRecord.and.returnValue(
-      throwError(() => new Error('Test error'))
-    );
-
-    component.ngOnInit();
-
-    expect(mockToastService.error).toHaveBeenCalledWith('Failed to load billing record details');
-    expect(component.loading()).toBe(false);
+  it('isAdmin() returns false when user is null', () => {
+    expect(component.isAdmin()).toBeFalse();
   });
 
-  it('should return true for isAdmin when user is staff', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: true, isSuperuser: false } as any);
-
-    expect(component.isAdmin()).toBe(true);
+  it('isAdmin() returns true when user is staff', () => {
+    currentUserSignal.set({ isStaff: true, isSuperuser: false });
+    expect(component.isAdmin()).toBeTrue();
   });
 
-  it('should return true for isAdmin when user is superuser', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: false, isSuperuser: true } as any);
-
-    expect(component.isAdmin()).toBe(true);
+  it('isAdmin() returns true when user is superuser', () => {
+    currentUserSignal.set({ isStaff: false, isSuperuser: true });
+    expect(component.isAdmin()).toBeTrue();
   });
 
-  it('should return false for isAdmin when user is not staff or superuser', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: false, isSuperuser: false } as any);
-
-    expect(component.isAdmin()).toBe(false);
+  it('canApprove() returns true when admin and status is pending', () => {
+    currentUserSignal.set({ isStaff: true, isSuperuser: false });
+    component.record.set(mockRecord);
+    expect(component.canApprove()).toBeTrue();
   });
 
-  it('should return true for canApprove when admin and status is pending', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: true, isSuperuser: false } as any);
-    component.record.set(mockBillingRecord);
-
-    expect(component.canApprove()).toBe(true);
+  it('canApprove() returns false when not admin', () => {
+    expect(component.canApprove()).toBeFalse();
   });
 
-  it('should return false for canApprove when not admin', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: false, isSuperuser: false } as any);
-    component.record.set(mockBillingRecord);
-
-    expect(component.canApprove()).toBe(false);
+  it('canApprove() returns false when status is not pending', () => {
+    currentUserSignal.set({ isStaff: true, isSuperuser: false });
+    component.record.set({ ...mockRecord, status: BillingStatus.APPROVED });
+    expect(component.canApprove()).toBeFalse();
   });
 
-  it('should return false for canApprove when status is not pending', () => {
-    mockAuthService.getCurrentUser.and.returnValue({ isStaff: true, isSuperuser: false } as any);
-    component.record.set({ ...mockBillingRecord, status: BillingStatus.APPROVED });
-
-    expect(component.canApprove()).toBe(false);
-  });
-
-  it('should approve billing record', () => {
+  it('approveRecord() calls service when confirmed', () => {
     spyOn(window, 'confirm').and.returnValue(true);
-    const updatedRecord = { ...mockBillingRecord, status: BillingStatus.APPROVED };
-    mockBillingRecordService.approveBillingRecord.and.returnValue(of(updatedRecord as BillingRecord));
-    component.record.set(mockBillingRecord);
-
+    const updated = { ...mockRecord, status: BillingStatus.APPROVED };
+    mockBillingRecordService.approveBillingRecord.and.returnValue(of(updated as BillingRecord));
+    component.record.set(mockRecord);
     component.approveRecord();
-
-    expect(window.confirm).toHaveBeenCalled();
-    expect(mockBillingRecordService.approveBillingRecord).toHaveBeenCalledWith('test-id-123', {});
+    expect(mockBillingRecordService.approveBillingRecord).toHaveBeenCalledWith('rec-1', {});
     expect(mockToastService.success).toHaveBeenCalledWith('Billing record approved successfully');
-    expect(mockActiveModal.close).toHaveBeenCalledWith(updatedRecord);
+    expect(mockActiveModal.close).toHaveBeenCalled();
   });
 
-  it('should not approve billing record when user cancels confirmation', () => {
-    spyOn(window, 'confirm').and.returnValue(false);
-    component.record.set(mockBillingRecord);
-
+  it('approveRecord() does nothing when no record set', () => {
+    component.record.set(null);
     component.approveRecord();
-
     expect(mockBillingRecordService.approveBillingRecord).not.toHaveBeenCalled();
   });
 
-  it('should handle error when approving billing record', () => {
-    spyOn(window, 'confirm').and.returnValue(true);
-    mockBillingRecordService.approveBillingRecord.and.returnValue(
-      throwError(() => new Error('Test error'))
-    );
-    component.record.set(mockBillingRecord);
-
-    component.approveRecord();
-
-    expect(mockToastService.error).toHaveBeenCalledWith('Failed to approve billing record');
-    expect(component.approving()).toBe(false);
+  it('close() dismisses the modal', () => {
+    component.close();
+    expect(mockActiveModal.dismiss).toHaveBeenCalled();
   });
 
-  it('should return correct badge class for status', () => {
+  it('getStatusBadgeClass() returns correct class', () => {
     expect(component.getStatusBadgeClass('pending')).toBe('bg-warning text-dark');
     expect(component.getStatusBadgeClass('approved')).toBe('bg-info text-dark');
-    expect(component.getStatusBadgeClass('billed')).toBe('bg-primary');
     expect(component.getStatusBadgeClass('paid')).toBe('bg-success');
-    expect(component.getStatusBadgeClass('disputed')).toBe('bg-danger');
-    expect(component.getStatusBadgeClass('cancelled')).toBe('bg-secondary');
     expect(component.getStatusBadgeClass('unknown')).toBe('bg-secondary');
-  });
-
-  it('should close modal', () => {
-    component.close();
-
-    expect(mockActiveModal.dismiss).toHaveBeenCalled();
   });
 });

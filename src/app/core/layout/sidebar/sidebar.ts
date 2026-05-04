@@ -1,9 +1,8 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit, OnDestroy, computed, effect } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
 import { ThemeService, AuthService, SiteConfigService, DemoModeService } from '@noatgnu/cupcake-core';
-import type { SiteConfig } from '@noatgnu/cupcake-core';
 import { NotificationDropdown } from '../../../shared/components/notification-dropdown/notification-dropdown';
 import { MessagingDropdown } from '../../../shared/components/messaging-dropdown/messaging-dropdown';
 import { AsyncTaskDropdown } from '../../../shared/components/async-task-dropdown/async-task-dropdown';
@@ -14,7 +13,8 @@ import { Subscription } from 'rxjs';
   selector: 'app-sidebar',
   imports: [RouterLink, RouterLinkActive, CommonModule, NotificationDropdown, MessagingDropdown, AsyncTaskDropdown],
   templateUrl: './sidebar.html',
-  styleUrl: './sidebar.scss'
+  styleUrl: './sidebar.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Sidebar implements OnInit, OnDestroy {
   private offcanvasService = inject(NgbOffcanvas);
@@ -26,24 +26,19 @@ export class Sidebar implements OnInit, OnDestroy {
   private demoModeService = inject(DemoModeService);
   private subscription?: Subscription;
 
-  currentUser$ = this.authService.currentUser$;
   isCollapsed = signal(false);
-  currentUser = signal(this.authService.getCurrentUser());
-  siteConfig = signal<SiteConfig | null>(null);
-  siteConfig$ = this.siteConfigService.config$;
+  currentUser = this.authService.currentUser;
+  siteConfig = this.siteConfigService.siteConfig;
   isDemoMode = signal(false);
 
-  ngOnInit(): void {
-    this.currentUser.set(this.authService.getCurrentUser());
-    this.authService.currentUser$.subscribe(user => {
-      this.currentUser.set(user);
-    });
-    this.siteConfigService.config$.subscribe(config => {
-      this.siteConfig.set(config);
-    });
-    this.demoModeService.demoMode$.subscribe(info => {
+  constructor() {
+    effect(() => {
+      const info = this.demoModeService.demoMode();
       this.isDemoMode.set(info.isActive);
     });
+  }
+
+  ngOnInit(): void {
     this.subscription = this.sidebarControl.toggle$.subscribe(() => {
       this.isCollapsed.update(v => !v);
     });

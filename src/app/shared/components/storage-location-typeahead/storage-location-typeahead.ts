@@ -1,5 +1,5 @@
-import { Component, inject, Input, Output, EventEmitter, signal, effect, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, Output, EventEmitter, signal, effect, OnDestroy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { StorageService, StorageObject, StoragePathUtils } from '@noatgnu/cupcake-macaron';
 import { Subject, Subscription } from 'rxjs';
@@ -7,9 +7,10 @@ import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-storage-location-typeahead',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './storage-location-typeahead.html',
-  styleUrl: './storage-location-typeahead.scss'
+  styleUrl: './storage-location-typeahead.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StorageLocationTypeahead implements OnDestroy {
   private storageService = inject(StorageService);
@@ -46,8 +47,7 @@ export class StorageLocationTypeahead implements OnDestroy {
         this.showDropdown.set(true);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error searching storage objects:', err);
+      error: () => {
         this.results.set([]);
         this.loading.set(false);
       }

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -11,15 +11,14 @@ import { UserEditModal } from '../user-edit-modal/user-edit-modal';
   selector: 'app-user-list',
   imports: [CommonModule, FormsModule],
   templateUrl: './user-list.html',
-  styleUrl: './user-list.scss'
+  styleUrl: './user-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserList implements OnInit {
   private userManagementService = inject(UserManagementService);
   private toastService = inject(ToastService);
-  private authService = inject(AuthService);
+  protected authService = inject(AuthService);
   private modalService = inject(NgbModal);
-
-  currentUser$ = this.authService.currentUser$;
 
   users = signal<User[]>([]);
   selectedUser = signal<User | null>(null);
@@ -65,7 +64,6 @@ export class UserList implements OnInit {
       error: (err) => {
         this.error.set('Failed to load users');
         this.loading.set(false);
-        console.error('Error loading users:', err);
       }
     });
   }
@@ -136,7 +134,7 @@ export class UserList implements OnInit {
   }
 
   isStaff(): boolean {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user?.isStaff ?? false;
   }
 }

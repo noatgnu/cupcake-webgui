@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SiteConfigService, ToastService, AuthService } from '@noatgnu/cupcake-core';
@@ -9,7 +9,8 @@ import { AdminNavbar } from '../admin-navbar/admin-navbar';
   selector: 'app-site-config',
   imports: [CommonModule, FormsModule, AdminNavbar],
   templateUrl: './site-config.html',
-  styleUrl: './site-config.scss'
+  styleUrl: './site-config.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SiteConfig implements OnInit {
   private siteConfigService = inject(SiteConfigService);
@@ -75,8 +76,7 @@ export class SiteConfig implements OnInit {
         this.formData.set(formDataValue);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading site config:', err);
+      error: () => {
         this.toastService.error('Failed to load site configuration');
         this.loading.set(false);
       }
@@ -103,8 +103,7 @@ export class SiteConfig implements OnInit {
         this.toastService.success('Site configuration updated successfully');
         this.saving.set(false);
       },
-      error: (err) => {
-        console.error('Error updating site config:', err);
+      error: () => {
         this.toastService.error('Failed to update site configuration');
         this.saving.set(false);
       }
@@ -158,8 +157,7 @@ export class SiteConfig implements OnInit {
         this.availableWhisperModels.set(response.models);
         this.loadingWhisperModels.set(false);
       },
-      error: (err: any) => {
-        console.error('Error loading Whisper models:', err);
+      error: () => {
         this.toastService.error('Failed to load available Whisper models');
         this.loadingWhisperModels.set(false);
       }
@@ -176,8 +174,7 @@ export class SiteConfig implements OnInit {
           this.loadAvailableWhisperModels();
         }, 2000);
       },
-      error: (err: any) => {
-        console.error('Error refreshing Whisper models:', err);
+      error: () => {
         this.toastService.error('Failed to refresh Whisper models');
         this.refreshingWhisperModels.set(false);
       }

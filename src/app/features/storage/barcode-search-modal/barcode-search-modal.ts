@@ -1,14 +1,15 @@
-import { Component, inject, OnInit, signal, ViewChild, ElementRef, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import Quagga from '@ericblade/quagga2';
 
 @Component({
   selector: 'app-barcode-search-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './barcode-search-modal.html',
-  styleUrl: './barcode-search-modal.scss'
+  styleUrl: './barcode-search-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BarcodeSearchModal implements OnInit, OnDestroy {
   private activeModal = inject(NgbActiveModal);
@@ -74,7 +75,6 @@ export class BarcodeSearchModal implements OnInit, OnDestroy {
         frequency: 10
       }, (err: any) => {
         if (err) {
-          console.error('Quagga initialization failed:', err);
           this.error.set('Failed to initialize camera. Please check permissions.');
           this.stopScanning();
           return;
@@ -99,7 +99,6 @@ export class BarcodeSearchModal implements OnInit, OnDestroy {
         Quagga.stop();
         this.quaggaInitialized = false;
       } catch (err) {
-        console.error('Error stopping Quagga:', err);
       }
     }
 

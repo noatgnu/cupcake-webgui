@@ -1,5 +1,5 @@
-import { Component, inject, signal, OnInit, computed, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, OnInit, computed, ViewChild, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
@@ -13,9 +13,10 @@ import type { InstrumentUsage } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-annotation-modal',
-  imports: [CommonModule, FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation, SketchAnnotation],
+  imports: [FormsModule, MediaRecorderAnnotation, InstrumentBookingAnnotation, CalculatorAnnotation, MolarityCalculatorAnnotation, SketchAnnotation],
   templateUrl: './annotation-modal.html',
-  styleUrl: './annotation-modal.scss'
+  styleUrl: './annotation-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AnnotationModal implements OnInit {
   public activeModal = inject(NgbActiveModal);

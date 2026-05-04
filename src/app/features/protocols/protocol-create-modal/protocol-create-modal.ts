@@ -1,5 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
@@ -7,9 +7,10 @@ import { ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-protocol-create-modal',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './protocol-create-modal.html',
-  styleUrl: './protocol-create-modal.scss'
+  styleUrl: './protocol-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProtocolCreateModal {
   private fb = inject(FormBuilder);
@@ -50,7 +51,6 @@ export class ProtocolCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create protocol');
-        console.error('Error creating protocol:', err);
         this.saving = false;
       }
     });
@@ -78,7 +78,6 @@ export class ProtocolCreateModal {
       },
       error: (err) => {
         this.toastService.error(err?.error?.error || 'Failed to import protocol from protocols.io');
-        console.error('Error importing protocol:', err);
         this.saving = false;
       }
     });

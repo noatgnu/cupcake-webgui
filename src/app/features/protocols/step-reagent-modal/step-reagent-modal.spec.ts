@@ -36,7 +36,7 @@ describe('StepReagentModal', () => {
   const mockStepReagent = {
     id: 1,
     step: 1,
-    reagent: 1,
+    reagent: { id: 1, name: 'Water', unit: 'mL', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
     reagentName: 'Water',
     reagentUnit: 'mL',
     quantity: 100,
@@ -95,7 +95,9 @@ describe('StepReagentModal', () => {
   it('should initialize form with existing values for editing', () => {
     component.stepReagent = mockStepReagent;
     fixture.detectChanges();
-    expect(mockReagentService.getReagent).toHaveBeenCalledWith(1);
+    expect(component.reagentForm.value.reagentName).toBe('Water');
+    expect(component.reagentForm.value.quantity).toBe(100);
+    expect(component.reagentForm.value.scalableFactor).toBe(1.5);
   });
 
   it('should create step reagent when save is called without existing stepReagent', () => {

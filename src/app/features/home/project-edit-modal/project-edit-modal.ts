@@ -1,5 +1,5 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectService, Project, ProjectCreateRequest, ProjectUpdateRequest } from '@noatgnu/cupcake-red-velvet';
@@ -7,9 +7,10 @@ import { ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-project-edit-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './project-edit-modal.html',
-  styleUrl: './project-edit-modal.scss'
+  styleUrl: './project-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectEditModal implements OnInit {
   activeModal = inject(NgbActiveModal);
@@ -56,7 +57,6 @@ export class ProjectEditModal implements OnInit {
         this.activeModal.close(project);
       },
       error: (err) => {
-        console.error('Error creating project:', err);
         this.toastService.error('Failed to create project');
         this.saving.set(false);
       }
@@ -76,7 +76,6 @@ export class ProjectEditModal implements OnInit {
         this.activeModal.close(project);
       },
       error: (err) => {
-        console.error('Error updating project:', err);
         this.toastService.error('Failed to update project');
         this.saving.set(false);
       }

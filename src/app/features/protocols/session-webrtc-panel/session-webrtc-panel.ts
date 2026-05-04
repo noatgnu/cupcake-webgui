@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
@@ -47,6 +47,7 @@ interface DisplayChatMessage {
   imports: [CommonModule, FormsModule, NgbDropdownModule],
   templateUrl: './session-webrtc-panel.html',
   styleUrl: './session-webrtc-panel.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionWebrtcPanel implements OnInit, OnDestroy {
   @Input() ccrvSessionId!: number;
@@ -93,7 +94,7 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
   });
 
   hasEditPermission = computed(() => {
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.currentUser();
     return currentUser !== null;
   });
 
@@ -122,7 +123,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     try {
       localStorage.setItem(this.VIDEO_DEVICE_KEY, deviceId);
     } catch (error) {
-      console.error('Failed to save video device preference:', error);
     }
   }
 
@@ -130,7 +130,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     try {
       localStorage.setItem(this.AUDIO_DEVICE_KEY, deviceId);
     } catch (error) {
-      console.error('Failed to save audio device preference:', error);
     }
   }
 
@@ -138,7 +137,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     try {
       return localStorage.getItem(this.VIDEO_DEVICE_KEY);
     } catch (error) {
-      console.error('Failed to load video device preference:', error);
       return null;
     }
   }
@@ -147,7 +145,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     try {
       return localStorage.getItem(this.AUDIO_DEVICE_KEY);
     } catch (error) {
-      console.error('Failed to load audio device preference:', error);
       return null;
     }
   }
@@ -169,10 +166,8 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
 
       if (response && response.results) {
         this.availableSessions.set(response.results);
-        console.log('Loaded available WebRTC sessions:', response.results);
       }
     } catch (error) {
-      console.error('Failed to load available WebRTC sessions:', error);
     } finally {
       this.isLoadingSessions.set(false);
     }
@@ -209,7 +204,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         this.selectedSessionId.set(newSession.id);
       }
     } catch (error) {
-      console.error('Failed to create WebRTC session:', error);
       this.toastService.error('Failed to create session');
     } finally {
       this.isCreatingNewSession.set(false);
@@ -235,7 +229,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         this.selectedSessionId.set(null);
       }
     } catch (error) {
-      console.error('Failed to delete WebRTC session:', error);
       this.toastService.error('Failed to delete session');
     } finally {
       this.isDeletingSession.set(false);
@@ -252,7 +245,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     this.webrtcService.connectionState$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(state => {
-      console.log('WebRTC connection state:', state);
       this.isConnected.set(state === 'connected' || state === 'connecting');
     });
 
@@ -277,7 +269,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     this.signalingService.connected$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(connected => {
-      console.log('Signaling connected:', connected);
       if (connected) {
         this.isConnected.set(true);
       }
@@ -302,13 +293,12 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     this.webrtcService.dataChannelReady$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(ready => {
-      console.log('Data channel ready state changed:', ready);
       this.dataChannelReady.set(ready);
     });
   }
 
   private handleIncomingChatMessage(chatMessage: ChatMessage): void {
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.currentUser();
     const isLocal = currentUser?.username === chatMessage.username;
 
     const displayMessage: DisplayChatMessage = {
@@ -399,24 +389,12 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       const enableVideo = this.videoEnabled();
       const enableAudio = this.audioEnabled();
 
-      console.log('Connect attempt:', {
-        videoEnabled: this.videoEnabled(),
-        audioEnabled: this.audioEnabled(),
-        selectedVideoDevice: this.selectedVideoDevice(),
-        selectedAudioDevice: this.selectedAudioDevice(),
-        enableVideo,
-        enableAudio,
-        ccrvSessionId: this.ccrvSessionId,
-        selectedSessionId: this.selectedSessionId()
-      });
-
       let session: WebRTCSession;
 
       if (this.selectedSessionId()) {
         const existingSession = this.availableSessions().find(s => s.id === this.selectedSessionId());
         if (existingSession) {
           session = existingSession;
-          console.log('Joining existing WebRTC session:', session);
         } else {
           throw new Error('Selected session not found');
         }
@@ -425,7 +403,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         if (!session) {
           throw new Error('Failed to join WebRTC session');
         }
-        console.log('Joined default WebRTC session:', session);
       }
 
       this.webrtcSession.set(session);
@@ -442,7 +419,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       this.isCreatingSession.set(false);
       this.toastService.success('Connected to WebRTC session');
     } catch (error) {
-      console.error('Failed to connect to WebRTC session:', error);
       this.isCreatingSession.set(false);
       this.toastService.error('Failed to connect to WebRTC session');
     }
@@ -469,7 +445,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
           await this.webrtcService.disableVideo();
         }
       } catch (error) {
-        console.error('Failed to toggle video:', error);
         this.videoEnabled.set(!isEnabling);
         this.toastService.error('Failed to toggle video');
       }
@@ -488,7 +463,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
           await this.webrtcService.disableAudio();
         }
       } catch (error) {
-        console.error('Failed to toggle audio:', error);
         this.audioEnabled.set(!isEnabling);
         this.toastService.error('Failed to toggle audio');
       }
@@ -508,7 +482,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         this.signalingService.sendPeerState(undefined, undefined, undefined, true);
         this.toastService.success('Screen sharing started');
       } catch (error) {
-        console.error('Failed to start screen sharing:', error);
         this.toastService.error('Failed to start screen sharing');
       }
     }
@@ -546,7 +519,7 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     const message = this.chatInput.trim();
     if (!message || !this.isConnected()) return;
 
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.currentUser();
     if (!currentUser) return;
 
     this.webrtcService.sendChatMessage(message);
@@ -586,7 +559,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       const savedVideoDevice = this.loadVideoDevicePreference();
       if (savedVideoDevice && videoDevices.some(d => d.deviceId === savedVideoDevice)) {
         this.selectedVideoDevice.set(savedVideoDevice);
-        console.log('Loaded saved video device:', savedVideoDevice);
       } else if (videoDevices.length > 0) {
         this.selectedVideoDevice.set(videoDevices[0].deviceId);
       }
@@ -594,17 +566,11 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       const savedAudioDevice = this.loadAudioDevicePreference();
       if (savedAudioDevice && audioDevices.some(d => d.deviceId === savedAudioDevice)) {
         this.selectedAudioDevice.set(savedAudioDevice);
-        console.log('Loaded saved audio device:', savedAudioDevice);
       } else if (audioDevices.length > 0) {
         this.selectedAudioDevice.set(audioDevices[0].deviceId);
       }
 
-      console.log('Devices enumerated:', {
-        videoDevices: videoDevices.length,
-        audioDevices: audioDevices.length
-      });
     } catch (error) {
-      console.error('Failed to enumerate devices:', error);
       this.toastService.error('Failed to enumerate media devices');
       this.videoEnabled.set(false);
       this.audioEnabled.set(false);
@@ -669,11 +635,9 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     }
 
     try {
-      console.log('Switching video device to:', deviceId);
       await this.webrtcService.switchVideoDevice(deviceId);
       this.toastService.success('Video device changed');
     } catch (error) {
-      console.error('Failed to switch video device:', error);
       this.toastService.error('Failed to switch video device');
     }
   }
@@ -684,11 +648,9 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     }
 
     try {
-      console.log('Switching audio device to:', deviceId);
       await this.webrtcService.switchAudioDevice(deviceId);
       this.toastService.success('Audio device changed');
     } catch (error) {
-      console.error('Failed to switch audio device:', error);
       this.toastService.error('Failed to switch audio device');
     }
   }
@@ -734,7 +696,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         }
       }
     } catch (error) {
-      console.error('Failed to update session name:', error);
       this.toastService.error('Failed to update session name');
     }
   }
@@ -756,7 +717,6 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
         this.toastService.success('Session set as default');
       }
     } catch (error) {
-      console.error('Failed to set session as default:', error);
       this.toastService.error('Failed to set session as default');
     }
   }

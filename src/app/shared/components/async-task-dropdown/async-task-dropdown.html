@@ -35,7 +35,7 @@
       } @else {
         <div class="tasks-list" style="max-height: 400px; overflow-y: auto;">
           @for (task of recentTasks(); track task.id) {
-            <div class="dropdown-item task-item" [class.has-download]="task.result?.download_url">
+            <div class="dropdown-item task-item" [class.has-download]="task.result?.['download_url']">
               <div class="d-flex flex-column gap-2">
                 <div class="d-flex justify-content-between align-items-start">
                   <div class="flex-grow-1 overflow-hidden">
@@ -86,7 +86,7 @@
                     }
                   </div>
                   <div class="d-flex gap-1">
-                    @if (task.result?.download_url) {
+                    @if (task.result?.['download_url']) {
                       <button
                         class="btn btn-sm btn-outline-primary"
                         (click)="downloadTask(task, $event)"

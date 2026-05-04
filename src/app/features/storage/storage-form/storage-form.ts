@@ -1,5 +1,5 @@
-import { Component, inject, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { StorageService } from '@noatgnu/cupcake-macaron';
 import { StorageObject, StorageObjectType, StorageObjectTypeLabels, StorageObjectCreateRequest, StorageObjectUpdateRequest } from '@noatgnu/cupcake-macaron';
@@ -7,9 +7,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-storage-form',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './storage-form.html',
-  styleUrl: './storage-form.scss'
+  styleUrl: './storage-form.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StorageForm implements OnInit {
   private fb = inject(FormBuilder);
@@ -60,7 +61,6 @@ export class StorageForm implements OnInit {
         error: (err) => {
           this.error.set('Failed to update storage object');
           this.submitting.set(false);
-          console.error('Error updating storage object:', err);
         }
       });
     } else {
@@ -73,7 +73,6 @@ export class StorageForm implements OnInit {
         error: (err) => {
           this.error.set('Failed to create storage object');
           this.submitting.set(false);
-          console.error('Error creating storage object:', err);
         }
       });
     }

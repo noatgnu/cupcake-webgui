@@ -1,20 +1,16 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 import { AsyncTaskUIService } from '@noatgnu/cupcake-vanilla';
 import { AsyncTaskStatus, TaskStatus, TASK_TYPE_LABELS, TASK_STATUS_COLORS } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-async-task-floating-panel',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './async-task-floating-panel.html',
   styleUrl: './async-task-floating-panel.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AsyncTaskFloatingPanel implements OnInit, OnDestroy {
-  private destroy$ = new Subject<void>();
-
   activeTasks = signal<AsyncTaskStatus[]>([]);
   isMinimized = signal(false);
 
@@ -28,21 +24,16 @@ export class AsyncTaskFloatingPanel implements OnInit, OnDestroy {
   constructor(
     private asyncTaskService: AsyncTaskUIService,
     private router: Router
-  ) {}
-
-  ngOnInit(): void {
-    this.asyncTaskService.activeTasks$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(tasks => {
-        const taskArray = Array.isArray(tasks) ? tasks : [];
-        this.activeTasks.set(taskArray);
-      });
+  ) {
+    effect(() => {
+      const tasks = this.asyncTaskService.activeTasks();
+      this.activeTasks.set(Array.isArray(tasks) ? tasks : []);
+    });
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
+  ngOnInit(): void {}
+
+  ngOnDestroy(): void {}
 
   toggleMinimize(): void {
     this.isMinimized.set(!this.isMinimized());
@@ -64,8 +55,7 @@ export class AsyncTaskFloatingPanel implements OnInit, OnDestroy {
     event.stopPropagation();
     this.asyncTaskService.cancelTask(taskId).subscribe({
       next: () => {},
-      error: (error) => {
-        console.error('Error cancelling task:', error);
+      error: () => {
       }
     });
   }

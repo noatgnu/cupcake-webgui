@@ -1,15 +1,14 @@
-import { Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, OnDestroy, signal, ElementRef, ViewChild, effect } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
 import { AsyncTaskStatus, TaskStatus, TASK_TYPE_LABELS, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
 import { DropdownCoordinator } from '../../services/dropdown-coordinator';
 
 @Component({
   selector: 'app-async-task-dropdown',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './async-task-dropdown.html',
-  styleUrl: './async-task-dropdown.scss'
+  styleUrl: './async-task-dropdown.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AsyncTaskDropdown implements OnInit, OnDestroy {
   private asyncTaskService = inject(AsyncTaskMonitorService);
@@ -26,9 +25,6 @@ export class AsyncTaskDropdown implements OnInit, OnDestroy {
   readonly taskTypeLabels = TASK_TYPE_LABELS;
   readonly TaskStatus = TaskStatus;
 
-  private taskSubscription?: Subscription;
-  private activeTaskSubscription?: Subscription;
-
   constructor() {
     effect(() => {
       const activeDropdown = this.dropdownCoordinator.getActiveDropdown();
@@ -36,42 +32,23 @@ export class AsyncTaskDropdown implements OnInit, OnDestroy {
         this.isOpen.set(false);
       }
     });
-  }
 
-  ngOnInit(): void {
-    this.loadTasks();
-  }
-
-  ngOnDestroy(): void {
-    if (this.taskSubscription) {
-      this.taskSubscription.unsubscribe();
-    }
-    if (this.activeTaskSubscription) {
-      this.activeTaskSubscription.unsubscribe();
-    }
-  }
-
-  loadTasks(): void {
-    this.taskSubscription = this.asyncTaskService.tasks$.subscribe({
-      next: (tasks) => {
-        const taskArray = Array.isArray(tasks) ? tasks : [];
-        this.recentTasks.set(taskArray.slice(0, 10));
-      },
-      error: (err) => {
-        console.error('AsyncTaskDropdown: Error loading tasks:', err);
-      }
+    effect(() => {
+      const tasks = this.asyncTaskService.tasks();
+      const taskArray = Array.isArray(tasks) ? tasks : [];
+      this.recentTasks.set(taskArray.slice(0, 10));
     });
 
-    this.activeTaskSubscription = this.asyncTaskService.activeTasks$.subscribe({
-      next: (tasks) => {
-        const taskArray = Array.isArray(tasks) ? tasks : [];
-        this.activeCount.set(taskArray.length);
-      },
-      error: (err) => {
-        console.error('AsyncTaskDropdown: Error loading active tasks:', err);
-      }
+    effect(() => {
+      const tasks = this.asyncTaskService.activeTasks();
+      const taskArray = Array.isArray(tasks) ? tasks : [];
+      this.activeCount.set(taskArray.length);
     });
   }
+
+  ngOnInit(): void {}
+
+  ngOnDestroy(): void {}
 
   toggleDropdown(): void {
     const willBeOpen = !this.isOpen();
@@ -119,19 +96,17 @@ export class AsyncTaskDropdown implements OnInit, OnDestroy {
     event.stopPropagation();
     this.asyncTaskService.cancelTask(taskId).subscribe({
       next: () => {
-        console.log('Task cancelled successfully:', taskId);
       },
-      error: (error) => {
-        console.error('Error cancelling task:', error);
+      error: () => {
       }
     });
   }
 
   downloadTask(task: AsyncTaskStatus, event: Event): void {
     event.stopPropagation();
-    if (task.result?.download_url) {
+    if (task.result?.['download_url']) {
       const link = document.createElement('a');
-      link.href = task.result.download_url;
+      link.href = task.result['download_url'] as string;
       link.download = '';
       document.body.appendChild(link);
       link.click();

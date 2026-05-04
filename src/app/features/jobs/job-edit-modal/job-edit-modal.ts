@@ -1,5 +1,5 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit, computed } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbTypeaheadModule } from '@ng-bootstrap/ng-bootstrap';
 import { InstrumentJobService, InstrumentJob } from '@noatgnu/cupcake-macaron';
@@ -9,9 +9,10 @@ import { debounceTime, distinctUntilChanged, map, switchMap, catchError } from '
 
 @Component({
   selector: 'app-job-edit-modal',
-  imports: [CommonModule, FormsModule, NgbTypeaheadModule],
+  imports: [FormsModule, NgbTypeaheadModule],
   templateUrl: './job-edit-modal.html',
   styleUrl: './job-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobEditModal implements OnInit {
   public activeModal = inject(NgbActiveModal);
@@ -81,8 +82,7 @@ export class JobEditModal implements OnInit {
         });
         this.loadingAutocomplete.set(false);
       },
-      error: (err) => {
-        console.error('Error loading autocomplete fields:', err);
+      error: () => {
         this.loadingAutocomplete.set(false);
       }
     });
@@ -211,7 +211,6 @@ export class JobEditModal implements OnInit {
         this.activeModal.close(updatedJob);
       },
       error: (err) => {
-        console.error('Error updating job:', err);
         this.toastService.error('Failed to update job details');
         this.saving.set(false);
       }

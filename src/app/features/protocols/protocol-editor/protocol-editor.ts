@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,7 +27,8 @@ import { SessionCreateModal } from '../session-create-modal/session-create-modal
     NgbDropdownMenu
   ],
   templateUrl: './protocol-editor.html',
-  styleUrl: './protocol-editor.scss'
+  styleUrl: './protocol-editor.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProtocolEditor implements OnInit {
   private fb = inject(FormBuilder);
@@ -98,7 +99,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load protocol');
-        console.error('Error loading protocol:', err);
         this.router.navigate(['/protocols']);
       }
     });
@@ -115,7 +115,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load sections');
-        console.error('Error loading sections:', err);
         this.loading.set(false);
       }
     });
@@ -137,7 +136,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load steps');
-        console.error('Error loading steps:', err);
       }
     });
   }
@@ -180,7 +178,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to save protocol');
-        console.error('Error saving protocol:', err);
         this.saving.set(false);
       }
     });
@@ -208,7 +205,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to create section');
-        console.error('Error creating section:', err);
       }
     });
   }
@@ -231,7 +227,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to save section');
-        console.error('Error saving section:', err);
       }
     });
   }
@@ -260,7 +255,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete section');
-        console.error('Error deleting section:', err);
       }
     });
   }
@@ -355,13 +349,11 @@ export class ProtocolEditor implements OnInit {
           },
           error: (err) => {
             this.toastService.error('Failed to update step order');
-            console.error('Error updating step order:', err);
           }
         });
       },
       error: (err) => {
         this.toastService.error('Failed to update step order');
-        console.error('Error updating step order:', err);
       }
     });
   }
@@ -384,7 +376,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete step');
-        console.error('Error deleting step:', err);
       }
     });
   }
@@ -402,7 +393,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load step reagents');
-        console.error('Error loading step reagents:', err);
       }
     });
   }
@@ -458,7 +448,6 @@ export class ProtocolEditor implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to remove reagent');
-        console.error('Error removing reagent:', err);
       }
     });
   }
@@ -470,8 +459,7 @@ export class ProtocolEditor implements OnInit {
       () => {
         this.toastService.success(`Template copied: ${template}`);
       },
-      (err) => {
-        console.error('Failed to copy template:', err);
+      () => {
         this.toastService.error('Failed to copy template to clipboard');
       }
     );

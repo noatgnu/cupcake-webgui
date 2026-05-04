@@ -1,5 +1,5 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, signal, computed, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbTypeahead, NgbHighlight } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -21,9 +21,10 @@ type CalculationMode = 'dynamic' | 'massFromVolumeAndConcentration' | 'volumeFro
 
 @Component({
   selector: 'app-molarity-calculator-annotation',
-  imports: [CommonModule, FormsModule, NgbTypeahead, NgbHighlight],
+  imports: [FormsModule, NgbTypeahead, NgbHighlight],
   templateUrl: './molarity-calculator-annotation.html',
-  styleUrl: './molarity-calculator-annotation.scss'
+  styleUrl: './molarity-calculator-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MolarityCalculatorAnnotation implements OnInit {
   private toastService = inject(ToastService);

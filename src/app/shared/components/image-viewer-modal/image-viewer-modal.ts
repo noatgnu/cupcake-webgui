@@ -1,10 +1,10 @@
 import { Component, Input, inject } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'app-image-viewer-modal',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './image-viewer-modal.html',
   styleUrl: './image-viewer-modal.scss'
 })

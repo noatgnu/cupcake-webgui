@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -11,6 +11,7 @@ import { ToastService } from '@noatgnu/cupcake-core';
   imports: [CommonModule, FormsModule],
   templateUrl: './session-date-edit-modal.html',
   styleUrl: './session-date-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionDateEditModal implements OnInit {
   public activeModal = inject(NgbActiveModal);
@@ -90,7 +91,6 @@ export class SessionDateEditModal implements OnInit {
         this.activeModal.close(updatedSession);
       },
       error: (err) => {
-        console.error('Error updating session dates:', err);
         this.toastService.error('Failed to update session dates');
         this.saving.set(false);
       }

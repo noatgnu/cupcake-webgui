@@ -1,17 +1,17 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
 import { InstrumentJobService, Status, JobType, InstrumentJob } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService } from '@noatgnu/cupcake-core';
-import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-job-list',
   imports: [CommonModule, FormsModule, NgbPaginationModule],
   templateUrl: './job-list.html',
-  styleUrl: './job-list.scss'
+  styleUrl: './job-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobList implements OnInit {
   private instrumentJobService = inject(InstrumentJobService);
@@ -32,7 +32,7 @@ export class JobList implements OnInit {
   totalPages = computed(() => Math.ceil(this.totalCount() / this.pageSize));
   Math = Math;
 
-  currentUser = toSignal(this.authService.currentUser$);
+  currentUser = this.authService.currentUser;
 
   canEdit = computed(() => {
     const job = this.selectedJob();
@@ -82,7 +82,6 @@ export class JobList implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load jobs');
-        console.error('Error loading jobs:', err);
         this.loading.set(false);
       }
     });

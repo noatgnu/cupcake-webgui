@@ -1,110 +1,78 @@
-import { Component, signal, inject, OnInit, OnDestroy, DOCUMENT, effect } from '@angular/core';
+import { Component, signal, inject, OnInit, OnDestroy, DOCUMENT, effect, ChangeDetectionStrategy, untracked } from '@angular/core';
 import { RouterOutlet, NavigationEnd, Router } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { CommonModule } from '@angular/common';
-import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, PoweredByFooterComponent, AuthService, WebSocketService, AsyncTaskMonitorService, DemoModeBannerComponent } from '@noatgnu/cupcake-core';
-import { CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
-import { BehaviorSubject, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
+
+import { SiteConfigService, ThemeService, ToastService, ToastContainerComponent, AuthService, WebSocketService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
+import { CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
 import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NgbModule, CommonModule, PoweredByFooterComponent, ToastContainerComponent, DemoModeBannerComponent],
+  imports: [RouterOutlet, NgbModule, ToastContainerComponent],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class App implements OnInit, OnDestroy {
   protected readonly title = signal('cupcake');
   protected readonly environment = environment;
 
-  private appInitializedSubject = new BehaviorSubject<boolean>(false);
-  public appInitialized$ = this.appInitializedSubject.asObservable();
-
-  private themeEffect;
   private document = inject(DOCUMENT);
   private titleService = inject(Title);
   private router = inject(Router);
-  private authSubscription?: Subscription;
-  private configSubscription?: Subscription;
 
-  constructor(
-    private siteConfigService: SiteConfigService,
-    private themeService: ThemeService,
-    private toastService: ToastService,
-    private authService: AuthService,
-    private coreWsService: WebSocketService,
-    private wsService: CommunicationWebSocketService,
-    private asyncTaskService: AsyncTaskMonitorService
-  ) {
-    this.themeEffect = effect(() => {
-      this.themeService.isDark();
-      this.siteConfigService.getCurrentConfig().subscribe(currentConfig => {
-        if (currentConfig) {
-          this.updatePrimaryColorTheme(currentConfig.primaryColor || '#1976d2');
-        }
-      });
+  private siteConfigService = inject(SiteConfigService);
+  private themeService = inject(ThemeService);
+  private toastService = inject(ToastService);
+  private authService = inject(AuthService);
+  private coreWsService = inject(WebSocketService);
+  private wsService = inject(CommunicationWebSocketService);
+  private asyncTaskService = inject(AsyncTaskMonitorService);
+
+  private themeEffect = effect(() => {
+    this.themeService.isDark();
+    const config = this.siteConfigService.siteConfig();
+    untracked(() => {
+      this.updatePrimaryColorTheme(config.primaryColor || '#1976d2');
     });
-  }
+  });
 
-  ngOnInit(): void {
-    this.initializeApp();
-    this.initializeWebSocket();
-  }
-
-  ngOnDestroy(): void {
-    if (this.authSubscription) {
-      this.authSubscription.unsubscribe();
-    }
-    if (this.configSubscription) {
-      this.configSubscription.unsubscribe();
-    }
-    this.coreWsService.disconnect();
-    this.wsService.disconnect();
-  }
-
-  private initializeWebSocket(): void {
-    this.authSubscription = this.authService.currentUser$.subscribe(user => {
+  private authEffect = effect(() => {
+    const user = this.authService.currentUser();
+    untracked(() => {
       if (user) {
-        console.log('User authenticated, connecting to WebSockets...');
-        console.log('Connecting core WebSocket (notifications endpoint) for async tasks...');
         this.coreWsService.connect();
-
-        console.log('Connecting communication WebSocket (messaging endpoint)...');
         this.wsService.connect(environment.websocketUrl, this.authService.getAccessToken()!);
-
         this.asyncTaskService.startRealtimeUpdates();
       } else {
-        console.log('User not authenticated, disconnecting WebSockets...');
         this.coreWsService.disconnect();
         this.wsService.disconnect();
         this.asyncTaskService.stopRealtimeUpdates();
       }
     });
+  });
+
+  ngOnInit(): void {
+    this.initializeApp();
   }
 
-  private async initializeApp(): Promise<void> {
-    try {
-      this.configSubscription = this.siteConfigService.config$.subscribe(config => {
-        this.updatePrimaryColorTheme(config.primaryColor || '#1976d2');
-        this.updatePageTitle(config.siteName || 'Cupcake');
-      });
+  ngOnDestroy(): void {
+    this.coreWsService.disconnect();
+    this.wsService.disconnect();
+  }
 
-      this.router.events.pipe(
-        filter(event => event instanceof NavigationEnd)
-      ).subscribe(() => {
-        const siteName = this.siteConfigService.getSiteName();
-        this.updatePageTitle(siteName);
-      });
+  private initializeApp(): void {
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe(() => {
+      const siteName = this.siteConfigService.getSiteName();
+      this.updatePageTitle(siteName);
+    });
 
-      this.appInitializedSubject.next(true);
-      this.toastService.show("Application initialized")
-    } catch (error) {
-      console.error('Failed to initialize app:', error);
-      this.appInitializedSubject.next(true);
-    }
+    this.toastService.show('Application initialized');
   }
 
   private updatePageTitle(siteName: string): void {
@@ -133,12 +101,7 @@ export class App implements OnInit, OnDestroy {
   private hexToRgb(hex: string): string {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!result) return '25, 118, 210';
-
-    const r = parseInt(result[1], 16);
-    const g = parseInt(result[2], 16);
-    const b = parseInt(result[3], 16);
-
-    return `${r}, ${g}, ${b}`;
+    return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
   }
 
   private adjustColorBrightness(hex: string, percent: number): string {
@@ -156,7 +119,6 @@ export class App implements OnInit, OnDestroy {
   private adjustColorForDarkMode(hex: string): string {
     const rgb = this.hexToRgb(hex).split(', ').map(Number);
     const [r, g, b] = rgb;
-
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
     if (luminance < 0.5) {

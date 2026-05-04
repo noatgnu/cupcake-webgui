@@ -1,5 +1,5 @@
 import { Component, inject, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { User, ToastService } from '@noatgnu/cupcake-core';
@@ -7,7 +7,7 @@ import { UserManagementService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-user-edit-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './user-edit-modal.html',
   styleUrl: './user-edit-modal.scss'
 })
@@ -65,7 +65,6 @@ export class UserEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update user');
-        console.error('Error updating user:', err);
         this.saving = false;
       }
     });

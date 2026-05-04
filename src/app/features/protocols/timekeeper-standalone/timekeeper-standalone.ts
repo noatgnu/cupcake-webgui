@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, OnDestroy, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, OnDestroy, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TimeKeeperService, SessionService, ProtocolStepService, TimeKeeperWebSocketService } from '@noatgnu/cupcake-red-velvet';
@@ -12,7 +12,8 @@ import { Subscription } from 'rxjs';
   selector: 'app-timekeeper-standalone',
   imports: [CommonModule, FormsModule],
   templateUrl: './timekeeper-standalone.html',
-  styleUrl: './timekeeper-standalone.scss'
+  styleUrl: './timekeeper-standalone.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TimekeeperStandalone implements OnInit, OnDestroy {
   private timeKeeperService = inject(TimeKeeperService);
@@ -87,7 +88,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.toastService.error('Failed to load timekeepers');
-        console.error('Error loading timekeepers:', err);
         this.loading.set(false);
       }
     });
@@ -133,7 +133,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.toastService.error('Failed to create timer');
-        console.error('Error creating timer:', err);
       }
     });
   }
@@ -156,7 +155,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.toastService.error('Failed to start timer');
-        console.error('Error starting timer:', err);
       }
     });
   }
@@ -190,13 +188,11 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
           },
           error: (err) => {
             this.toastService.error('Failed to stop timer');
-            console.error('Error stopping timer:', err);
           }
         });
       },
       error: (err) => {
         this.toastService.error('Failed to pause timer');
-        console.error('Error pausing timer:', err);
       }
     });
   }
@@ -220,7 +216,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.toastService.error('Failed to reset timer');
-        console.error('Error resetting timer:', err);
       }
     });
   }
@@ -250,7 +245,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.toastService.error('Failed to delete timer');
-        console.error('Error deleting timer:', err);
       }
     });
   }
@@ -326,8 +320,7 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
                 this.loadingDetails.set(false);
               }
             },
-            error: (err) => {
-              console.error('Error loading session:', err);
+            error: () => {
               if (!fullTimer.step) {
                 this.loadingDetails.set(false);
               }
@@ -341,8 +334,7 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
               this.selectedTimerStep.set(step);
               this.loadingDetails.set(false);
             },
-            error: (err) => {
-              console.error('Error loading step:', err);
+            error: () => {
               this.loadingDetails.set(false);
             }
           });
@@ -352,8 +344,7 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
           this.loadingDetails.set(false);
         }
       },
-      error: (err) => {
-        console.error('Error loading timer details:', err);
+      error: () => {
         this.loadingDetails.set(false);
       }
     });
@@ -367,7 +358,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
       this.wsSubscriptions.push(
         this.timeKeeperWsService.timeKeeperStarted$.subscribe({
           next: (event) => {
-            console.log('TimeKeeper started:', event);
             const timekeeperId = parseInt(event.timekeeperId);
             const tk = this.timekeepers().find(t => t.id === timekeeperId);
             if (tk && this.timer.timeKeeper[timekeeperId.toString()]) {
@@ -380,14 +370,13 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
               this.applyFilter();
             }
           },
-          error: (err) => console.error('WebSocket timeKeeperStarted error:', err)
+          error: () => {}
         })
       );
 
       this.wsSubscriptions.push(
         this.timeKeeperWsService.timeKeeperStopped$.subscribe({
           next: (event) => {
-            console.log('TimeKeeper stopped:', event);
             const timekeeperId = parseInt(event.timekeeperId);
             const tk = this.timekeepers().find(t => t.id === timekeeperId);
             if (tk && this.timer.timeKeeper[timekeeperId.toString()]) {
@@ -407,14 +396,13 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
               this.applyFilter();
             }
           },
-          error: (err) => console.error('WebSocket timeKeeperStopped error:', err)
+          error: () => {}
         })
       );
 
       this.wsSubscriptions.push(
         this.timeKeeperWsService.timeKeeperUpdated$.subscribe({
           next: (event) => {
-            console.log('TimeKeeper updated:', event);
             const timekeeperId = parseInt(event.timekeeperId);
             if (this.timer.timeKeeper[timekeeperId.toString()]) {
               if (event.duration !== undefined) {
@@ -438,7 +426,7 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
             );
             this.applyFilter();
           },
-          error: (err) => console.error('WebSocket timeKeeperUpdated error:', err)
+          error: () => {}
         })
       );
     }

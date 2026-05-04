@@ -1,11 +1,11 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { LabGroup } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-step-two-lab-group-staff',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './step-two-lab-group-staff.html',
   styleUrl: './step-two-lab-group-staff.scss'
 })

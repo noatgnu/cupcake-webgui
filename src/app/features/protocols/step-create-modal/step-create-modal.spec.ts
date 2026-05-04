@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { StepCreateModal } from './step-create-modal';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { ProtocolStepService } from '@noatgnu/cupcake-red-velvet';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
+import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
 import { of, throwError } from 'rxjs';
 
 describe('StepCreateModal', () => {
@@ -16,12 +16,15 @@ describe('StepCreateModal', () => {
     mockActiveModal = jasmine.createSpyObj('NgbActiveModal', ['close', 'dismiss']);
     mockStepService = jasmine.createSpyObj('ProtocolStepService', ['createProtocolStep']);
     mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    const mockStepReagentService = jasmine.createSpyObj('StepReagentService', ['getReagentsByStep']);
 
     await TestBed.configureTestingModule({
       imports: [StepCreateModal],
       providers: [
+        { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
         { provide: NgbActiveModal, useValue: mockActiveModal },
         { provide: ProtocolStepService, useValue: mockStepService },
+        { provide: StepReagentService, useValue: mockStepReagentService },
         { provide: ToastService, useValue: mockToastService }
       ]
     })

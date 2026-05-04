@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -13,7 +13,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
   selector: 'app-reagent-booking-modal',
   imports: [CommonModule, FormsModule],
   templateUrl: './reagent-booking-modal.html',
-  styleUrl: './reagent-booking-modal.scss'
+  styleUrl: './reagent-booking-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ReagentBookingModal implements OnInit {
   activeModal = inject(NgbActiveModal);
@@ -89,7 +90,6 @@ export class ReagentBookingModal implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading stored reagents:', err);
         this.toastService.error('Failed to load stored reagents');
         this.loading.set(false);
       }
@@ -136,7 +136,6 @@ export class ReagentBookingModal implements OnInit {
         this.activeModal.close(action);
       },
       error: (err) => {
-        console.error('Error booking reagent:', err);
         this.toastService.error('Failed to book reagent');
         this.saving.set(false);
       }

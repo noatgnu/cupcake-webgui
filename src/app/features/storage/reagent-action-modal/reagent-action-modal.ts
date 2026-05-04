@@ -1,5 +1,5 @@
-import { Component, inject, Input, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -8,9 +8,10 @@ import type { StoredReagent } from '@noatgnu/cupcake-macaron';
 
 @Component({
   selector: 'app-reagent-action-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './reagent-action-modal.html',
-  styleUrl: './reagent-action-modal.scss'
+  styleUrl: './reagent-action-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ReagentActionModal {
   private activeModal = inject(NgbActiveModal);
@@ -64,7 +65,6 @@ export class ReagentActionModal {
       },
       error: (err) => {
         this.toastService.error('Failed to save reagent action');
-        console.error('Error creating reagent action:', err);
         this.saving.set(false);
       }
     });

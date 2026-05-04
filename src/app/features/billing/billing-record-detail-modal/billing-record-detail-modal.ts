@@ -1,4 +1,4 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
@@ -9,7 +9,8 @@ import { ToastService, AuthService } from '@noatgnu/cupcake-core';
   selector: 'app-billing-record-detail-modal',
   imports: [CommonModule],
   templateUrl: './billing-record-detail-modal.html',
-  styleUrl: './billing-record-detail-modal.scss'
+  styleUrl: './billing-record-detail-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BillingRecordDetailModal {
   activeModal = inject(NgbActiveModal);
@@ -33,8 +34,7 @@ export class BillingRecordDetailModal {
         this.record.set(record);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading billing record:', err);
+      error: () => {
         this.toastService.error('Failed to load billing record details');
         this.loading.set(false);
       }
@@ -42,7 +42,7 @@ export class BillingRecordDetailModal {
   }
 
   isAdmin(): boolean {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     return user ? (user.isStaff || user.isSuperuser) : false;
   }
 
@@ -67,8 +67,7 @@ export class BillingRecordDetailModal {
         this.approving.set(false);
         this.activeModal.close(updated);
       },
-      error: (err) => {
-        console.error('Error approving billing record:', err);
+      error: () => {
         this.toastService.error('Failed to approve billing record');
         this.approving.set(false);
       }

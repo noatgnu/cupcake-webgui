@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, Output, EventEmitter } from '@angular/core';
+import { Component, inject, OnInit, signal, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InstrumentService, InstrumentUsageService, InstrumentPermissionService } from '@noatgnu/cupcake-macaron';
@@ -9,7 +9,8 @@ import { ToastService } from '@noatgnu/cupcake-core';
   selector: 'app-instrument-booking-annotation',
   imports: [CommonModule, FormsModule],
   templateUrl: './instrument-booking-annotation.html',
-  styleUrl: './instrument-booking-annotation.scss'
+  styleUrl: './instrument-booking-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstrumentBookingAnnotation implements OnInit {
   private instrumentService = inject(InstrumentService);
@@ -102,14 +103,12 @@ export class InstrumentBookingAnnotation implements OnInit {
             this.loadingInstruments.set(false);
           },
           error: (err) => {
-            console.error('Error loading instruments:', err);
             this.toastService.error('Failed to load instruments');
             this.loadingInstruments.set(false);
           }
         });
       },
       error: (err) => {
-        console.error('Error loading permissions:', err);
         this.toastService.error('Failed to load instrument permissions');
         this.loadingInstruments.set(false);
       }
@@ -186,8 +185,7 @@ export class InstrumentBookingAnnotation implements OnInit {
         this.checkForOverlaps();
         this.loadingBookings.set(false);
       },
-      error: (err) => {
-        console.error('Error loading bookings:', err);
+      error: () => {
         this.existingBookings.set([]);
         this.hasOverlappingBookings.set(false);
         this.loadingBookings.set(false);

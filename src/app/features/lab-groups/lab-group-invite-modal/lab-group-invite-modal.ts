@@ -1,5 +1,5 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -13,9 +13,10 @@ import { UserManagementService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-lab-group-invite-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './lab-group-invite-modal.html',
-  styleUrl: './lab-group-invite-modal.scss'
+  styleUrl: './lab-group-invite-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LabGroupInviteModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -26,7 +27,6 @@ export class LabGroupInviteModal implements OnInit {
 
   @Input() labGroup!: LabGroup;
 
-  currentUser$ = this.authService.currentUser$;
   users = signal<User[]>([]);
   selectedUser: User | null = null;
   searchQuery = '';
@@ -35,7 +35,7 @@ export class LabGroupInviteModal implements OnInit {
   isStaff = false;
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     this.isStaff = user?.isStaff || false;
     this.searchUsers();
   }
@@ -54,7 +54,6 @@ export class LabGroupInviteModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load users');
-        console.error('Error loading users:', err);
         this.loading.set(false);
       }
     });
@@ -87,7 +86,6 @@ export class LabGroupInviteModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to send invitation');
-        console.error('Error sending invitation:', err);
         this.saving.set(false);
       }
     });

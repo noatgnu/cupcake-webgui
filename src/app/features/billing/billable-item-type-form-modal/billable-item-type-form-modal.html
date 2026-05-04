@@ -1,1 +1,151 @@
-<p>billable-item-type-form-modal works!</p>
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-tag me-2"></i>
+    @if (isEditMode()) {
+      Edit Billable Item Type
+    } @else {
+      New Billable Item Type
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="close()" [disabled]="saving()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form">
+    <div class="mb-3">
+      <label for="name" class="form-label">
+        Name <span class="text-danger">*</span>
+      </label>
+      <input
+        type="text"
+        class="form-control"
+        [class.is-invalid]="isFieldInvalid('name')"
+        id="name"
+        formControlName="name"
+        placeholder="Enter item type name"
+        maxlength="200">
+      @if (isFieldInvalid('name')) {
+        <div class="invalid-feedback">
+          {{ getFieldError('name') }}
+        </div>
+      }
+      <small class="form-text text-muted">
+        A descriptive name for this billable item type
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label for="description" class="form-label">Description</label>
+      <textarea
+        class="form-control"
+        id="description"
+        formControlName="description"
+        rows="3"
+        placeholder="Enter description (optional)"></textarea>
+      <small class="form-text text-muted">
+        Additional details about this item type
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label for="contentType" class="form-label">
+        Content Type <span class="text-danger">*</span>
+      </label>
+      <input
+        type="number"
+        class="form-control"
+        [class.is-invalid]="isFieldInvalid('contentType')"
+        id="contentType"
+        formControlName="contentType"
+        placeholder="Enter content type ID">
+      @if (isFieldInvalid('contentType')) {
+        <div class="invalid-feedback">
+          {{ getFieldError('contentType') }}
+        </div>
+      }
+      <small class="form-text text-muted">
+        @if (isEditMode()) {
+          Content type cannot be changed after creation
+        } @else {
+          The Django content type ID this item type is associated with
+        }
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <label for="defaultBillingUnit" class="form-label">
+        Default Billing Unit <span class="text-danger">*</span>
+      </label>
+      <select
+        class="form-select"
+        [class.is-invalid]="isFieldInvalid('defaultBillingUnit')"
+        id="defaultBillingUnit"
+        formControlName="defaultBillingUnit">
+        @for (unit of billingUnits; track unit) {
+          <option [value]="unit">{{ getBillingUnitDisplay(unit) }}</option>
+        }
+      </select>
+      @if (isFieldInvalid('defaultBillingUnit')) {
+        <div class="invalid-feedback">
+          {{ getFieldError('defaultBillingUnit') }}
+        </div>
+      }
+      <small class="form-text text-muted">
+        The default unit used for billing this type of item
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="requiresApproval"
+          formControlName="requiresApproval">
+        <label class="form-check-label" for="requiresApproval">
+          <i class="bi bi-shield-check me-1"></i>
+          Requires Approval
+        </label>
+      </div>
+      <small class="form-text text-muted">
+        If checked, billing records for this item type will require manual approval before processing
+      </small>
+    </div>
+
+    <div class="mb-3">
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="isActive"
+          formControlName="isActive">
+        <label class="form-check-label" for="isActive">
+          <i class="bi bi-check-circle me-1"></i>
+          Active
+        </label>
+      </div>
+      <small class="form-text text-muted">
+        Only active item types can be used for new billing records
+      </small>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="saving()">
+    <i class="bi bi-x-circle me-1"></i>
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || form.invalid">
+    @if (saving()) {
+      <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+    } @else {
+      <i class="bi bi-check-circle me-1"></i>
+    }
+    @if (isEditMode()) {
+      Update
+    } @else {
+      Create
+    }
+  </button>
+</div>

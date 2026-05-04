@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, ActivatedRoute } from '@angular/router';
 import { HomeNavbar } from '../home-navbar/home-navbar';
@@ -10,13 +10,13 @@ import { TimeKeeperService } from '@noatgnu/cupcake-red-velvet';
 import { MessageThreadService, NotificationService } from '@noatgnu/cupcake-mint-chocolate';
 import type { MessageThread, Notification } from '@noatgnu/cupcake-mint-chocolate';
 import { SiteConfigService } from '@noatgnu/cupcake-core';
-import type { SiteConfig } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-home',
   imports: [CommonModule, HomeNavbar, RouterOutlet, TasksView, RouterLink],
   templateUrl: './home.html',
-  styleUrl: './home.scss'
+  styleUrl: './home.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Home implements OnInit, OnDestroy {
   private router = inject(Router);
@@ -34,7 +34,7 @@ export class Home implements OnInit, OnDestroy {
   activeTimeKeeper = signal<TimeKeeper | null>(null);
   recentMessages = signal<MessageThread[]>([]);
   recentNotifications = signal<Notification[]>([]);
-  siteConfig = signal<SiteConfig | null>(null);
+  siteConfig = this.siteConfigService.siteConfig;
 
   loadingSessions = signal(false);
   loadingTimeKeeper = signal(false);
@@ -48,10 +48,6 @@ export class Home implements OnInit, OnDestroy {
       if (fragment === 'tasks') {
         this.activeSection = 'tasks';
       }
-    });
-
-    this.siteConfigService.config$.subscribe(config => {
-      this.siteConfig.set(config);
     });
 
     this.loadDashboardData();
@@ -77,8 +73,7 @@ export class Home implements OnInit, OnDestroy {
         this.recentSessions.set(response.results);
         this.loadingSessions.set(false);
       },
-      error: (err) => {
-        console.error('Error loading recent sessions:', err);
+      error: () => {
         this.loadingSessions.set(false);
       }
     });
@@ -92,8 +87,7 @@ export class Home implements OnInit, OnDestroy {
         this.activeTimeKeeper.set(activeTimer || null);
         this.loadingTimeKeeper.set(false);
       },
-      error: (err) => {
-        console.error('Error loading active timekeeper:', err);
+      error: () => {
         this.loadingTimeKeeper.set(false);
       }
     });
@@ -111,8 +105,7 @@ export class Home implements OnInit, OnDestroy {
         this.recentMessages.set(response.results);
         this.loadingMessages.set(false);
       },
-      error: (err) => {
-        console.error('Error loading recent messages:', err);
+      error: () => {
         this.loadingMessages.set(false);
       }
     });
@@ -130,8 +123,7 @@ export class Home implements OnInit, OnDestroy {
         this.recentNotifications.set(response.results);
         this.loadingNotifications.set(false);
       },
-      error: (err) => {
-        console.error('Error loading recent notifications:', err);
+      error: () => {
         this.loadingNotifications.set(false);
       }
     });

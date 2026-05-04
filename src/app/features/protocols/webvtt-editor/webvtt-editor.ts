@@ -1,5 +1,5 @@
-import { Component, Input, Output, EventEmitter, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 
 export interface WebVTTCue {
@@ -11,9 +11,10 @@ export interface WebVTTCue {
 
 @Component({
   selector: 'app-webvtt-editor',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './webvtt-editor.html',
-  styleUrl: './webvtt-editor.scss'
+  styleUrl: './webvtt-editor.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WebvttEditor {
   @Input() set vttContent(content: string | undefined) {

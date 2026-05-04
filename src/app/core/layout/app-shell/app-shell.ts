@@ -1,4 +1,4 @@
-import { Component, TemplateRef, ViewChild, signal, inject, OnInit, OnDestroy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, TemplateRef, ViewChild, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
 import { Sidebar } from '../sidebar/sidebar';
@@ -9,7 +9,8 @@ import { Subscription } from 'rxjs';
   selector: 'app-app-shell',
   imports: [RouterOutlet, Sidebar],
   templateUrl: './app-shell.html',
-  styleUrl: './app-shell.scss'
+  styleUrl: './app-shell.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppShell implements OnInit, OnDestroy {
   @ViewChild('sidebarContent') sidebarContent!: TemplateRef<any>;

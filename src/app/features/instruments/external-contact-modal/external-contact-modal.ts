@@ -1,4 +1,4 @@
-import { Component, Input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { FormsModule } from '@angular/forms';
 import {
@@ -17,7 +17,8 @@ import { ToastService } from '@noatgnu/cupcake-core';
   selector: 'app-external-contact-modal',
   imports: [FormsModule],
   templateUrl: './external-contact-modal.html',
-  styleUrl: './external-contact-modal.scss'
+  styleUrl: './external-contact-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ExternalContactModal {
   @Input() contact?: ExternalContact;
@@ -73,7 +74,6 @@ export class ExternalContactModal {
         this.toastService.success('Contact detail added successfully');
       },
       error: (error) => {
-        console.error('Error creating contact detail:', error);
         this.toastService.error('Failed to create contact detail');
         this.saving.set(false);
       }
@@ -90,7 +90,6 @@ export class ExternalContactModal {
           this.toastService.success('Contact detail removed successfully');
         },
         error: (error) => {
-          console.error('Error removing contact detail:', error);
           this.toastService.error('Failed to remove contact detail');
           this.saving.set(false);
         }
@@ -121,7 +120,6 @@ export class ExternalContactModal {
           this.saving.set(false);
         },
         error: (error) => {
-          console.error('Error updating contact:', error);
           this.toastService.error('Failed to update contact');
           this.saving.set(false);
         }
@@ -139,7 +137,6 @@ export class ExternalContactModal {
           this.saving.set(false);
         },
         error: (error) => {
-          console.error('Error creating contact:', error);
           this.toastService.error('Failed to create contact');
           this.saving.set(false);
         }

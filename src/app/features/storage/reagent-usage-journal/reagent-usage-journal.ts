@@ -1,14 +1,15 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+
 import { ReagentActionService, ActionType } from '@noatgnu/cupcake-macaron';
 import type { ReagentAction } from '@noatgnu/cupcake-macaron';
 import { TimeUtils } from '../../../shared/utils/time.utils';
 
 @Component({
   selector: 'app-reagent-usage-journal',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './reagent-usage-journal.html',
-  styleUrl: './reagent-usage-journal.scss'
+  styleUrl: './reagent-usage-journal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ReagentUsageJournal implements OnInit {
   private reagentActionService = inject(ReagentActionService);
@@ -43,8 +44,7 @@ export class ReagentUsageJournal implements OnInit {
         this.total.set(response.count);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading reagent actions:', err);
+      error: () => {
         this.loading.set(false);
       }
     });

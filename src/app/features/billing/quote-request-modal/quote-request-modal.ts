@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ServiceTierService, ServicePriceService, BillableItemTypeService, BillingUnit } from '@noatgnu/cupcake-salted-caramel';
@@ -10,9 +10,10 @@ import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-quote-request-modal',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './quote-request-modal.html',
-  styleUrl: './quote-request-modal.scss'
+  styleUrl: './quote-request-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class QuoteRequestModal implements OnInit {
   activeModal = inject(NgbActiveModal);
@@ -45,7 +46,7 @@ export class QuoteRequestModal implements OnInit {
   }
 
   initForm(): void {
-    const user = this.authService.getCurrentUser();
+    const user = this.authService.currentUser();
     this.form = this.fb.group({
       instrument: [null, Validators.required],
       serviceTier: [null, Validators.required],
@@ -79,8 +80,7 @@ export class QuoteRequestModal implements OnInit {
       next: (response) => {
         this.instruments.set(response.results);
       },
-      error: (err) => {
-        console.error('Error loading instruments:', err);
+      error: () => {
         this.toastService.error('Failed to load instruments');
       }
     });
@@ -89,8 +89,7 @@ export class QuoteRequestModal implements OnInit {
       next: (response) => {
         this.serviceTiers.set(response.results);
       },
-      error: (err) => {
-        console.error('Error loading service tiers:', err);
+      error: () => {
         this.toastService.error('Failed to load service tiers');
       }
     });
@@ -100,8 +99,7 @@ export class QuoteRequestModal implements OnInit {
         this.billableItemTypes.set(response.results);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Error loading billable item types:', err);
+      error: () => {
         this.toastService.error('Failed to load billable item types');
         this.loading.set(false);
       }
@@ -152,8 +150,7 @@ export class QuoteRequestModal implements OnInit {
           this.toastService.warning('No active pricing found for this combination');
         }
       },
-      error: (err) => {
-        console.error('Error loading service prices:', err);
+      error: () => {
         this.toastService.error('Failed to load pricing');
       }
     });
@@ -177,8 +174,7 @@ export class QuoteRequestModal implements OnInit {
         this.costBreakdown.set(breakdown);
         this.calculating.set(false);
       },
-      error: (err) => {
-        console.error('Error calculating cost:', err);
+      error: () => {
         this.toastService.error('Failed to calculate cost');
         this.calculating.set(false);
       }

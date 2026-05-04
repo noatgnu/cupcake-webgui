@@ -1,4 +1,4 @@
-import { Component, inject, Input, signal, OnInit, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -9,7 +9,8 @@ import { MaintenanceService, type MaintenanceLog, type MaintenanceLogAnnotation 
   selector: 'app-maintenance-log-annotations-modal',
   imports: [CommonModule, FormsModule],
   templateUrl: './maintenance-log-annotations-modal.html',
-  styleUrl: './maintenance-log-annotations-modal.scss'
+  styleUrl: './maintenance-log-annotations-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MaintenanceLogAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -49,7 +50,6 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to load annotations');
-        console.error('Error loading maintenance log annotations:', err);
         this.loadingAnnotations.set(false);
       }
     });
@@ -102,7 +102,6 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
         },
         error: (err) => {
           this.toastService.error('Failed to create annotation');
-          console.error('Error creating annotation:', err);
           this.uploading.set(false);
           this.uploadProgress.set(0);
         }
@@ -130,7 +129,6 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to delete annotation');
-        console.error('Error deleting annotation:', err);
       }
     });
   }

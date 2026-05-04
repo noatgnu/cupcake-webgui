@@ -108,8 +108,7 @@ export class JobSubmissionStateService {
         this.projectSuggestions.set(response.results);
         this.searchingProjects.set(false);
       },
-      error: (err) => {
-        console.error('Error searching projects:', err);
+      error: () => {
         this.searchingProjects.set(false);
       }
     });
@@ -127,8 +126,7 @@ export class JobSubmissionStateService {
         this.labGroupSuggestions.set(response.results);
         this.searchingLabGroups.set(false);
       },
-      error: (err) => {
-        console.error('Error searching lab groups:', err);
+      error: () => {
         this.searchingLabGroups.set(false);
       }
     });
@@ -145,9 +143,8 @@ export class JobSubmissionStateService {
         const uniqueFunders = [...new Set(response.results.map(j => j.funder).filter(f => f && f.toLowerCase().includes(search.toLowerCase())))];
         this.funderSuggestions.set(uniqueFunders as string[]);
       },
-      error: (err) => {
-        console.error('Error searching funders:', err);
-      }
+      error: () => {}
+
     });
   }
 
@@ -162,9 +159,8 @@ export class JobSubmissionStateService {
         const uniqueCostCenters = [...new Set(response.results.map(j => j.costCenter).filter(c => c && c.toLowerCase().includes(search.toLowerCase())))];
         this.costCenterSuggestions.set(uniqueCostCenters as string[]);
       },
-      error: (err) => {
-        console.error('Error searching cost centers:', err);
-      }
+      error: () => {}
+
     });
   }
 
@@ -182,9 +178,8 @@ export class JobSubmissionStateService {
           this.selectedStaffIds.set(validStaffIds);
         }
       },
-      error: (err) => {
-        console.error('Error loading lab group members:', err);
-      }
+      error: () => {}
+
     });
   }
 
@@ -196,9 +191,7 @@ export class JobSubmissionStateService {
       next: (response) => {
         this.templates.set(response.results);
       },
-      error: (err) => {
-        console.error('Error loading templates:', err);
-      }
+      error: () => {}
     });
   }
 
@@ -209,9 +202,7 @@ export class JobSubmissionStateService {
       next: (response) => {
         this.templates.set(response.results);
       },
-      error: (err) => {
-        console.error('Error loading templates:', err);
-      }
+      error: () => {}
     });
   }
 

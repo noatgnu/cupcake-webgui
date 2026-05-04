@@ -1,11 +1,11 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { Project } from '@noatgnu/cupcake-red-velvet';
 
 @Component({
   selector: 'app-step-one-job-project',
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './step-one-job-project.html',
   styleUrl: './step-one-job-project.scss'
 })
