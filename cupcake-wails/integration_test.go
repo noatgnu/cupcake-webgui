@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/models"
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/services"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/services"
 )
 
 func TestFullInitializationFlow(t *testing.T) {

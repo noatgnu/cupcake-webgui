@@ -16,15 +16,15 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/models"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 )
 
 const (
-	GithubReleasesURL = "https://api.github.com/repos/noatgnu/cupcake/releases"
-	GithubRepoURL     = "https://api.github.com/repos/noatgnu/cupcake"
+	GithubReleasesURL = "https://api.github.com/repos/noatgnu/cupcake_vanilla/releases"
+	GithubRepoURL     = "https://api.github.com/repos/noatgnu/cupcake_vanilla"
 	GithubOwner       = "noatgnu"
-	GithubRepo        = "cupcake"
-	GithubCloneURL    = "https://github.com/noatgnu/cupcake.git"
+	GithubRepo        = "cupcake_vanilla"
+	GithubCloneURL    = "https://github.com/noatgnu/cupcake_vanilla.git"
 )
 
 type BackendDownloader struct {

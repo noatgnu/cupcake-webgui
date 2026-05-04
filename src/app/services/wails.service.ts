@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import * as App from '@cupcake-wails-bindings/github.com/noatgnu/cupcake/cupcake-wails/app';
+import * as App from '@cupcake-wails-bindings/github.com/noatgnu/cupcake-webgui/cupcake-wails/app';
 
 @Injectable({ providedIn: 'root' })
 export class WailsService {

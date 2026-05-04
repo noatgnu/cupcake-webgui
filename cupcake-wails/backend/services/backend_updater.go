@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/models"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 )
 
 type BackendUpdater struct {

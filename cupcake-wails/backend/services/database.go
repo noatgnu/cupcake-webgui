@@ -4,7 +4,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/models"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

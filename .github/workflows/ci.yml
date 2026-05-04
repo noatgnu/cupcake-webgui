@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'cupcake-wails/**'
+      - 'src/**'
+      - 'angular.json'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'cupcake-wails/**'
+      - 'src/**'
+      - 'angular.json'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/ci.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: cupcake-wails/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            cupcake-wails/frontend/package-lock.json
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: cupcake-wails/frontend
+        run: npm ci
+
+      - name: Generate bindings
+        working-directory: cupcake-wails
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          wails3 generate bindings -ts -d frontend/bindings
+
+      - name: Build frontend
+        working-directory: cupcake-wails/frontend
+        run: npm run build
+
+      - name: Build main app
+        run: |
+          npx ng build --configuration=wails || npx ng build --configuration=production
+          mkdir -p cupcake-wails/mainapp/dist/browser
+          cp -r dist/cupcake/browser/* cupcake-wails/mainapp/dist/browser/
+
+      - name: Run Go tests
+        working-directory: cupcake-wails
+        run: go test -v ./... -count=1
+
+      - name: Install Playwright
+        working-directory: cupcake-wails/frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        working-directory: cupcake-wails/frontend
+        run: npm run test:e2e
+
+  build:
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: amd64
+          - os: windows-latest
+            platform: windows
+            arch: amd64
+          - os: macos-latest
+            platform: darwin
+            arch: amd64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: cupcake-wails/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            cupcake-wails/frontend/package-lock.json
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: cupcake-wails/frontend
+        run: npm ci
+
+      - name: Generate bindings
+        working-directory: cupcake-wails
+        shell: bash
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          wails3 generate bindings -ts -d frontend/bindings
+
+      - name: Build frontend
+        working-directory: cupcake-wails/frontend
+        run: npm run build
+
+      - name: Build main app
+        shell: bash
+        run: |
+          npx ng build --configuration=wails || npx ng build --configuration=production
+          mkdir -p cupcake-wails/mainapp/dist/browser
+          cp -r dist/cupcake/browser/* cupcake-wails/mainapp/dist/browser/
+
+      - name: Build application (Linux/macOS)
+        if: matrix.platform != 'windows'
+        working-directory: cupcake-wails
+        shell: bash
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          mkdir -p build/bin/${{ matrix.platform }}-${{ matrix.arch }}
+          GOOS=${{ matrix.platform }} GOARCH=${{ matrix.arch }} CGO_ENABLED=1 go build \
+            -ldflags="-s -w" \
+            -o build/bin/${{ matrix.platform }}-${{ matrix.arch }}/cupcake
+
+      - name: Build application (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: cupcake-wails
+        shell: bash
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          mkdir -p build/bin/${{ matrix.platform }}-${{ matrix.arch }}
+          GOOS=${{ matrix.platform }} GOARCH=${{ matrix.arch }} CGO_ENABLED=1 go build \
+            -ldflags="-s -w -H windowsgui" \
+            -o build/bin/${{ matrix.platform }}-${{ matrix.arch }}/cupcake.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-${{ matrix.platform }}-${{ matrix.arch }}
+          path: cupcake-wails/build/bin/${{ matrix.platform }}-${{ matrix.arch }}/
+          retention-days: 7

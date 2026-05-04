@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/noatgnu/cupcake/cupcake-wails/backend/models"
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 )
 
 type TestAPI struct {

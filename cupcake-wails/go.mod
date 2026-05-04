@@ -1,4 +1,4 @@
-module github.com/noatgnu/cupcake/cupcake-wails
+module github.com/noatgnu/cupcake-webgui/cupcake-wails
 
 go 1.25
 

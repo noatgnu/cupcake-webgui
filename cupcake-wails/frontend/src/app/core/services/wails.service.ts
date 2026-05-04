@@ -1,6 +1,6 @@
 import { Injectable, signal, Signal } from '@angular/core';
 import { Events } from '@wailsio/runtime';
-import * as App from '../../../../bindings/github.com/noatgnu/cupcake/cupcake-wails/app';
+import * as App from '../../../../bindings/github.com/noatgnu/cupcake-webgui/cupcake-wails/app';
 
 export interface BackendStatus {
   service: string;
