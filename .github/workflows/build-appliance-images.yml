@@ -85,63 +85,60 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client python3
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client
 
       - name: Fix /dev/kvm permissions
         run: sudo chmod 666 /dev/kvm 2>/dev/null || true
 
       - name: Generate SSH key
         run: |
-          ssh-keygen -t rsa -b 4096 -f cupckey -N '' -q
+          ssh-keygen -t ed25519 -f cupckey -N '' -q
           echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
 
-      - name: Create cloud-init config
+      - name: Download Ubuntu cloud image
         run: |
-          sed "s|SSH_PUBKEY_PLACEHOLDER|$SSH_PUBKEY|" provision/http/user-data > user-data
+          wget -q --show-progress "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" -O ubuntu-cloud.img
+          qemu-img resize ubuntu-cloud.img 8G
 
-      - name: Create cloud-init seed ISO
-        run: cloud-localds seed.iso user-data provision/http/meta-data
-
-      - name: Create disk
-        run: qemu-img create -f qcow2 -o preallocation=metadata disk.qcow2 8G
-
-      - name: Download Ubuntu Server ISO
+      - name: Create cloud-init seed
         run: |
-          wget -q --show-progress "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-amd64.iso" -O ubuntu.iso
+          cat > ci-user-data << EOF
+          #cloud-config
+          users:
+            - name: cupcake
+              sudo: ALL=(ALL) NOPASSWD:ALL
+              shell: /bin/bash
+              lock_passwd: false
+              ssh_authorized_keys:
+                - $SSH_PUBKEY
+          EOF
+          sed -i 's/^          //' ci-user-data
+          cloud-localds seed.iso ci-user-data provision/http/meta-data
 
       - name: Boot VM and wait for SSH
-        timeout-minutes: 20
+        timeout-minutes: 10
         run: |
-          # Extract kernel and initrd from ISO for explicit autoinstall boot
-          mkdir -p /tmp/iso
-          sudo mount ubuntu.iso /tmp/iso
-          cp /tmp/iso/casper/vmlinuz .
-          cp /tmp/iso/casper/initrd .
-          sudo umount /tmp/iso
-
           qemu-system-x86_64 \
             -m 4096 -smp 2 \
-            -kernel vmlinuz -initrd initrd \
-            -append "autoinstall ds=nocloud console=ttyS0" \
-            -drive file=disk.qcow2,format=qcow2,if=virtio \
+            -drive file=ubuntu-cloud.img,format=qcow2,if=virtio \
             -drive file=seed.iso,format=raw,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=net0 \
             -machine type=pc,accel=kvm -cpu host \
-            -display none -serial file:serial.log -no-reboot &
+            -display none -serial file:serial.log &
           QEMU_PID=$!
           echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
 
-          for i in $(seq 1 120); do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -i cupckey -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
+          for i in $(seq 1 60); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -i cupckey -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
               echo "SSH ready (${i}x5s)"
               exit 0
             fi
             sleep 5
           done
-          kill $QEMU_PID 2>/dev/null || true
           echo "=== SSH never came up. Serial console output: ==="
           cat serial.log 2>/dev/null | tail -50
+          kill $QEMU_PID 2>/dev/null || true
           exit 1
 
       - name: Provision base
@@ -150,8 +147,8 @@ jobs:
           BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
         run: |
           for s in 01-base 02-postgresql 03-redis 04-backend; do
-            scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
-            ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
+            ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
           done
 
@@ -161,28 +158,28 @@ jobs:
           WEBGUI_REF: ${{ inputs.webgui_ref || 'master' }}
           VANILLA_NG_REF: ${{ inputs.vanilla_ng_ref || 'master' }}
         run: |
-          scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
-          ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/05-frontend.sh && sudo /tmp/05-frontend.sh"
 
       - name: Provision nginx and finalize
         timeout-minutes: 5
         run: |
           for s in 06-nginx 07-mdns 08-cleanup; do
-            scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
-            ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
+            ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
           done
 
       - name: Shutdown VM
         run: |
-          ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
           sleep 10
           kill $QEMU_PID 2>/dev/null || true
 
       - name: Compact and compress
         run: |
-          qemu-img convert -O qcow2 -c disk.qcow2 cupcake-vm-amd64.qcow2
+          qemu-img convert -O qcow2 -c ubuntu-cloud.img cupcake-vm-amd64.qcow2
           xz -3 cupcake-vm-amd64.qcow2
           ls -lh cupcake-vm-amd64.qcow2.xz
 
@@ -225,7 +222,7 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt debootstrap zerofree zip dosfstools \
             libarchive-tools rsync xz-utils file git curl bc gpg pigz \
-            qemu-user-static binfmt-support qemu-user-binfmt arch-test
+            qemu-user-static binfmt-support arch-test
 
       - name: Enable ARM64 emulation
         run: |
