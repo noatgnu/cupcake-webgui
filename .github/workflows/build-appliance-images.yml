@@ -51,6 +51,7 @@ jobs:
           git clone --depth 1 --branch "$VANILLA_NG_REF" https://github.com/noatgnu/cupcake-vanilla-ng.git /tmp/vanilla-ng
           cd /tmp/vanilla-ng
           npm ci
+          bash build-all.sh
           npx ng build --configuration=production --base-href /
           mkdir -p frontend/vanilla
           cp -r dist/cupcake-vanilla-ng/browser/* frontend/vanilla/
