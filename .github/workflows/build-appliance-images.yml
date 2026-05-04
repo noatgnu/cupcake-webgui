@@ -41,8 +41,8 @@ jobs:
           cd /tmp/webgui
           npm ci
           npx ng build --configuration=production --base-href /
-          mkdir -p frontend/webgui
-          cp -r dist/cupcake/browser/* frontend/webgui/
+          mkdir -p "$GITHUB_WORKSPACE/frontend/webgui"
+          cp -r dist/cupcake/browser/* "$GITHUB_WORKSPACE/frontend/webgui/"
 
       - name: Build cupcake-vanilla-ng
         env:
@@ -58,8 +58,8 @@ jobs:
           npx ng build @noatgnu/cupcake-red-velvet
           npx ng build @noatgnu/cupcake-salted-caramel
           npx ng build --configuration=production --base-href /
-          mkdir -p frontend/vanilla
-          cp -r dist/cupcake-vanilla-ng/browser/* frontend/vanilla/
+          mkdir -p "$GITHUB_WORKSPACE/frontend/vanilla"
+          cp -r dist/cupcake-vanilla-ng/browser/* "$GITHUB_WORKSPACE/frontend/vanilla/"
 
       - name: Upload webgui
         uses: actions/upload-artifact@v4
@@ -90,17 +90,24 @@ jobs:
       - name: Fix /dev/kvm permissions
         run: sudo chmod 666 /dev/kvm 2>/dev/null || true
 
+      - name: Generate SSH key
+        run: |
+          ssh-keygen -t rsa -b 4096 -f cupckey -N '' -q
+          echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
+
+      - name: Create cloud-init config
+        run: |
+          sed "s|SSH_PUBKEY_PLACEHOLDER|$SSH_PUBKEY|" provision/http/user-data > user-data
+
       - name: Create cloud-init seed ISO
-        run: cloud-localds seed.iso provision/http/user-data provision/http/meta-data
+        run: cloud-localds seed.iso user-data provision/http/meta-data
 
       - name: Create disk
         run: qemu-img create -f qcow2 -o preallocation=metadata disk.qcow2 8G
 
       - name: Download Ubuntu Server ISO
         run: |
-          ISO_URL="https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-amd64.iso"
-          wget -q --show-progress "$ISO_URL" -O ubuntu.iso
-          echo "ISO ready: $(du -sh ubuntu.iso)"
+          wget -q --show-progress "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-amd64.iso" -O ubuntu.iso
 
       - name: Boot VM and wait for SSH
         timeout-minutes: 20
@@ -115,12 +122,11 @@ jobs:
             -machine type=pc,accel=kvm -cpu host \
             -display none -serial none -no-reboot &
           QEMU_PID=$!
-          echo "QEMU PID: $QEMU_PID"
+          echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
 
           for i in $(seq 1 120); do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -i cupckey -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
               echo "SSH ready (${i}x5s)"
-              echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
               exit 0
             fi
             sleep 5
@@ -136,7 +142,7 @@ jobs:
         run: |
           for s in 01-base 02-postgresql 03-redis 04-backend; do
             scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
-            ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+            ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
           done
 
@@ -147,7 +153,7 @@ jobs:
           VANILLA_NG_REF: ${{ inputs.vanilla_ng_ref || 'master' }}
         run: |
           scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
-          ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+          ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
             "chmod +x /tmp/05-frontend.sh && sudo /tmp/05-frontend.sh"
 
       - name: Provision nginx and finalize
@@ -155,13 +161,13 @@ jobs:
         run: |
           for s in 06-nginx 07-mdns 08-cleanup; do
             scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
-            ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+            ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
           done
 
       - name: Shutdown VM
         run: |
-          ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
+          ssh -o StrictHostKeyChecking=no -i cupckey -P 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
           sleep 10
           kill $QEMU_PID 2>/dev/null || true
 

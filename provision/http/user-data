@@ -4,10 +4,12 @@ autoinstall:
   identity:
     hostname: cupcake
     username: cupcake
-    password: "$6$rounds=4096$salt$wR0G0b49s2dLhGCA3Ip/m9ljBOsk6Q4J.HxN5fB8m2qVmCzd5BUyN3g1k7Vp9xYZ0D"
+    password: "cupcake"
   ssh:
     install-server: true
     allow-pw: true
+    authorized-keys:
+      - "SSH_PUBKEY_PLACEHOLDER"
   storage:
     layout:
       name: lvm
