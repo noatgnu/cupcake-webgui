@@ -46,3 +46,13 @@ Thumbs.db
 /electron-app/node_modules
 /electron-app/dist
 /electron-app/web-dist
+
+# Wails
+/cupcake-wails/frontend/node_modules
+/cupcake-wails/frontend/dist
+/cupcake-wails/frontend/bindings
+/cupcake-wails/frontend/src/wailsjs
+/cupcake-wails/frontend/.angular
+/cupcake-wails/frontend/test-results
+/cupcake-wails/mainapp/dist
+/cupcake-wails/build

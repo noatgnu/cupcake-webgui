@@ -4,5 +4,6 @@ export const environment = {
   websocketUrl: 'wss://localhost/ws',
   features: {
     asyncTasks: true
-  }
+  },
+  isWails: false
 };

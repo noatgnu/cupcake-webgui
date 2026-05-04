@@ -1,0 +1,37 @@
+<div class="splash-layout">
+  <header class="splash-header">
+    <img src="assets/cupcake_logo.png" alt="Cupcake Vanilla" class="logo" />
+    <div class="header-text">
+      <h1 class="title">Cupcake Vanilla</h1>
+      <span class="version">v{{ version }}</span>
+    </div>
+  </header>
+
+  <section class="status-section">
+    <div class="service-list">
+      @for (service of services(); track service.name) {
+        <div class="service-row" [class]="service.status">
+          @switch (service.status) {
+            @case ('pending') { <i class="bi bi-circle status-icon"></i> }
+            @case ('starting') { <div class="spinner"></div> }
+            @case ('ready') { <i class="bi bi-check-circle-fill status-icon ready"></i> }
+            @case ('error') { <i class="bi bi-x-circle-fill status-icon error"></i> }
+          }
+          <span class="service-name">{{ service.displayName }}</span>
+          <span class="service-msg">{{ service.message }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="log-section">
+    <div class="log-viewport" #logContainer>
+      @for (log of recentLogs(); track $index) {
+        <div class="log-line" [class]="log.type">
+          <span class="ts">[{{ currentTime | date:'HH:mm:ss' }}]</span>
+          <span class="msg">{{ log.message }}</span>
+        </div>
+      }
+    </div>
+  </section>
+</div>

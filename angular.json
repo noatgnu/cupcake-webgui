@@ -78,6 +78,24 @@
                   "with": "src/environments/environment.electron.ts"
                 }
               ]
+            },
+            "wails": {
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": true
+              },
+              "extractLicenses": true,
+              "sourceMap": false,
+              "namedChunks": false,
+              "baseHref": "/",
+              "outputPath": "dist/cupcake",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.wails.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"

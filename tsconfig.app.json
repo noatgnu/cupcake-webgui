@@ -3,10 +3,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "baseUrl": "./",
     "outDir": "./out-tsc/app",
     "types": [
       "@angular/localize"
-    ]
+    ],
+    "paths": {
+      "@cupcake-wails-bindings/*": ["cupcake-wails/frontend/bindings/*"]
+    }
   },
   "include": [
     "src/**/*.ts"

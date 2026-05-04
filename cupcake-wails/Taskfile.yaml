@@ -1,0 +1,154 @@
+version: '3'
+
+vars:
+  APP_NAME: cupcake
+  BIN_DIR: build/bin
+  VERSION: '{{.VERSION | default "0.0.1"}}'
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  install-frontend-deps:
+    dir: frontend
+    sources:
+      - package.json
+    generates:
+      - node_modules/.package-lock.json
+    cmds:
+      - npm install
+
+  build-frontend:
+    dir: frontend
+    deps:
+      - install-frontend-deps
+    sources:
+      - src/**/*
+      - angular.json
+      - tsconfig*.json
+    generates:
+      - dist/browser/**/*
+    cmds:
+      - npm run build
+
+  generate-bindings:
+    deps:
+      - build-frontend
+    cmds:
+      - wails3 generate bindings
+
+  build:
+    deps:
+      - build-frontend
+    cmds:
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}}
+    generates:
+      - "{{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}}"
+
+  build:linux:amd64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/linux-amd64
+      - go build -tags devtools -ldflags="-s -w" -o {{.BIN_DIR}}/linux-amd64/{{.APP_NAME}}-{{.VERSION}}-linux-amd64
+
+  build:linux:arm64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: linux
+      GOARCH: arm64
+      CGO_ENABLED: 1
+      CC: aarch64-linux-gnu-gcc
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/linux-arm64
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/linux-arm64/{{.APP_NAME}}-{{.VERSION}}-linux-arm64
+
+  build:windows:amd64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: 1
+      CC: x86_64-w64-mingw32-gcc
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/windows-amd64
+      - go build -tags devtools -ldflags="-s -w -H windowsgui" -o {{.BIN_DIR}}/windows-amd64/{{.APP_NAME}}-{{.VERSION}}-windows-amd64.exe
+
+  build:windows:arm64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: windows
+      GOARCH: arm64
+      CGO_ENABLED: 1
+      CC: aarch64-w64-mingw32-gcc
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/windows-arm64
+      - go build -ldflags="-s -w -H windowsgui" -o {{.BIN_DIR}}/windows-arm64/{{.APP_NAME}}-{{.VERSION}}-windows-arm64.exe
+
+  build:darwin:amd64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: darwin
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/darwin-amd64
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/darwin-amd64/{{.APP_NAME}}-{{.VERSION}}-darwin-amd64
+
+  build:darwin:arm64:
+    deps:
+      - build-frontend
+    env:
+      GOOS: darwin
+      GOARCH: arm64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.BIN_DIR}}/darwin-arm64
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/darwin-arm64/{{.APP_NAME}}-{{.VERSION}}-darwin-arm64
+
+  build:all:
+    deps:
+      - build-frontend
+    cmds:
+      - task: build:linux:amd64
+      - task: build:linux:arm64
+      - task: build:windows:amd64
+      - task: build:windows:arm64
+
+  build:linux:
+    deps:
+      - build-frontend
+    cmds:
+      - task: build:linux:amd64
+      - task: build:linux:arm64
+
+  build:windows:
+    deps:
+      - build-frontend
+    cmds:
+      - task: build:windows:amd64
+      - task: build:windows:arm64
+
+  dev:
+    cmds:
+      - wails3 dev
+
+  clean:
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+      - rm -rf frontend/dist
+      - rm -f {{.APP_NAME}}
+      - rm -f {{.APP_NAME}}.exe
+
+  doctor:
+    cmds:
+      - wails3 doctor

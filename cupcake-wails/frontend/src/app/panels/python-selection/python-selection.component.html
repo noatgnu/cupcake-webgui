@@ -1,0 +1,51 @@
+<div class="py-layout">
+  <header class="panel-header">
+    <h1 class="title">Python Setup</h1>
+  </header>
+
+  <main class="panel-main">
+    @if (loading()) {
+      <div class="loading-state">
+        <span class="spinner"></span>
+        <span>Scanning for Python...</span>
+      </div>
+    } @else {
+      <section class="candidates-section">
+        <span class="section-lbl">Detected</span>
+        @for (candidate of candidates(); track candidate.path) {
+          <div class="candidate-row" [class.active]="selectedPath() === candidate.path" (click)="selectCandidate(candidate)">
+            <span class="dot" [class.active]="selectedPath() === candidate.path"></span>
+            <span class="version">Python {{ candidate.version }}</span>
+            <code class="path">{{ candidate.path }}</code>
+            @if (selectedPath() === candidate.path) {
+              <i class="bi bi-check-circle-fill check"></i>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="custom-section">
+        <span class="section-lbl">Manual Path</span>
+        <div class="input-row">
+          <input type="text" class="input" [(ngModel)]="customPath" placeholder="/usr/bin/python3" (input)="onCustomPathChange()" />
+          <button class="btn-browse" (click)="browseForPython()"><i class="bi bi-folder2-open"></i></button>
+          <button class="btn-verify" [disabled]="!customPath" (click)="verifyCustomPath()">Verify</button>
+        </div>
+        @if (validationResult()) {
+          <div class="validation" [class.valid]="validationResult()?.valid" [class.invalid]="!validationResult()?.valid">
+            {{ validationResult()?.valid ? '✓' : '⚠' }} {{ validationResult()?.message }}
+          </div>
+        }
+      </section>
+    }
+  </main>
+
+  <footer class="panel-footer">
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="createNewVenv" />
+      <span>Create virtual environment</span>
+    </label>
+    <div class="spacer"></div>
+    <button class="btn-primary" [disabled]="!canProceed()" (click)="proceed()">Continue</button>
+  </footer>
+</div>

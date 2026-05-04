@@ -1,0 +1,65 @@
+<div class="superuser-layout">
+  <header class="panel-header">
+    <i class="bi bi-shield-lock-fill header-icon"></i>
+    <h1 class="title">Create Admin Account</h1>
+  </header>
+
+  <main class="panel-main">
+    <div class="form-row">
+      <label class="lbl" for="username">Username</label>
+      <div class="input-wrap">
+        <i class="bi bi-person"></i>
+        <input id="username" type="text" [(ngModel)]="username" placeholder="administrator" [disabled]="creating()" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="lbl" for="email">Email</label>
+      <div class="input-wrap">
+        <i class="bi bi-envelope"></i>
+        <input id="email" type="email" [(ngModel)]="email" placeholder="admin@cupcake.io" [disabled]="creating()" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="lbl" for="password">Password</label>
+      <div class="input-wrap">
+        <i class="bi bi-key"></i>
+        <input id="password" type="password" [(ngModel)]="password" placeholder="Min 8 characters" [disabled]="creating()" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="lbl" for="confirmPassword">Confirm</label>
+      <div class="input-wrap">
+        <i class="bi bi-shield-check"></i>
+        <input id="confirmPassword" type="password" [(ngModel)]="confirmPassword" placeholder="Repeat password" [disabled]="creating()" />
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="msg-bar error">
+        <i class="bi bi-exclamation-circle"></i>
+        {{ error() }}
+      </div>
+    }
+
+    @if (success()) {
+      <div class="msg-bar success">
+        <i class="bi bi-check-circle-fill"></i>
+        Account created successfully.
+      </div>
+    }
+  </main>
+
+  <footer class="panel-footer">
+    <button class="btn-outline" (click)="skip()" [disabled]="creating()">Skip</button>
+    <div class="spacer"></div>
+    <button class="btn-primary" (click)="create()" [disabled]="!isValid() || creating()">
+      @if (creating()) {
+        <span class="spinner"></span>
+      }
+      Create
+    </button>
+  </footer>
+</div>

@@ -1,0 +1,38 @@
+<div class="debug-layout">
+  <header class="debug-header">
+    <span class="title">Console</span>
+    <span class="badge">{{ logCount() }}</span>
+    <div class="spacer"></div>
+    <select class="filter-select" [(ngModel)]="filterLevel">
+      <option value="all">All</option>
+      <option value="info">Info</option>
+      <option value="success">Success</option>
+      <option value="warning">Warning</option>
+      <option value="error">Error</option>
+    </select>
+    <button class="btn-clear" (click)="clearLogs()">Clear</button>
+  </header>
+
+  <main class="console-main">
+    @if (filteredLogs().length === 0) {
+      <div class="empty-state">No logs</div>
+    }
+    @for (log of filteredLogs(); track $index) {
+      <div class="log-row" [class]="log.type">
+        <span class="ts">[{{ log.time }}]</span>
+        <span class="lvl">{{ log.type.toUpperCase() }}</span>
+        <span class="msg">{{ log.message }}</span>
+      </div>
+    }
+  </main>
+
+  <footer class="debug-footer">
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="autoScroll" />
+      <span>Auto-scroll</span>
+    </label>
+    <div class="spacer"></div>
+    <span class="status-dot" [class.error]="isLastError()"></span>
+    <span class="status-text">{{ backendStatus() }}</span>
+  </footer>
+</div>

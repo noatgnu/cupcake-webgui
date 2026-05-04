@@ -1,0 +1,28 @@
+{
+  "$schema": "https://wails.io/schemas/config.v3.json",
+  "name": "cupcake-wails",
+  "outputfilename": "cupcake",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://localhost:4200",
+  "wailsjsdir": "./frontend/src/wailsjs",
+  "bindings": {
+    "output_dir": "./frontend/bindings",
+    "ts_generation": {
+      "output_type": "classes"
+    }
+  },
+  "author": {
+    "name": "Toan K. Phung",
+    "email": "tphung001@dundee.ac.uk"
+  },
+  "info": {
+    "companyName": "Cupcake",
+    "productName": "Cupcake",
+    "productVersion": "0.0.1",
+    "copyright": "Copyright 2024-2026",
+    "comments": "Metadata management for mass spectrometry",
+    "icon": "resources/cupcake_logo.png"
+  }
+}

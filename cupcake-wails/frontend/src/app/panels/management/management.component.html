@@ -1,0 +1,108 @@
+<div class="management-layout">
+  <header class="panel-header">
+    <h1 class="title">System Management</h1>
+    <div class="spacer"></div>
+    <span class="status-dot"></span>
+    <span class="status-text">Port 8000</span>
+    <button class="btn-sm" (click)="refreshStats()">Refresh</button>
+  </header>
+
+  <main class="panel-main">
+    <aside class="stats-col">
+      <div class="stat-row">
+        <i class="bi bi-bar-chart"></i>
+        <span class="stat-val">{{ schemaCount() }}</span>
+        <span class="stat-lbl">Schemas</span>
+      </div>
+      <div class="stat-row">
+        <i class="bi bi-card-checklist"></i>
+        <span class="stat-val">{{ columnTemplateCount() }}</span>
+        <span class="stat-lbl">Templates</span>
+      </div>
+      <div class="stat-row primary">
+        <i class="bi bi-dna"></i>
+        <span class="stat-val">{{ ontologyTotal() }}</span>
+        <span class="stat-lbl">Ontologies</span>
+      </div>
+      <div class="ontology-list">
+        @for (item of ontologyBreakdown(); track item.name) {
+          <span class="ont-item">{{ item.name }}: {{ item.count | number }}</span>
+        }
+      </div>
+    </aside>
+
+    <div class="commands-col">
+      <div class="command-list">
+        @for (cmd of commands(); track cmd.name) {
+          <div class="command-row" [class.running]="cmd.running" [class.expanded]="cmd.expanded">
+            <div class="command-main">
+              <i [class]="cmd.icon" class="cmd-icon"></i>
+              <div class="cmd-info">
+                <span class="cmd-name">{{ cmd.displayName }}</span>
+                @if (cmd.count !== null) {
+                  <span class="cmd-badge">{{ cmd.count | number }}</span>
+                }
+              </div>
+              <button class="btn-opt" (click)="toggleExpanded(cmd.name)" [class.active]="cmd.expanded">
+                <i class="bi bi-gear"></i>
+              </button>
+              <button class="btn-exec" [disabled]="cmd.running" (click)="runCommand(cmd.name)">
+                @if (cmd.running) {
+                  <span class="spinner"></span>
+                } @else {
+                  Run
+                }
+              </button>
+            </div>
+            @if (cmd.expanded && cmd.options.length > 0) {
+              <div class="command-opts">
+                @for (opt of cmd.options; track opt.key) {
+                  @switch (opt.type) {
+                    @case ('boolean') {
+                      <label class="opt-check">
+                        <input type="checkbox" [checked]="getOptionValue(cmd.name, opt.key)" (change)="setOptionValue(cmd.name, opt.key, $any($event.target).checked)" />
+                        {{ opt.label }}
+                      </label>
+                    }
+                    @case ('number') {
+                      <label class="opt-num">
+                        {{ opt.label }}
+                        <input type="number" [value]="getOptionValue(cmd.name, opt.key)" [disabled]="cmd.name === 'load-ontologies' && getOptionValue('load-ontologies', 'noLimit')" (change)="setOptionValue(cmd.name, opt.key, +$any($event.target).value)" min="1" max="100000" />
+                      </label>
+                    }
+                    @case ('select') {
+                      <div class="opt-chips">
+                        <span class="opt-lbl">{{ opt.label }}</span>
+                        @for (type of ontologyTypes; track type.value) {
+                          <button class="chip" [class.selected]="isOntologyTypeSelected(type.value)" (click)="toggleOntologyType(type.value)">{{ type.label }}</button>
+                        }
+                      </div>
+                    }
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="terminal">
+        <div class="term-header">
+          <span class="term-title">Output</span>
+          <button class="btn-clear" (click)="outputLines.set([])">Clear</button>
+        </div>
+        <div class="term-viewport" #terminalViewport>
+          @if (outputLines().length === 0) {
+            <span class="term-empty">Awaiting command...</span>
+          }
+          @for (line of outputLines(); track $index) {
+            <div class="term-line" [class]="line.type">
+              <span class="caret">></span>
+              <span class="text">{{ line.text }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
