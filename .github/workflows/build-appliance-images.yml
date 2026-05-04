@@ -95,10 +95,10 @@ jobs:
           ssh-keygen -t ed25519 -f cupckey -N '' -q
           echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
 
-      - name: Download Ubuntu cloud image
+      - name: Download Debian cloud image
         run: |
-          wget -q --show-progress "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" -O ubuntu-cloud.img
-          qemu-img resize ubuntu-cloud.img 8G
+          wget -q --show-progress "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2" -O debian-cloud.qcow2
+          qemu-img resize debian-cloud.qcow2 8G
 
       - name: Create cloud-init seed
         run: |
@@ -120,7 +120,7 @@ jobs:
         run: |
           qemu-system-x86_64 \
             -m 4096 -smp 2 \
-            -drive file=ubuntu-cloud.img,format=qcow2,if=virtio \
+            -drive file=debian-cloud.qcow2,format=qcow2,if=virtio \
             -drive file=seed.iso,format=raw,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=net0 \
@@ -142,7 +142,7 @@ jobs:
           exit 1
 
       - name: Provision base
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
         run: |
@@ -179,7 +179,7 @@ jobs:
 
       - name: Compact and compress
         run: |
-          qemu-img convert -O qcow2 -c ubuntu-cloud.img cupcake-vm-amd64.qcow2
+          qemu-img convert -O qcow2 -c debian-cloud.qcow2 cupcake-vm-amd64.qcow2
           xz -3 cupcake-vm-amd64.qcow2
           ls -lh cupcake-vm-amd64.qcow2.xz
 
@@ -232,6 +232,11 @@ jobs:
 
       - name: Clone pi-gen
         run: git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Patch pi-gen for qemu-user-static compatibility
+        run: |
+          sed -i 's/qemu-arm:qemu-user-binfmt/qemu-arm-static:qemu-user-static/' pi-gen/depends
+          sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
       - name: Copy frontends into pi-gen stage
         run: |
