@@ -31,38 +31,33 @@ variable "vanilla_ng_ref" {
 locals {
   is_vm  = var.image_type == "vm"
   is_rpi = var.image_type == "rpi"
+  is_arm64_cross = var.arch == "arm64"
 
-  qemu_binary = var.arch == "arm64" ? "qemu-aarch64" : "qemu-x86_64"
-  cpu_model   = var.arch == "arm64" ? "cortex-a72" : "host"
+  disk_format = local.is_vm ? "qcow2" : "raw"
+  disk_size   = local.is_vm ? "8192" : "4096"
 
-  disk_format   = local.is_vm ? "qcow2" : "raw"
-  disk_size     = local.is_vm ? "8192" : "4096"
-  machine_type  = local.is_rpi ? "raspi3b" : "pc"
-  firmware      = local.is_rpi ? "/usr/share/AAVMF/AAVMF_CODE.fd" : null
-
-  iso_urls = local.is_rpi ? [
-    "https://cdimage.ubuntu.com/ubuntu-server/24.04/release/ubuntu-24.04.2-live-server-arm64.iso",
-  ] : [
-    "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-${var.arch}.iso",
-  ]
-  iso_checksum = local.is_rpi ? "file:https://cdimage.ubuntu.com/ubuntu-server/24.04/release/SHA256SUMS" : "file:https://releases.ubuntu.com/24.04.2/SHA256SUMS"
+  iso_url = local.is_rpi ? (
+    "https://cdimage.ubuntu.com/ubuntu-server/24.04/release/ubuntu-24.04.2-live-server-arm64.iso"
+  ) : (
+    "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-${var.arch}.iso"
+  )
 }
 
 source "qemu" "cupcake" {
-  iso_url          = local.iso_urls[0]
-  iso_checksum     = local.iso_checksum
+  iso_url      = local.iso_url
   output_directory = "${var.output_dir}/cupcake-${var.image_type}-${var.arch}"
 
-  vm_name     = "cupcake-${var.image_type}-${var.arch}"
-  disk_size   = local.disk_size
-  format      = local.disk_format
-  accelerator = "kvm"
+  vm_name   = "cupcake-${var.image_type}-${var.arch}"
+  disk_size = local.disk_size
+  format    = local.disk_format
 
-  qemu_binary = local.qemu_binary
-  cpu_model   = local.cpu_model
+  accelerator = local.is_arm64_cross ? "none" : "kvm"
+
+  qemu_binary = local.is_arm64_cross ? "qemu-system-aarch64" : ""
+  cpu_model   = local.is_arm64_cross ? "cortex-a72" : "host"
 
   http_directory = "packer/http"
-  boot_wait      = "5s"
+  boot_wait      = "10s"
 
   ssh_username = "cupcake"
   ssh_password = "cupcake"

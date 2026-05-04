@@ -94,7 +94,7 @@ jobs:
         run: packer validate packer/cupcake-appliance.pkr.hcl
 
       - name: Build RPi image (emulated ARM64)
-        timeout-minutes: 120
+        timeout-minutes: 180
         run: |
           packer build \
             -var "arch=arm64" \
