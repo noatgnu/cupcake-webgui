@@ -42,12 +42,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Packer
+      - name: Install dependencies
         run: |
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
           sudo apt-get update
-          sudo apt-get install -y packer qemu-kvm qemu-utils
+          sudo apt-get install -y packer qemu-system-x86 qemu-utils
+
+      - name: Verify KVM
+        run: |
+          ls -la /dev/kvm || echo "No /dev/kvm"
+          which qemu-system-x86_64 || echo "qemu-system-x86_64 not found"
 
       - name: Install Packer QEMU plugin
         run: packer plugins install github.com/hashicorp/qemu
@@ -57,7 +62,7 @@ jobs:
 
       - name: Build VM image
         run: |
-          packer build \
+          PACKER_LOG=1 packer build \
             -var "arch=amd64" \
             -var "image_type=vm" \
             -var "output_dir=${{ runner.temp }}/output" \

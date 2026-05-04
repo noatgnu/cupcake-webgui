@@ -36,11 +36,7 @@ locals {
   disk_format = local.is_vm ? "qcow2" : "raw"
   disk_size   = local.is_vm ? "8192" : "4096"
 
-  iso_url = local.is_rpi ? (
-    "https://cdimage.ubuntu.com/ubuntu-server/24.04/release/ubuntu-24.04.2-live-server-arm64.iso"
-  ) : (
-    "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-${var.arch}.iso"
-  )
+  iso_url = "https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-${var.arch}.iso"
 }
 
 source "qemu" "cupcake" {
@@ -53,6 +49,7 @@ source "qemu" "cupcake" {
   format    = local.disk_format
 
   accelerator = local.is_arm64_cross ? "none" : "kvm"
+  headless    = true
 
   qemu_binary = local.is_arm64_cross ? "qemu-system-aarch64" : ""
   cpu_model   = local.is_arm64_cross ? "cortex-a72" : "host"
