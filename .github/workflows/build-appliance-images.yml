@@ -4,13 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       image_type:
-        description: 'Image type to build'
+        description: 'Image type'
         type: choice
         default: 'both'
-        options:
-          - vm
-          - rpi
-          - both
+        options: [vm, rpi, both]
       backend_ref:
         description: 'Backend branch/tag (cupcake_vanilla)'
         type: string
@@ -23,120 +20,492 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
-  push:
-    branches: [master, main]
-    paths:
-      - 'packer/**'
-      - 'nginx/**'
-      - 'systemd/**'
-      - '.github/workflows/build-appliance-images.yml'
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-vm-amd64:
-    name: Build VM Image (amd64)
-    if: inputs.image_type != 'rpi'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-          sudo apt-get update
-          sudo apt-get install -y packer qemu-system-x86 qemu-utils
-
-      - name: Verify KVM
-        run: |
-          ls -la /dev/kvm || echo "No /dev/kvm"
-          which qemu-system-x86_64 || echo "qemu-system-x86_64 not found"
-
-      - name: Install Packer QEMU plugin
-        run: packer plugins install github.com/hashicorp/qemu
-
-      - name: Validate Packer template
-        run: packer validate packer/cupcake-appliance.pkr.hcl
-
-      - name: Build VM image
-        run: |
-          PACKER_LOG=1 packer build \
-            -var "arch=amd64" \
-            -var "image_type=vm" \
-            -var "output_dir=${{ runner.temp }}/output" \
-            -var "backend_ref=${{ inputs.backend_ref || 'master' }}" \
-            -var "webgui_ref=${{ inputs.webgui_ref || 'master' }}" \
-            -var "vanilla_ng_ref=${{ inputs.vanilla_ng_ref || 'master' }}" \
-            packer/cupcake-appliance.pkr.hcl
-
-      - name: Upload VM image
-        uses: actions/upload-artifact@v4
-        with:
-          name: cupcake-vm-amd64
-          path: ${{ runner.temp }}/output/cupcake-vm-amd64/
-          retention-days: 7
-
-  build-rpi-arm64:
-    name: Build RPi Image (arm64)
+  build-frontend:
+    name: Pre-build Frontends
     if: inputs.image_type != 'vm'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Packer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build cupcake-webgui
+        env:
+          WEBGUI_REF: ${{ inputs.webgui_ref || 'master' }}
         run: |
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-          sudo apt-get update
-          sudo apt-get install -y packer qemu-system-arm qemu-utils qemu-efi-aarch64
+          git clone --depth 1 --branch "$WEBGUI_REF" https://github.com/noatgnu/cupcake-webgui.git /tmp/webgui
+          cd /tmp/webgui
+          npm ci
+          npx ng build --configuration=production --base-href /
+          mkdir -p frontend/webgui
+          cp -r dist/cupcake/browser/* frontend/webgui/
 
-      - name: Install Packer QEMU plugin
-        run: packer plugins install github.com/hashicorp/qemu
-
-      - name: Validate Packer template
-        run: packer validate packer/cupcake-appliance.pkr.hcl
-
-      - name: Build RPi image (emulated ARM64)
-        timeout-minutes: 180
+      - name: Build cupcake-vanilla-ng
+        env:
+          VANILLA_NG_REF: ${{ inputs.vanilla_ng_ref || 'master' }}
         run: |
-          packer build \
-            -var "arch=arm64" \
-            -var "image_type=rpi" \
-            -var "output_dir=${{ runner.temp }}/output" \
-            -var "backend_ref=${{ inputs.backend_ref || 'master' }}" \
-            -var "webgui_ref=${{ inputs.webgui_ref || 'master' }}" \
-            -var "vanilla_ng_ref=${{ inputs.vanilla_ng_ref || 'master' }}" \
-            packer/cupcake-appliance.pkr.hcl
+          git clone --depth 1 --branch "$VANILLA_NG_REF" https://github.com/noatgnu/cupcake-vanilla-ng.git /tmp/vanilla-ng
+          cd /tmp/vanilla-ng
+          npm ci
+          npx ng build --configuration=production --base-href /
+          mkdir -p frontend/vanilla
+          cp -r dist/cupcake-vanilla-ng/browser/* frontend/vanilla/
 
-      - name: Compress RPi image
-        run: |
-          mkdir -p ${{ runner.temp }}/output/compressed
-          xz -z -k ${{ runner.temp }}/output/cupcake-rpi-arm64/cupcake-rpi-arm64
-          mv ${{ runner.temp }}/output/cupcake-rpi-arm64/cupcake-rpi-arm64.xz ${{ runner.temp }}/output/compressed/
-
-      - name: Upload RPi image
+      - name: Upload webgui
         uses: actions/upload-artifact@v4
         with:
-          name: cupcake-rpi-arm64
-          path: ${{ runner.temp }}/output/compressed/
+          name: cupcake-webgui-frontend
+          path: frontend/webgui/
+          retention-days: 1
+
+      - name: Upload vanilla-ng
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-vanilla-ng-frontend
+          path: frontend/vanilla/
+          retention-days: 1
+
+  build-vm:
+    name: VM Image (amd64)
+    if: inputs.image_type != 'rpi'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client
+
+      - name: Fix /dev/kvm permissions
+        run: sudo chmod 666 /dev/kvm 2>/dev/null || true
+
+      - name: Create cloud-init seed ISO
+        run: cloud-localds seed.iso provision/http/user-data provision/http/meta-data
+
+      - name: Create disk
+        run: qemu-img create -f qcow2 -o preallocation=metadata disk.qcow2 8G
+
+      - name: Download Ubuntu Server ISO
+        run: |
+          ISO_URL="https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-amd64.iso"
+          wget -q --show-progress "$ISO_URL" -O ubuntu.iso
+          echo "ISO ready: $(du -sh ubuntu.iso)"
+
+      - name: Boot VM and wait for SSH
+        timeout-minutes: 20
+        run: |
+          qemu-system-x86_64 \
+            -m 4096 -smp 2 \
+            -drive file=disk.qcow2,format=qcow2,if=virtio \
+            -cdrom ubuntu.iso \
+            -drive file=seed.iso,format=raw,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            -machine type=pc,accel=kvm -cpu host \
+            -display none -serial none -no-reboot &
+          QEMU_PID=$!
+          echo "QEMU PID: $QEMU_PID"
+
+          for i in $(seq 1 120); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
+              echo "SSH ready (${i}x5s)"
+              echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
+              exit 0
+            fi
+            sleep 5
+          done
+          kill $QEMU_PID 2>/dev/null || true
+          echo "SSH never came up"
+          exit 1
+
+      - name: Provision base
+        timeout-minutes: 10
+        env:
+          BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
+        run: |
+          for s in 01-base 02-postgresql 03-redis 04-backend; do
+            scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
+            ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+              "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
+          done
+
+      - name: Provision frontend
+        timeout-minutes: 60
+        env:
+          WEBGUI_REF: ${{ inputs.webgui_ref || 'master' }}
+          VANILLA_NG_REF: ${{ inputs.vanilla_ng_ref || 'master' }}
+        run: |
+          scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+            "chmod +x /tmp/05-frontend.sh && sudo /tmp/05-frontend.sh"
+
+      - name: Provision nginx and finalize
+        timeout-minutes: 5
+        run: |
+          for s in 06-nginx 07-mdns 08-cleanup; do
+            scp -o StrictHostKeyChecking=no -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
+            ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost \
+              "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
+          done
+
+      - name: Shutdown VM
+        run: |
+          ssh -o StrictHostKeyChecking=no -P 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
+          sleep 10
+          kill $QEMU_PID 2>/dev/null || true
+
+      - name: Compact and compress
+        run: |
+          qemu-img convert -O qcow2 -c disk.qcow2 cupcake-vm-amd64.qcow2
+          xz -3 cupcake-vm-amd64.qcow2
+          ls -lh cupcake-vm-amd64.qcow2.xz
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-vm-amd64
+          path: cupcake-vm-amd64.qcow2.xz
           retention-days: 7
-          if-no-files-found: warn
+
+  build-rpi:
+    name: RPi Image
+    if: inputs.image_type != 'vm'
+    needs: build-frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download webgui frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-webgui-frontend
+          path: frontend/webgui
+
+      - name: Download vanilla-ng frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-vanilla-ng-frontend
+          path: frontend/vanilla
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/lib/python*
+          sudo apt-get clean
+          df -h
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            coreutils quilt debootstrap zerofree zip dosfstools \
+            libarchive-tools rsync xz-utils file git curl bc gpg pigz \
+            qemu-user-static binfmt-support
+
+      - name: Enable ARM64 emulation
+        run: |
+          sudo modprobe binfmt_misc
+          sudo update-binfmts --enable qemu-aarch64 || true
+          echo ':aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F' | sudo tee /proc/sys/fs/binfmt_misc/register || true
+          /usr/bin/qemu-aarch64-static --version
+
+      - name: Clone pi-gen
+        run: git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Copy frontends into pi-gen stage
+        run: |
+          mkdir -p pi-gen/stage2a/files/opt/cupcake/{webgui,vanilla}
+          cp -r frontend/webgui/* pi-gen/stage2a/files/opt/cupcake/webgui/
+          cp -r frontend/vanilla/* pi-gen/stage2a/files/opt/cupcake/vanilla/
+
+      - name: Create cupcake stage
+        run: |
+          mkdir -p pi-gen/stage2a/00-install-cupcake
+
+          cat > pi-gen/stage2a/prerun.sh << 'EOF'
+          #!/bin/bash -e
+          echo "CUPCAKE appliance stage starting"
+          EOF
+
+          cat > pi-gen/stage2a/00-install-cupcake/00-run-chroot.sh << 'EOF'
+          #!/bin/bash -e
+
+          echo "=== CUPCAKE: installing packages ==="
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            postgresql postgresql-client redis-server nginx \
+            python3.12 python3.12-venv python3.12-dev libpq-dev \
+            avahi-daemon avahi-utils curl git
+
+          systemctl enable postgresql redis-server nginx avahi-daemon
+
+          echo "=== CUPCAKE: creating user ==="
+          useradd -m -s /bin/bash cupcake || true
+          echo 'cupcake:cupcake' | chpasswd
+
+          mkdir -p /opt/cupcake/{backend,static,media,backups,venv}
+          mkdir -p /var/log/cupcake
+          chown -R cupcake:cupcake /opt/cupcake /var/log/cupcake
+
+          echo "=== CUPCAKE: setting up PostgreSQL ==="
+          systemctl start postgresql
+          su - postgres -c "psql -c \"CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';\"" || true
+          su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\"" || true
+          su - postgres -c "psql -c \"ALTER USER cupcake_vanilla CREATEDB;\"" || true
+
+          echo "=== CUPCAKE: Python venv ==="
+          python3.12 -m venv /opt/cupcake/venv
+          /opt/cupcake/venv/bin/pip install --upgrade pip
+
+          echo "=== CUPCAKE: cloning backend ==="
+          git clone --depth 1 https://github.com/noatgnu/cupcake_vanilla.git /opt/cupcake/backend || true
+          /opt/cupcake/venv/bin/pip install -r /opt/cupcake/backend/requirements.txt
+          /opt/cupcake/venv/bin/pip install gunicorn "uvicorn[standard]" psycopg2-binary
+
+          cat > /opt/cupcake/.env << 'DOTENV'
+          POSTGRES_DB=cupcake_vanilla_db
+          POSTGRES_USER=cupcake_vanilla
+          POSTGRES_PASSWORD=cupcake_vanilla_pass
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          REDIS_HOST=127.0.0.1
+          REDIS_PORT=6379
+          DJANGO_SETTINGS_MODULE=cupcake_vanilla.settings
+          DEBUG=False
+          ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
+          CORS_ALLOWED_ORIGINS=http://cupcake.local,http://vanilla.local,http://localhost
+          STATIC_ROOT=/opt/cupcake/static
+          MEDIA_ROOT=/opt/cupcake/media
+          DOTENV
+
+          cd /opt/cupcake/backend
+          /opt/cupcake/venv/bin/python manage.py migrate
+          /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
+
+          echo "=== CUPCAKE: deploying nginx ==="
+          cat > /etc/nginx/sites-available/cupcake.conf << 'NGXEOF'
+          upstream django_backend {
+              server 127.0.0.1:8000;
+          }
+
+          server {
+              listen 80;
+              server_name cupcake.local cupcake;
+              client_max_body_size 2G;
+              root /opt/cupcake/webgui;
+              index index.html;
+
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+
+              location /api/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_read_timeout 300s;
+              }
+
+              location /admin/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host \$host;
+              }
+
+              location /ws/ {
+                  proxy_pass http://django_backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host \$host;
+                  proxy_read_timeout 86400s;
+              }
+
+              location /static/ {
+                  alias /opt/cupcake/static/;
+              }
+
+              location /media/ {
+                  alias /opt/cupcake/media/;
+              }
+
+              location /internal/media/ {
+                  internal;
+                  alias /opt/cupcake/media/;
+              }
+          }
+          NGXEOF
+
+          cat > /etc/nginx/sites-available/vanilla.conf << 'NGXEOF'
+          upstream django_backend {
+              server 127.0.0.1:8000;
+          }
+
+          server {
+              listen 80;
+              server_name vanilla.local vanilla;
+              client_max_body_size 2G;
+              root /opt/cupcake/vanilla;
+              index index.html;
+
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+
+              location /api/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_read_timeout 300s;
+              }
+
+              location /admin/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host \$host;
+              }
+
+              location /ws/ {
+                  proxy_pass http://django_backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host \$host;
+                  proxy_read_timeout 86400s;
+              }
+
+              location /static/ {
+                  alias /opt/cupcake/static/;
+              }
+
+              location /media/ {
+                  alias /opt/cupcake/media/;
+              }
+
+              location /internal/media/ {
+                  internal;
+                  alias /opt/cupcake/media/;
+              }
+          }
+          NGXEOF
+
+          ln -sf /etc/nginx/sites-available/cupcake.conf /etc/nginx/sites-enabled/
+          ln -sf /etc/nginx/sites-available/vanilla.conf /etc/nginx/sites-enabled/
+          rm -f /etc/nginx/sites-enabled/default
+
+          echo "=== CUPCAKE: deploying systemd ==="
+          cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
+          [Unit]
+          Description=Cupcake Django Backend
+          After=network.target postgresql.service redis-server.service
+          Requires=postgresql.service redis-server.service
+
+          [Service]
+          Type=simple
+          User=cupcake
+          Group=cupcake
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStart=/opt/cupcake/venv/bin/gunicorn cupcake_vanilla.asgi:application \
+              --bind 127.0.0.1:8000 --workers 4 --timeout 300 \
+              -k uvicorn.workers.UvicornWorker --log-level info
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          UNITEOF
+
+          systemctl enable cupcake-backend.service
+
+          chown -R cupcake:cupcake /opt/cupcake
+
+          echo "=== CUPCAKE: done ==="
+          EOF
+
+          echo "IMG_SUFFIX=-cupcake" > pi-gen/stage2a/EXPORT_IMAGE
+          chmod +x pi-gen/stage2a/prerun.sh pi-gen/stage2a/00-install-cupcake/00-run-chroot.sh
+
+          touch pi-gen/stage3/SKIP pi-gen/stage4/SKIP pi-gen/stage5/SKIP
+
+          cat > pi-gen/config << 'CFGEOF'
+          IMG_NAME=cupcake-pi
+          RELEASE=bookworm
+          DEPLOY_COMPRESSION=xz
+          COMPRESSION_LEVEL=9
+          LOCALE_DEFAULT=en_US.UTF-8
+          TARGET_HOSTNAME=cupcake-pi
+          KEYBOARD_KEYMAP=gb
+          KEYBOARD_LAYOUT="English (UK)"
+          TIMEZONE_DEFAULT=UTC
+          FIRST_USER_NAME=cupcake
+          FIRST_USER_PASS=cupcake123
+          ENABLE_SSH=1
+          STAGE_LIST="stage0 stage1 stage2 stage2a"
+          BOOTSTRAP_KEYRING=debian-archive-keyring
+          CFGEOF
+
+      - name: Build
+        timeout-minutes: 240
+        run: |
+          cd pi-gen
+          export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
+          sudo -E USE_DOCKER=0 ./build.sh
+
+      - name: Create model-specific images
+        run: |
+          mkdir -p deploy
+          cd pi-gen/deploy
+          shopt -s nullglob
+          for img in *.img.xz; do
+            base=$(basename "$img" .img.xz)
+            for model in pi3b pi4 pi5; do
+              cp "$img" "../../deploy/${base}-${model}.img.xz"
+            done
+          done
+          cd ../..
+          echo "Built images:"
+          ls -lh deploy/ || echo "No images found"
+
+      - name: Upload Pi 3B
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-pi3b-arm64
+          path: deploy/*pi3b*.img.xz
+          retention-days: 30
+
+      - name: Upload Pi 4
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-pi4-arm64
+          path: deploy/*pi4*.img.xz
+          retention-days: 30
+
+      - name: Upload Pi 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-pi5-arm64
+          path: deploy/*pi5*.img.xz
+          retention-days: 30
 
   summary:
     name: Summary
-    needs: [build-vm-amd64, build-rpi-arm64]
+    needs: [build-frontend, build-vm, build-rpi]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Summary
         run: |
           echo "## Cupcake Appliance Images" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| VM (amd64) | ${{ needs.build-vm-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| RPi (arm64) | ${{ needs.build-rpi-arm64.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Backend**: ${{ inputs.backend_ref || 'master' }} | **WebGUI**: ${{ inputs.webgui_ref || 'master' }} | **Vanilla NG**: ${{ inputs.vanilla_ng_ref || 'master' }}" >> $GITHUB_STEP_SUMMARY
+          echo "| VM (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi 3B | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi 4 | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi 5 | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
