@@ -5,27 +5,21 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 
-echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list
-apt-get update
-
 apt-get install -y \
     build-essential \
-    sudo \
     curl \
     wget \
     git \
     libpq-dev \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
     nginx \
     avahi-daemon \
     avahi-utils \
     unzip \
     ca-certificates \
     ufw
-
-apt-get install -y -t bookworm-backports \
-    python3.12 \
-    python3.12-venv \
-    python3.12-dev
 
 useradd -m -s /bin/bash cupcake || true
 echo 'cupcake:cupcake' | chpasswd

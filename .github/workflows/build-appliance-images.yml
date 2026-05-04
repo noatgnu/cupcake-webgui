@@ -95,10 +95,10 @@ jobs:
           ssh-keygen -t ed25519 -f cupckey -N '' -q
           echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
 
-      - name: Download Debian cloud image
+      - name: Download Ubuntu cloud image
         run: |
-          wget -q --show-progress "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2" -O debian-cloud.qcow2
-          qemu-img resize debian-cloud.qcow2 8G
+          wget -q --show-progress "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" -O vm-disk.qcow2
+          qemu-img resize vm-disk.qcow2 8G
 
       - name: Create cloud-init seed
         run: |
@@ -120,7 +120,7 @@ jobs:
         run: |
           qemu-system-x86_64 \
             -m 4096 -smp 2 \
-            -drive file=debian-cloud.qcow2,format=qcow2,if=virtio \
+            -drive file=vm-disk.qcow2,format=qcow2,if=virtio \
             -drive file=seed.iso,format=raw,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=net0 \
@@ -179,7 +179,7 @@ jobs:
 
       - name: Compact and compress
         run: |
-          qemu-img convert -O qcow2 -c debian-cloud.qcow2 cupcake-vm-amd64.qcow2
+          qemu-img convert -O qcow2 -c vm-disk.qcow2 cupcake-vm-amd64.qcow2
           xz -3 cupcake-vm-amd64.qcow2
           ls -lh cupcake-vm-amd64.qcow2.xz
 
@@ -222,7 +222,7 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt debootstrap zerofree zip dosfstools \
             libarchive-tools rsync xz-utils file git curl bc gpg pigz \
-            qemu-user-static binfmt-support arch-test
+            qemu-user-static binfmt-support arch-test debian-archive-keyring
 
       - name: Enable ARM64 emulation
         run: |
