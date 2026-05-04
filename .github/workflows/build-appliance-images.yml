@@ -143,27 +143,25 @@ jobs:
 
       - name: Provision base
         timeout-minutes: 20
-        env:
-          BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
         run: |
+          BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
           for s in 01-base 02-postgresql 03-redis 04-backend; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
+              "chmod +x /tmp/${s}.sh && sudo BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
           done
 
       - name: Provision frontend
         timeout-minutes: 60
-        env:
-          WEBGUI_REF: ${{ inputs.webgui_ref || 'master' }}
-          VANILLA_NG_REF: ${{ inputs.vanilla_ng_ref || 'master' }}
         run: |
+          WEBGUI_REF="${{ inputs.webgui_ref || 'master' }}"
+          VANILLA_NG_REF="${{ inputs.vanilla_ng_ref || 'master' }}"
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "chmod +x /tmp/05-frontend.sh && sudo /tmp/05-frontend.sh"
+            "chmod +x /tmp/05-frontend.sh && sudo WEBGUI_REF='${WEBGUI_REF}' VANILLA_NG_REF='${VANILLA_NG_REF}' /tmp/05-frontend.sh"
 
       - name: Provision nginx and finalize
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           for s in 06-nginx 07-mdns 08-cleanup; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
@@ -237,6 +235,15 @@ jobs:
         run: |
           sed -i 's/qemu-arm:qemu-user-binfmt/qemu-arm-static:qemu-user-static/' pi-gen/depends
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
+
+          cat > pi-gen/stage0/00-configure-apt/00-keyring.sh << 'SCRIPT'
+          #!/bin/bash -e
+          mkdir -p "${ROOTFS_DIR}/etc/apt/trusted.gpg.d"
+          cp /usr/share/keyrings/debian-archive-keyring.gpg \
+            "${ROOTFS_DIR}/etc/apt/trusted.gpg.d/debian-archive-keyring.gpg"
+          SCRIPT
+          sed -i 's/^          //' pi-gen/stage0/00-configure-apt/00-keyring.sh
+          chmod +x pi-gen/stage0/00-configure-apt/00-keyring.sh
 
       - name: Copy frontends into pi-gen stage
         run: |
