@@ -44,8 +44,10 @@ locals {
 }
 
 source "qemu" "cupcake" {
-  iso_url      = local.iso_url
-  output_directory = "${var.output_dir}/cupcake-${var.image_type}-${var.arch}"
+  iso_url           = local.iso_url
+  iso_checksum      = "none"
+  iso_checksum_type = "none"
+  output_directory  = "${var.output_dir}/cupcake-${var.image_type}-${var.arch}"
 
   vm_name   = "cupcake-${var.image_type}-${var.arch}"
   disk_size = local.disk_size
