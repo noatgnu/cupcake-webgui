@@ -1,0 +1,143 @@
+name: Build Appliance Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_type:
+        description: 'Image type to build'
+        type: choice
+        default: 'both'
+        options:
+          - vm
+          - rpi
+          - both
+      backend_ref:
+        description: 'Backend branch/tag (cupcake_vanilla)'
+        type: string
+        default: 'master'
+      webgui_ref:
+        description: 'WebGUI branch/tag (cupcake-webgui)'
+        type: string
+        default: 'master'
+      vanilla_ng_ref:
+        description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
+        type: string
+        default: 'master'
+  push:
+    branches: [master, main]
+    paths:
+      - 'packer/**'
+      - 'nginx/**'
+      - 'systemd/**'
+      - '.github/workflows/build-appliance-images.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-vm-amd64:
+    name: Build VM Image (amd64)
+    if: inputs.image_type != 'rpi'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Packer
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update
+          sudo apt-get install -y packer qemu-kvm qemu-utils
+
+      - name: Install Packer QEMU plugin
+        run: packer plugins install github.com/hashicorp/qemu
+
+      - name: Validate Packer template
+        run: packer validate packer/cupcake-appliance.pkr.hcl
+
+      - name: Build VM image
+        run: |
+          packer build \
+            -var "arch=amd64" \
+            -var "image_type=vm" \
+            -var "output_dir=${{ runner.temp }}/output" \
+            -var "backend_ref=${{ inputs.backend_ref || 'master' }}" \
+            -var "webgui_ref=${{ inputs.webgui_ref || 'master' }}" \
+            -var "vanilla_ng_ref=${{ inputs.vanilla_ng_ref || 'master' }}" \
+            packer/cupcake-appliance.pkr.hcl
+
+      - name: Upload VM image
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-vm-amd64
+          path: ${{ runner.temp }}/output/cupcake-vm-amd64/
+          retention-days: 7
+
+  build-rpi-arm64:
+    name: Build RPi Image (arm64)
+    if: inputs.image_type != 'vm'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          repository: noatgnu/cupcake_vanilla
+          ref: ${{ inputs.backend_ref || 'master' }}
+          path: backend
+
+      - name: Build RPi image via pi-gen
+        run: |
+          cd backend/raspberry-pi
+          if [ -f "docker-build/Dockerfile.cupcake-builder" ]; then
+            docker buildx build \
+              --platform linux/arm64 \
+              --load \
+              -t cupcake-pi-builder:latest \
+              -f docker-build/Dockerfile.cupcake-builder .
+          fi
+
+      - name: Extract and compress image
+        run: |
+          mkdir -p output
+          # pi-gen outputs an .img file; compress it
+          if [ -f backend/raspberry-pi/output/*.img ]; then
+            xz -z backend/raspberry-pi/output/*.img
+            mv backend/raspberry-pi/output/*.img.xz output/cupcake-rpi-arm64.img.xz
+          else
+            echo "No RPi image found; check pi-gen output"
+          fi
+
+      - name: Upload RPi image
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-rpi-arm64
+          path: output/
+          retention-days: 7
+          if-no-files-found: warn
+
+  summary:
+    name: Summary
+    needs: [build-vm-amd64, build-rpi-arm64]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## Cupcake Appliance Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| VM (amd64) | ${{ needs.build-vm-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi (arm64) | ${{ needs.build-rpi-arm64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend**: ${{ inputs.backend_ref || 'master' }} | **WebGUI**: ${{ inputs.webgui_ref || 'master' }} | **Vanilla NG**: ${{ inputs.vanilla_ng_ref || 'master' }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,20 @@
+[Unit]
+Description=Cupcake mDNS Advertisement
+After=network.target nginx.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/avahi-publish-service \
+    "Cupcake" _http._tcp 80 \
+    "WebGUI for metadata management" \
+    "path=/" \
+    "sub=cupcake"
+ExecStart=/usr/bin/avahi-publish-service \
+    "Cupcake Vanilla" _http._tcp 80 \
+    "Vanilla NG interface" \
+    "sub=vanilla"
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Cupcake RQ Worker
+After=cupcake-backend.service
+Requires=cupcake-backend.service
+
+[Service]
+Type=simple
+User=cupcake
+Group=cupcake
+WorkingDirectory=/opt/cupcake/backend
+EnvironmentFile=/opt/cupcake/.env
+ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

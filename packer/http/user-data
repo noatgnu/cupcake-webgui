@@ -1,0 +1,38 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: cupcake
+    username: cupcake
+    password: "$6$rounds=4096$salt$wR0G0b49s2dLhGCA3Ip/m9ljBOsk6Q4J.HxN5fB8m2qVmCzd5BUyN3g1k7Vp9xYZ0D"
+  ssh:
+    install-server: true
+    allow-pw: true
+  storage:
+    layout:
+      name: lvm
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  timezone: UTC
+  packages:
+    - openssh-server
+    - curl
+    - wget
+    - git
+    - build-essential
+    - python3.12
+    - python3.12-venv
+    - python3.12-dev
+    - libpq-dev
+    - nginx
+    - postgresql
+    - postgresql-client
+    - redis-server
+    - avahi-daemon
+    - avahi-utils
+    - unzip
+    - ca-certificates
+    - ufw
+  late-commands:
+    - echo "Cupcake appliance installation starting..."
