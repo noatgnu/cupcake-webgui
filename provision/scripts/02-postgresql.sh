@@ -3,7 +3,7 @@ set -eux
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y postgresql postgresql-client
+apt-get install -y postgresql-16 postgresql-client-16
 
 systemctl enable postgresql
 systemctl start postgresql

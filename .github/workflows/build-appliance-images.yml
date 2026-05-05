@@ -237,12 +237,9 @@ jobs:
           sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
 
           cat >> pi-gen/stage0/prerun.sh << 'SCRIPT'
-
-          mkdir -p "${ROOTFS_DIR}/etc/apt/trusted.gpg.d"
-          if [ -f "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.gpg" ]; then
-            cp "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.gpg" \
-              "${ROOTFS_DIR}/etc/apt/trusted.gpg.d/debian-archive-keyring.gpg"
-          fi
+          mkdir -p "${ROOTFS_DIR}/usr/share/keyrings"
+          cp /usr/share/keyrings/debian-archive-keyring.gpg \
+            "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.pgp"
           SCRIPT
 
       - name: Copy frontends into pi-gen stage
@@ -265,10 +262,14 @@ jobs:
 
           echo "=== CUPCAKE: installing packages ==="
           apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y curl gpg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+          apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            postgresql postgresql-client redis-server nginx \
-            python3.12 python3.12-venv python3.12-dev libpq-dev \
-            avahi-daemon avahi-utils curl git
+            postgresql-16 postgresql-client-16 redis-server nginx \
+            python3 python3-venv python3-dev libpq-dev \
+            avahi-daemon avahi-utils git
 
           systemctl --root=/ enable postgresql redis-server nginx avahi-daemon
 
@@ -281,13 +282,19 @@ jobs:
           chown -R cupcake:cupcake /opt/cupcake /var/log/cupcake
 
           echo "=== CUPCAKE: setting up PostgreSQL ==="
-          service postgresql start
+          service postgresql start || \
+            pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" start
           su - postgres -c "psql -c \"CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';\"" || true
           su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\"" || true
           su - postgres -c "psql -c \"ALTER USER cupcake_vanilla CREATEDB;\"" || true
+          PG_HBA=$(su - postgres -c "psql -t -c 'SHOW hba_file;'" | tr -d ' ')
+          sed -i 's/local[[:space:]]\+all[[:space:]]\+all[[:space:]]\+peer/local   all             all                                     md5/' "$PG_HBA"
+          sed -i 's/host[[:space:]]\+all[[:space:]]\+all[[:space:]]\+127\.0\.0\.1\/32[[:space:]]\+scram-sha-256/host    all             all             127.0.0.1\/32            md5/' "$PG_HBA"
+          service postgresql restart || \
+            pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" restart
 
           echo "=== CUPCAKE: Python venv ==="
-          python3.12 -m venv /opt/cupcake/venv
+          python3 -m venv /opt/cupcake/venv
           /opt/cupcake/venv/bin/pip install --upgrade pip
 
           echo "=== CUPCAKE: cloning backend ==="
@@ -473,7 +480,7 @@ jobs:
 
           cat > pi-gen/config << 'CFGEOF'
           IMG_NAME=cupcake-pi
-          RELEASE=bookworm
+          RELEASE=trixie
           DEPLOY_COMPRESSION=xz
           COMPRESSION_LEVEL=9
           LOCALE_DEFAULT=en_US.UTF-8

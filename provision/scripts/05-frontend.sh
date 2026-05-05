@@ -20,6 +20,12 @@ cd /tmp
 git clone --depth 1 --branch "${VANILLA_NG_REF}" https://github.com/noatgnu/cupcake-vanilla-ng.git cupcake-vanilla-ng
 cd cupcake-vanilla-ng
 npm ci
+npx ng build @noatgnu/cupcake-core
+npx ng build @noatgnu/cupcake-vanilla
+npx ng build @noatgnu/cupcake-macaron
+npx ng build @noatgnu/cupcake-mint-chocolate
+npx ng build @noatgnu/cupcake-red-velvet
+npx ng build @noatgnu/cupcake-salted-caramel
 npx ng build --configuration=production --base-href /
 mkdir -p /opt/cupcake/vanilla
 cp -r dist/cupcake-vanilla-ng/browser/* /opt/cupcake/vanilla/
