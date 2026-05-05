@@ -98,7 +98,7 @@ jobs:
       - name: Download Ubuntu cloud image
         run: |
           wget -q --show-progress "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" -O vm-disk.qcow2
-          qemu-img resize vm-disk.qcow2 8G
+          qemu-img resize vm-disk.qcow2 20G
 
       - name: Create cloud-init seed
         run: |

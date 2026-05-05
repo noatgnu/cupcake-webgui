@@ -14,6 +14,7 @@ npx ng build --configuration=production --base-href /
 mkdir -p /opt/cupcake/webgui
 cp -r dist/cupcake/browser/* /opt/cupcake/webgui/
 chown -R cupcake:cupcake /opt/cupcake/webgui
+rm -rf /tmp/cupcake-webgui
 
 # Build cupcake-vanilla-ng
 cd /tmp

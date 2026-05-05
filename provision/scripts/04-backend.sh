@@ -27,6 +27,10 @@ cmake --build build --config Release -j "$(nproc)"
 mkdir -p /opt/cupcake/whisper.cpp/models
 cd /opt/cupcake/whisper.cpp/models
 bash /opt/cupcake/whisper.cpp/models/download-ggml-model.sh medium
+rm -rf /opt/cupcake/whisper.cpp/build/CMakeFiles \
+       /opt/cupcake/whisper.cpp/build/_deps \
+       /opt/cupcake/whisper.cpp/src \
+       /opt/cupcake/whisper.cpp/ggml
 chown -R cupcake:cupcake /opt/cupcake/whisper.cpp
 
 cat > /opt/cupcake/.env << 'EOF'
