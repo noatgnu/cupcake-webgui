@@ -1,12 +1,13 @@
 #!/bin/bash
 set -eux
 
-# cupcake.local nginx config
-cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
+cat > /etc/nginx/conf.d/cupcake-upstream.conf << 'NGINXEOF'
 upstream django_backend {
     server 127.0.0.1:8000;
 }
+NGINXEOF
 
+cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
 server {
     listen 80;
     server_name cupcake.local cupcake;
@@ -69,12 +70,7 @@ server {
 }
 NGINXEOF
 
-# vanilla.local nginx config
 cat > /etc/nginx/sites-available/vanilla.conf << 'NGINXEOF'
-upstream django_backend {
-    server 127.0.0.1:8000;
-}
-
 server {
     listen 80;
     server_name vanilla.local vanilla;

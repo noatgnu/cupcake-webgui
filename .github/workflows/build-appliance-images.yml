@@ -242,22 +242,26 @@ jobs:
             "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.pgp"
           SCRIPT
 
-      - name: Copy frontends into pi-gen stage
-        run: |
-          mkdir -p pi-gen/stage2a/files/opt/cupcake/{webgui,vanilla}
-          cp -r frontend/webgui/* pi-gen/stage2a/files/opt/cupcake/webgui/
-          cp -r frontend/vanilla/* pi-gen/stage2a/files/opt/cupcake/vanilla/
-
       - name: Create cupcake stage
         run: |
           mkdir -p pi-gen/stage2a/00-install-cupcake
 
           cat > pi-gen/stage2a/prerun.sh << 'EOF'
           #!/bin/bash -e
-          echo "CUPCAKE appliance stage starting"
+          if [ ! -d "${ROOTFS_DIR}" ]; then
+            copy_previous
+          fi
           EOF
 
-          cat > pi-gen/stage2a/00-install-cupcake/00-run-chroot.sh << 'EOF'
+          cat > pi-gen/stage2a/00-install-cupcake/00-run.sh << 'EOF'
+          #!/bin/bash -e
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/webgui"
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/vanilla"
+          cp -rT "${GITHUB_WORKSPACE}/frontend/webgui" "${ROOTFS_DIR}/opt/cupcake/webgui"
+          cp -rT "${GITHUB_WORKSPACE}/frontend/vanilla" "${ROOTFS_DIR}/opt/cupcake/vanilla"
+          EOF
+
+          cat > pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh << 'EOF'
           #!/bin/bash -e
 
           echo "=== CUPCAKE: installing packages ==="
@@ -331,11 +335,13 @@ jobs:
           /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
 
           echo "=== CUPCAKE: deploying nginx ==="
-          cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
+          cat > /etc/nginx/conf.d/cupcake-upstream.conf << NGXEOF
           upstream django_backend {
               server 127.0.0.1:8000;
           }
+          NGXEOF
 
+          cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
           server {
               listen 80;
               server_name cupcake.local cupcake;
@@ -386,10 +392,6 @@ jobs:
           NGXEOF
 
           cat > /etc/nginx/sites-available/vanilla.conf << NGXEOF
-          upstream django_backend {
-              server 127.0.0.1:8000;
-          }
-
           server {
               listen 80;
               server_name vanilla.local vanilla;
@@ -468,13 +470,37 @@ jobs:
 
           systemctl --root=/ enable cupcake-backend.service
 
+          cat > /etc/systemd/system/cupcake-rqworker.service << 'UNITEOF'
+          [Unit]
+          Description=Cupcake RQ Worker
+          After=cupcake-backend.service
+          Requires=cupcake-backend.service
+
+          [Service]
+          Type=simple
+          User=cupcake
+          Group=cupcake
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          UNITEOF
+
+          systemctl --root=/ enable cupcake-rqworker.service
+
           chown -R cupcake:cupcake /opt/cupcake
 
           echo "=== CUPCAKE: done ==="
           EOF
 
           echo "IMG_SUFFIX=-cupcake" > pi-gen/stage2a/EXPORT_IMAGE
-          chmod +x pi-gen/stage2a/prerun.sh pi-gen/stage2a/00-install-cupcake/00-run-chroot.sh
+          chmod +x pi-gen/stage2a/prerun.sh \
+            pi-gen/stage2a/00-install-cupcake/00-run.sh \
+            pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh
 
           touch pi-gen/stage3/SKIP pi-gen/stage4/SKIP pi-gen/stage5/SKIP
 
