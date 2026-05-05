@@ -544,6 +544,10 @@ jobs:
 
           chown -R cupcake:cupcake /opt/cupcake /var/log/cupcake
 
+          echo "=== CUPCAKE: stopping services ==="
+          service postgresql stop || \
+            pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" stop || true
+
           echo "=== CUPCAKE: done ==="
           EOF
 
