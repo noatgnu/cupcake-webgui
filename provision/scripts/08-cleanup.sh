@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux
 
-# Deploy systemd units
-
 cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
 [Unit]
 Description=Cupcake Django Backend (Gunicorn)
@@ -32,7 +30,7 @@ UNITEOF
 
 cat > /etc/systemd/system/cupcake-rqworker.service << 'UNITEOF'
 [Unit]
-Description=Cupcake RQ Worker
+Description=Cupcake RQ Worker (default high low)
 After=cupcake-backend.service
 Requires=cupcake-backend.service
 
@@ -42,7 +40,29 @@ User=cupcake
 Group=cupcake
 WorkingDirectory=/opt/cupcake/backend
 EnvironmentFile=/opt/cupcake/.env
-ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default
+ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default high low
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
+cat > /etc/systemd/system/cupcake-transcribe-worker.service << 'UNITEOF'
+[Unit]
+Description=Cupcake Transcribe Worker
+After=cupcake-backend.service
+Requires=cupcake-backend.service
+
+[Service]
+Type=simple
+User=cupcake
+Group=cupcake
+WorkingDirectory=/opt/cupcake/backend
+EnvironmentFile=/opt/cupcake/.env
+ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker transcribe
 Restart=always
 RestartSec=5
 
@@ -53,8 +73,8 @@ UNITEOF
 systemctl daemon-reload
 systemctl enable cupcake-backend.service
 systemctl enable cupcake-rqworker.service
+systemctl enable cupcake-transcribe-worker.service
 
-# Clean up
 apt-get clean
 apt-get autoremove -y
 rm -rf /var/lib/apt/lists/*

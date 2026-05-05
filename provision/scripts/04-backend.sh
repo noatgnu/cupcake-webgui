@@ -19,6 +19,16 @@ fi
 /opt/cupcake/venv/bin/pip install gunicorn uvicorn[standard] psycopg2-binary
 
 # Create .env file
+# Build whisper.cpp
+git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /opt/cupcake/whisper.cpp
+cd /opt/cupcake/whisper.cpp
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF
+cmake --build build --config Release -j "$(nproc)"
+mkdir -p /opt/cupcake/whisper.cpp/models
+cd /opt/cupcake/whisper.cpp/models
+bash /opt/cupcake/whisper.cpp/models/download-ggml-model.sh medium
+chown -R cupcake:cupcake /opt/cupcake/whisper.cpp
+
 cat > /opt/cupcake/.env << 'EOF'
 POSTGRES_DB=cupcake_vanilla_db
 POSTGRES_USER=cupcake_vanilla
@@ -38,6 +48,9 @@ ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://cupcake.local,http://vanilla.local,http://localhost
 STATIC_ROOT=/opt/cupcake/static
 MEDIA_ROOT=/opt/cupcake/media
+WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
+WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-medium.bin
+WHISPERCPP_THREAD_COUNT=4
 EOF
 
 chown cupcake:cupcake /opt/cupcake/.env

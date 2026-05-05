@@ -172,8 +172,15 @@ jobs:
       - name: Shutdown VM
         run: |
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
-          sleep 10
+          for i in $(seq 1 60); do
+            if ! kill -0 $QEMU_PID 2>/dev/null; then
+              echo "QEMU exited after ${i}x3s"
+              break
+            fi
+            sleep 3
+          done
           kill $QEMU_PID 2>/dev/null || true
+          sleep 2
 
       - name: Compact and compress
         run: |
@@ -220,7 +227,8 @@ jobs:
           sudo apt-get install -y \
             coreutils quilt debootstrap zerofree zip dosfstools \
             libarchive-tools rsync xz-utils file git curl bc gpg pigz \
-            qemu-user-static binfmt-support arch-test debian-archive-keyring
+            qemu-user-static binfmt-support arch-test debian-archive-keyring \
+            cmake gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
       - name: Enable ARM64 emulation
         run: |
@@ -259,6 +267,21 @@ jobs:
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/vanilla"
           cp -rT "${GITHUB_WORKSPACE}/frontend/webgui" "${ROOTFS_DIR}/opt/cupcake/webgui"
           cp -rT "${GITHUB_WORKSPACE}/frontend/vanilla" "${ROOTFS_DIR}/opt/cupcake/vanilla"
+
+          git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper-build
+          cd /tmp/whisper-build
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          cmake --build build --config Release -j"$(nproc)"
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/build/bin"
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models"
+          cp build/bin/whisper-cli "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/build/bin/"
+          cd /tmp/whisper-build/models
+          bash download-ggml-model.sh base
+          cp ggml-base.bin "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models/"
           EOF
 
           cat > pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh << 'EOF'
@@ -273,7 +296,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
             postgresql-16 postgresql-client-16 redis-server nginx \
             python3 python3-venv python3-dev libpq-dev \
-            avahi-daemon avahi-utils git
+            avahi-daemon avahi-utils git ffmpeg
 
           systemctl --root=/ enable postgresql redis-server nginx avahi-daemon
 
@@ -325,6 +348,9 @@ jobs:
           CORS_ALLOWED_ORIGINS=http://cupcake.local,http://vanilla.local,http://localhost
           STATIC_ROOT=/opt/cupcake/static
           MEDIA_ROOT=/opt/cupcake/media
+          WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
+          WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
+          WHISPERCPP_THREAD_COUNT=4
           DOTENV
 
           cd /opt/cupcake/backend
@@ -472,7 +498,7 @@ jobs:
 
           cat > /etc/systemd/system/cupcake-rqworker.service << 'UNITEOF'
           [Unit]
-          Description=Cupcake RQ Worker
+          Description=Cupcake RQ Worker (default high low)
           After=cupcake-backend.service
           Requires=cupcake-backend.service
 
@@ -482,7 +508,8 @@ jobs:
           Group=cupcake
           WorkingDirectory=/opt/cupcake/backend
           EnvironmentFile=/opt/cupcake/.env
-          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default
+          ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default high low
           Restart=always
           RestartSec=5
 
@@ -492,7 +519,30 @@ jobs:
 
           systemctl --root=/ enable cupcake-rqworker.service
 
-          chown -R cupcake:cupcake /opt/cupcake
+          cat > /etc/systemd/system/cupcake-transcribe-worker.service << 'UNITEOF'
+          [Unit]
+          Description=Cupcake Transcribe Worker
+          After=cupcake-backend.service
+          Requires=cupcake-backend.service
+
+          [Service]
+          Type=simple
+          User=cupcake
+          Group=cupcake
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker transcribe
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          UNITEOF
+
+          systemctl --root=/ enable cupcake-transcribe-worker.service
+
+          chown -R cupcake:cupcake /opt/cupcake /var/log/cupcake
 
           echo "=== CUPCAKE: done ==="
           EOF
