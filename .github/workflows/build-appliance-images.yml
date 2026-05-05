@@ -148,7 +148,7 @@ jobs:
           for s in 01-base 02-postgresql 03-redis 04-backend; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "chmod +x /tmp/${s}.sh && sudo BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
+              "chmod +x /tmp/${s}.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
           done
 
       - name: Provision frontend
@@ -158,7 +158,7 @@ jobs:
           VANILLA_NG_REF="${{ inputs.vanilla_ng_ref || 'master' }}"
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/05-frontend.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "chmod +x /tmp/05-frontend.sh && sudo WEBGUI_REF='${WEBGUI_REF}' VANILLA_NG_REF='${VANILLA_NG_REF}' /tmp/05-frontend.sh"
+            "chmod +x /tmp/05-frontend.sh && sudo env WEBGUI_REF='${WEBGUI_REF}' VANILLA_NG_REF='${VANILLA_NG_REF}' /tmp/05-frontend.sh"
 
       - name: Provision nginx and finalize
         timeout-minutes: 10
@@ -166,7 +166,7 @@ jobs:
           for s in 06-nginx 07-mdns 08-cleanup; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "chmod +x /tmp/${s}.sh && sudo /tmp/${s}.sh"
+              "chmod +x /tmp/${s}.sh && sudo env /tmp/${s}.sh"
           done
 
       - name: Shutdown VM
