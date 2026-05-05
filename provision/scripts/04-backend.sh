@@ -40,7 +40,9 @@ chown cupcake:cupcake /opt/cupcake/.env
 
 # Run Django setup
 cd /opt/cupcake/backend
+set -a
 source /opt/cupcake/.env
+set +a
 /opt/cupcake/venv/bin/python manage.py migrate
 /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
 
