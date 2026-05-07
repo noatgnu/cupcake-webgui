@@ -424,7 +424,7 @@ jobs:
 
           if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
               SECRET_KEY=$(/opt/cupcake/venv/bin/python -c \
-                  "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+                  "import secrets, string; charset=string.ascii_letters+string.digits+'-_+@%^='; print(''.join(secrets.choice(charset) for _ in range(50)))")
               sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
           fi
 
