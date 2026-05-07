@@ -410,8 +410,6 @@ jobs:
           ENABLE_CUPCAKE_RED_VELVET=True
           ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
           CORS_ALLOWED_ORIGINS=http://cupcake.local,http://vanilla.local,http://localhost
-          STATIC_ROOT=/opt/cupcake/static
-          MEDIA_ROOT=/opt/cupcake/media
           WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
           WHISPERCPP_THREAD_COUNT=4
@@ -527,16 +525,16 @@ jobs:
               }
 
               location /static/ {
-                  alias /opt/cupcake/static/;
+                  alias /opt/cupcake/backend/staticfiles/;
               }
 
               location /media/ {
-                  alias /opt/cupcake/media/;
+                  alias /opt/cupcake/backend/media/;
               }
 
               location /internal/media/ {
                   internal;
-                  alias /opt/cupcake/media/;
+                  alias /opt/cupcake/backend/media/;
               }
           }
           NGXEOF
@@ -577,16 +575,16 @@ jobs:
               }
 
               location /static/ {
-                  alias /opt/cupcake/static/;
+                  alias /opt/cupcake/backend/staticfiles/;
               }
 
               location /media/ {
-                  alias /opt/cupcake/media/;
+                  alias /opt/cupcake/backend/media/;
               }
 
               location /internal/media/ {
                   internal;
-                  alias /opt/cupcake/media/;
+                  alias /opt/cupcake/backend/media/;
               }
           }
           NGXEOF

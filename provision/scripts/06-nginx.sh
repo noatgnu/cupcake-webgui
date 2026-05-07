@@ -54,18 +54,18 @@ server {
     }
 
     location /static/ {
-        alias /opt/cupcake/static/;
+        alias /opt/cupcake/backend/staticfiles/;
         expires 7d;
     }
 
     location /media/ {
-        alias /opt/cupcake/media/;
+        alias /opt/cupcake/backend/media/;
         expires 7d;
     }
 
     location /internal/media/ {
         internal;
-        alias /opt/cupcake/media/;
+        alias /opt/cupcake/backend/media/;
     }
 }
 NGINXEOF
@@ -117,18 +117,18 @@ server {
     }
 
     location /static/ {
-        alias /opt/cupcake/static/;
+        alias /opt/cupcake/backend/staticfiles/;
         expires 7d;
     }
 
     location /media/ {
-        alias /opt/cupcake/media/;
+        alias /opt/cupcake/backend/media/;
         expires 7d;
     }
 
     location /internal/media/ {
         internal;
-        alias /opt/cupcake/media/;
+        alias /opt/cupcake/backend/media/;
     }
 }
 NGINXEOF

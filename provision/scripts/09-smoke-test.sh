@@ -32,27 +32,14 @@ check "transcribe active"    systemctl is-active cupcake-transcribe-worker
 echo ""
 echo "--- Waiting for Django to bind port 8000 ---"
 for i in $(seq 1 20); do
-    if curl -sf http://127.0.0.1:8000/api/v1/ >/dev/null 2>&1; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v1/ 2>/dev/null)
+    if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
         echo "Django ready after ${i}x3s"
         break
     fi
+    [ "$i" -eq 20 ] && echo "WARNING: Django did not respond in 60s"
     sleep 3
 done
-
-echo ""
-echo "--- API and frontend ---"
-check "api root direct"      curl -sf http://127.0.0.1:8000/api/v1/
-check "api via nginx"        curl -sf "$API/"
-check "nginx webgui 200"     bash -c 'curl -sfI http://localhost/ | grep -q "200 OK"'
-check "nginx vanilla 200"    bash -c 'curl -sfI -H "Host: vanilla.local" http://localhost/ | grep -q "200 OK"'
-check "static admin files"   test -d /opt/cupcake/static/admin
-
-echo ""
-echo "--- Whisper.cpp ---"
-check "whisper binary"       test -x /opt/cupcake/whisper.cpp/build/bin/whisper-cli
-check "whisper model"        bash -c \
-    'test -f /opt/cupcake/whisper.cpp/models/ggml-medium.bin || \
-     test -f /opt/cupcake/whisper.cpp/models/ggml-base.bin'
 
 echo ""
 echo "--- JWT authentication ---"
@@ -73,6 +60,23 @@ check "auth lab-groups"      curl -sf "$API/lab-groups/" \
     -H "Authorization: Bearer $TOKEN"
 check "auth annotations"     curl -sf "$API/annotations/" \
     -H "Authorization: Bearer $TOKEN"
+
+echo ""
+echo "--- API and frontend ---"
+check "api root direct"      curl -sf "http://127.0.0.1:8000/api/v1/" \
+    -H "Authorization: Bearer $TOKEN"
+check "api via nginx"        curl -sf "$API/" \
+    -H "Authorization: Bearer $TOKEN"
+check "nginx webgui 200"     bash -c 'curl -sfI http://localhost/ | grep -q "200 OK"'
+check "nginx vanilla 200"    bash -c 'curl -sfI -H "Host: vanilla.local" http://localhost/ | grep -q "200 OK"'
+check "static admin files"   test -d /opt/cupcake/backend/staticfiles/admin
+
+echo ""
+echo "--- Whisper.cpp ---"
+check "whisper binary"       test -x /opt/cupcake/whisper.cpp/build/bin/whisper-cli
+check "whisper model"        bash -c \
+    'test -f /opt/cupcake/whisper.cpp/models/ggml-medium.bin || \
+     test -f /opt/cupcake/whisper.cpp/models/ggml-base.bin'
 
 echo ""
 echo "--- Ontologies ---"
