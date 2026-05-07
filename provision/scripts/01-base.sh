@@ -23,16 +23,21 @@ apt-get install -y \
     ca-certificates \
     ufw
 
+mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
+mkdir -p /var/log/cupcake
+
+useradd -r -s /usr/sbin/nologin -M -d /opt/cupcake cupcake-svc || true
+usermod -aG www-data cupcake-svc
+
 useradd -m -s /bin/bash cupcake || true
 echo 'cupcake:cupcake' | chpasswd
 usermod -aG sudo cupcake
 usermod -aG www-data cupcake
+usermod -aG cupcake-svc cupcake
 
-mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
-chown -R cupcake:cupcake /opt/cupcake
-
-mkdir -p /var/log/cupcake
-chown cupcake:cupcake /var/log/cupcake
+chown -R cupcake-svc:cupcake-svc /opt/cupcake
+chown cupcake-svc:cupcake-svc /var/log/cupcake
+chmod 775 /var/log/cupcake
 
 ufw allow 22/tcp
 ufw allow 80/tcp

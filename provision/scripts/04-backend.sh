@@ -3,7 +3,7 @@ set -eux
 
 # Create virtualenv
 python3.12 -m venv /opt/cupcake/venv
-chown -R cupcake:cupcake /opt/cupcake/venv
+chown -R cupcake-svc:cupcake-svc /opt/cupcake/venv
 
 # Clone backend
 cd /opt/cupcake/backend
@@ -31,7 +31,7 @@ rm -rf /opt/cupcake/whisper.cpp/build/CMakeFiles \
        /opt/cupcake/whisper.cpp/build/_deps \
        /opt/cupcake/whisper.cpp/src \
        /opt/cupcake/whisper.cpp/ggml
-chown -R cupcake:cupcake /opt/cupcake/whisper.cpp
+chown -R cupcake-svc:cupcake-svc /opt/cupcake/whisper.cpp
 
 cat > /opt/cupcake/.env << 'EOF'
 POSTGRES_DB=cupcake_vanilla_db
@@ -42,7 +42,7 @@ POSTGRES_PORT=5432
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 DJANGO_SETTINGS_MODULE=cupcake_vanilla.settings
-SECRET_KEY=change-me-in-production
+SECRET_KEY=CHANGE-ON-FIRST-BOOT
 DEBUG=False
 ENABLE_CUPCAKE_MACARON=True
 ENABLE_CUPCAKE_MINT_CHOCOLATE=True
@@ -57,7 +57,21 @@ WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-medium.bin
 WHISPERCPP_THREAD_COUNT=4
 EOF
 
-chown cupcake:cupcake /opt/cupcake/.env
+chown root:cupcake-svc /opt/cupcake/.env
+chmod 640 /opt/cupcake/.env
+
+cat > /opt/cupcake/first-boot.sh << 'FBEOF'
+#!/bin/bash
+set -e
+ENV_FILE=/opt/cupcake/.env
+if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+    SECRET_KEY=$(/opt/cupcake/venv/bin/python -c \
+        "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+    sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+fi
+FBEOF
+chmod +x /opt/cupcake/first-boot.sh
+chown root:root /opt/cupcake/first-boot.sh
 
 # Run Django setup
 cd /opt/cupcake/backend
@@ -67,4 +81,22 @@ set +a
 /opt/cupcake/venv/bin/python manage.py migrate
 /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
 
-chown -R cupcake:cupcake /opt/cupcake/backend
+DJANGO_SUPERUSER_USERNAME=admin \
+DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
+DJANGO_SUPERUSER_PASSWORD=cupcake \
+/opt/cupcake/venv/bin/python manage.py createsuperuser --noinput
+
+BACKEND_COMMIT=$(git -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
+cat > /opt/cupcake/versions.txt << VEREOF
+BACKEND_REF=${BACKEND_REF}
+BACKEND_COMMIT=${BACKEND_COMMIT}
+WEBGUI_REF=
+WEBGUI_COMMIT=
+VANILLA_NG_REF=
+VANILLA_NG_COMMIT=
+BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+LAST_UPDATE=
+VEREOF
+chown cupcake-svc:cupcake-svc /opt/cupcake/versions.txt
+
+chown -R cupcake-svc:cupcake-svc /opt/cupcake/backend

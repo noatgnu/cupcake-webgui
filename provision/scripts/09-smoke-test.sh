@@ -61,30 +61,18 @@ set -a
 source /opt/cupcake/.env
 set +a
 
-/opt/cupcake/venv/bin/python manage.py shell -c "
-from django.contrib.auth import get_user_model
-U = get_user_model()
-if not U.objects.filter(username='smoketest').exists():
-    U.objects.create_superuser('smoketest', 'smoke@cupcake.local', 'Sm0ke\$Test99')
-" 2>/dev/null
-
 TOKEN=$(curl -sf -X POST "$API/auth/token/" \
     -H "Content-Type: application/json" \
-    -d '{"username":"smoketest","password":"Sm0ke$Test99"}' \
+    -d '{"username":"admin","password":"cupcake"}' \
     | python3 -c \
     'import sys, json; d = json.load(sys.stdin); print(d.get("access", ""))' \
     2>/dev/null)
 
-check "jwt token obtained"   test -n "$TOKEN"
+check "default admin login"  test -n "$TOKEN"
 check "auth lab-groups"      curl -sf "$API/lab-groups/" \
     -H "Authorization: Bearer $TOKEN"
 check "auth annotations"     curl -sf "$API/annotations/" \
     -H "Authorization: Bearer $TOKEN"
-
-/opt/cupcake/venv/bin/python manage.py shell -c "
-from django.contrib.auth import get_user_model
-get_user_model().objects.filter(username='smoketest').delete()
-" 2>/dev/null
 
 echo ""
 echo "--- Ontologies ---"

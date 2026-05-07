@@ -1,16 +1,33 @@
 #!/bin/bash
 set -eux
 
+cat > /etc/systemd/system/cupcake-firstboot.service << 'UNITEOF'
+[Unit]
+Description=Cupcake First Boot Setup
+After=local-fs.target
+Before=cupcake-backend.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+ExecStart=/opt/cupcake/first-boot.sh
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
 cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
 [Unit]
 Description=Cupcake Django Backend (Gunicorn)
-After=network.target postgresql.service redis-server.service
+After=network.target postgresql.service redis-server.service cupcake-firstboot.service
 Requires=postgresql.service redis-server.service
+Wants=cupcake-firstboot.service
 
 [Service]
 Type=simple
-User=cupcake
-Group=cupcake
+User=cupcake-svc
+Group=cupcake-svc
 WorkingDirectory=/opt/cupcake/backend
 EnvironmentFile=/opt/cupcake/.env
 ExecStart=/opt/cupcake/venv/bin/gunicorn cupcake_vanilla.asgi:application \
@@ -36,8 +53,8 @@ Requires=cupcake-backend.service
 
 [Service]
 Type=simple
-User=cupcake
-Group=cupcake
+User=cupcake-svc
+Group=cupcake-svc
 WorkingDirectory=/opt/cupcake/backend
 EnvironmentFile=/opt/cupcake/.env
 ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
@@ -57,8 +74,8 @@ Requires=cupcake-backend.service
 
 [Service]
 Type=simple
-User=cupcake
-Group=cupcake
+User=cupcake-svc
+Group=cupcake-svc
 WorkingDirectory=/opt/cupcake/backend
 EnvironmentFile=/opt/cupcake/.env
 ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
@@ -71,13 +88,16 @@ WantedBy=multi-user.target
 UNITEOF
 
 systemctl daemon-reload
+systemctl enable cupcake-firstboot.service
 systemctl enable cupcake-backend.service
 systemctl enable cupcake-rqworker.service
 systemctl enable cupcake-transcribe-worker.service
+
+cp "$(dirname "$0")/update.sh" /opt/cupcake/update.sh
+chmod +x /opt/cupcake/update.sh
+chown root:root /opt/cupcake/update.sh
 
 apt-get clean
 apt-get autoremove -y
 rm -rf /var/lib/apt/lists/*
 rm -rf /tmp/*
-
-rm -f /home/cupcake/.ssh/authorized_keys
