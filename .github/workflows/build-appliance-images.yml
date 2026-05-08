@@ -850,7 +850,7 @@ jobs:
           CFGEOF
 
       - name: Build
-        timeout-minutes: 120
+        timeout-minutes: 180
         run: |
           cd pi-gen
           export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
