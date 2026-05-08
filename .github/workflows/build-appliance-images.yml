@@ -75,9 +75,110 @@ jobs:
           path: frontend/vanilla/
           retention-days: 1
 
+  build-db:
+    name: Build seeded database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 python3-venv python3-dev libpq-dev \
+            postgresql postgresql-client redis-server
+          sudo service redis-server start || true
+
+      - name: Set up PostgreSQL
+        run: |
+          sudo -u postgres psql -c "CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';"
+          sudo -u postgres psql -c "CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;"
+          sudo -u postgres psql -c "ALTER USER cupcake_vanilla CREATEDB;"
+
+      - name: Clone backend and install dependencies
+        env:
+          BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --upgrade pip --quiet
+          git clone --depth 1 --branch "$BACKEND_REF" \
+            https://github.com/noatgnu/cupcake_vanilla.git /tmp/backend
+          /tmp/venv/bin/pip install -r /tmp/backend/requirements.txt --quiet
+
+      - name: Migrate and create superuser
+        env:
+          POSTGRES_DB: cupcake_vanilla_db
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: build-time-only-not-used-in-production
+          DEBUG: 'False'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+          ALLOWED_HOSTS: localhost
+        run: |
+          cd /tmp/backend
+          /tmp/venv/bin/python manage.py migrate --noinput
+          DJANGO_SUPERUSER_USERNAME=admin \
+          DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
+          DJANGO_SUPERUSER_PASSWORD=cupcake \
+          /tmp/venv/bin/python manage.py createsuperuser --noinput
+
+      - name: Load ontologies
+        timeout-minutes: 240
+        env:
+          POSTGRES_DB: cupcake_vanilla_db
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: build-time-only-not-used-in-production
+          DEBUG: 'False'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+          ALLOWED_HOSTS: localhost
+        run: |
+          cd /tmp/backend
+          MANAGE="/tmp/venv/bin/python manage.py"
+          $MANAGE load_species
+          $MANAGE load_tissue
+          $MANAGE load_human_disease
+          $MANAGE load_subcellular_location
+          $MANAGE load_ms_mod
+          $MANAGE load_ms_term
+          $MANAGE load_ontologies --ontology all --no-limit
+
+      - name: Dump database
+        run: |
+          PGPASSWORD=cupcake_vanilla_pass pg_dump \
+            -h 127.0.0.1 -U cupcake_vanilla \
+            --format=plain \
+            cupcake_vanilla_db \
+            | gzip -6 > cupcake-seed.sql.gz
+          echo "Seed dump size: $(du -sh cupcake-seed.sql.gz | cut -f1)"
+
+      - name: Upload seed database
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-seed-db
+          path: cupcake-seed.sql.gz
+          retention-days: 1
+
   build-vm:
     name: VM Image (amd64)
     if: inputs.image_type != 'rpi'
+    needs: build-db
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,13 +252,28 @@ jobs:
               "chmod +x /tmp/${s}.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
           done
 
-      - name: Load ontologies
-        timeout-minutes: 240
+      - name: Download seed database
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-seed-db
+
+      - name: Restore seed database
+        timeout-minutes: 30
         run: |
+          cat > restore-seed.sh << 'SCRIPT'
+          #!/bin/bash
+          set -e
+          sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='cupcake_vanilla_db';"
+          sudo -u postgres psql -c "DROP DATABASE IF EXISTS cupcake_vanilla_db;"
+          sudo -u postgres psql -c "CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;"
+          gunzip -c /tmp/cupcake-seed.sql.gz | sudo -u postgres psql cupcake_vanilla_db
+          rm -f /tmp/cupcake-seed.sql.gz
+          SCRIPT
+
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
-            provision/scripts/10-ontologies.sh cupcake@localhost:/tmp/
+            cupcake-seed.sql.gz restore-seed.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "chmod +x /tmp/10-ontologies.sh && sudo env /tmp/10-ontologies.sh"
+            "chmod +x /tmp/restore-seed.sh && sudo /tmp/restore-seed.sh"
 
       - name: Provision frontend
         timeout-minutes: 60
@@ -192,8 +308,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "sudo systemctl start postgresql redis-server nginx cupcake-backend"
           for i in $(seq 1 20); do
-            if ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-                "curl -sf http://127.0.0.1:8000/api/v1/" 2>/dev/null; then
+            code=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null)
+            if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
               echo "Backend ready after ${i}x3s"
               break
             fi
@@ -244,7 +361,7 @@ jobs:
   build-rpi:
     name: RPi Image
     if: inputs.image_type != 'vm'
-    needs: build-frontend
+    needs: [build-frontend, build-db]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -260,6 +377,11 @@ jobs:
         with:
           name: cupcake-vanilla-ng-frontend
           path: frontend/vanilla
+
+      - name: Download seed database
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-seed-db
 
       - name: Free disk space
         run: |
@@ -338,6 +460,7 @@ jobs:
           cd /tmp/whisper-build/models
           bash download-ggml-model.sh base
           cp ggml-base.bin "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models/"
+          cp "${GITHUB_WORKSPACE}/cupcake-seed.sql.gz" "${ROOTFS_DIR}/tmp/"
           EOF
 
           cat > pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh << 'EOF'
@@ -465,6 +588,13 @@ jobs:
           DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
           DJANGO_SUPERUSER_PASSWORD=cupcake \
           /opt/cupcake/venv/bin/python manage.py createsuperuser --noinput
+
+          echo "=== CUPCAKE: restoring seed database ==="
+          su - postgres -c "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='cupcake_vanilla_db';\""
+          su - postgres -c "psql -c \"DROP DATABASE IF EXISTS cupcake_vanilla_db;\""
+          su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\""
+          gunzip -c /tmp/cupcake-seed.sql.gz | su - postgres -c "psql cupcake_vanilla_db"
+          rm -f /tmp/cupcake-seed.sql.gz
 
           BACKEND_COMMIT=$(git -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
           WEBGUI_COMMIT=$(grep "^WEBGUI_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
@@ -694,45 +824,10 @@ jobs:
           echo "=== CUPCAKE: done ==="
           EOF
 
-          cat > pi-gen/stage2a/00-install-cupcake/02-run-chroot.sh << 'EOF'
-          #!/bin/bash -e
-
-          echo "=== CUPCAKE: starting PostgreSQL for ontology load ==="
-          service postgresql start || \
-            pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" start
-
-          cd /opt/cupcake/backend
-          set -a
-          source /opt/cupcake/.env
-          set +a
-
-          MANAGE="/opt/cupcake/venv/bin/python manage.py"
-
-          echo "=== CUPCAKE: loading UniProt controlled vocabularies ==="
-          $MANAGE load_species
-          $MANAGE load_tissue
-          $MANAGE load_human_disease
-          $MANAGE load_subcellular_location
-
-          echo "=== CUPCAKE: loading MS ontologies ==="
-          $MANAGE load_ms_mod
-          $MANAGE load_ms_term
-
-          echo "=== CUPCAKE: loading OBO ontologies (including NCBI taxonomy and ChEBI) ==="
-          $MANAGE load_ontologies --ontology all --no-limit
-
-          echo "=== CUPCAKE: stopping PostgreSQL ==="
-          service postgresql stop || \
-            pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" stop || true
-
-          echo "=== CUPCAKE: ontologies done ==="
-          EOF
-
           echo "IMG_SUFFIX=-cupcake" > pi-gen/stage2a/EXPORT_IMAGE
           chmod +x pi-gen/stage2a/prerun.sh \
             pi-gen/stage2a/00-install-cupcake/00-run.sh \
-            pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh \
-            pi-gen/stage2a/00-install-cupcake/02-run-chroot.sh
+            pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh
 
           touch pi-gen/stage3/SKIP pi-gen/stage4/SKIP pi-gen/stage5/SKIP
 
@@ -754,7 +849,7 @@ jobs:
           CFGEOF
 
       - name: Build
-        timeout-minutes: 360
+        timeout-minutes: 120
         run: |
           cd pi-gen
           export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
@@ -798,15 +893,16 @@ jobs:
 
   summary:
     name: Summary
-    needs: [build-frontend, build-vm, build-rpi]
+    needs: [build-db, build-frontend, build-vm, build-rpi]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Summary
         run: |
           echo "## Cupcake Appliance Images" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Seed DB | ${{ needs.build-db.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| VM (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| RPi 3B | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| RPi 4 | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
