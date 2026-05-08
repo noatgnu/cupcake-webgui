@@ -91,6 +91,7 @@ jobs:
 
       - name: Set up PostgreSQL
         run: |
+          sudo service postgresql start
           sudo -u postgres psql -c "CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';"
           sudo -u postgres psql -c "CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;"
           sudo -u postgres psql -c "ALTER USER cupcake_vanilla CREATEDB;"
