@@ -67,8 +67,11 @@ check "api root direct"      curl -sf "http://127.0.0.1:8000/api/v1/" \
     -H "Authorization: Bearer $TOKEN"
 check "api via nginx"        curl -sf "$API/" \
     -H "Authorization: Bearer $TOKEN"
-check "nginx webgui 200"     bash -c 'curl -sfI http://localhost/ | grep -q "200 OK"'
-check "nginx vanilla 200"    bash -c 'curl -sfI -H "Host: vanilla.local" http://localhost/ | grep -q "200 OK"'
+check "nginx webgui http"    bash -c 'curl -sfI http://localhost/ | grep -q "200 OK"'
+check "nginx webgui https"   bash -c 'curl -sfIk https://cupcake.local/ | grep -q "200 OK"'
+check "nginx vanilla http"   bash -c 'curl -sfI -H "Host: vanilla.local" http://localhost/ | grep -q "200 OK"'
+check "nginx vanilla https"  bash -c 'curl -sfIk https://vanilla.local/ | grep -q "200 OK"'
+check "nginx localhost https" bash -c 'curl -sfIk https://localhost/ | grep -q "200 OK"'
 check "static admin files"   test -d /opt/cupcake/backend/staticfiles/admin
 
 echo ""

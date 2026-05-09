@@ -1,16 +1,36 @@
 #!/bin/bash
 set -eux
 
+mkdir -p /etc/ssl/cupcake
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout /etc/ssl/cupcake/cupcake.key \
+    -out /etc/ssl/cupcake/cupcake.crt \
+    -subj "/CN=cupcake.local/O=Cupcake Appliance" \
+    -addext "subjectAltName=DNS:cupcake.local,DNS:cupcake,DNS:vanilla.local,DNS:vanilla,DNS:localhost,IP:127.0.0.1"
+chmod 640 /etc/ssl/cupcake/cupcake.key
+
 cat > /etc/nginx/conf.d/cupcake-upstream.conf << 'NGINXEOF'
 upstream django_backend {
     server 127.0.0.1:8000;
 }
 NGINXEOF
 
+cat > /etc/nginx/snippets/cupcake-ssl.conf << 'NGINXEOF'
+ssl_certificate     /etc/ssl/cupcake/cupcake.crt;
+ssl_certificate_key /etc/ssl/cupcake/cupcake.key;
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_ciphers         HIGH:!aNULL:!MD5;
+ssl_session_cache   shared:SSL:10m;
+ssl_session_timeout 10m;
+NGINXEOF
+
 cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
 server {
     listen 80;
+    listen 443 ssl;
     server_name cupcake.local cupcake;
+
+    include /etc/nginx/snippets/cupcake-ssl.conf;
 
     client_max_body_size 2G;
 
@@ -73,7 +93,10 @@ NGINXEOF
 cat > /etc/nginx/sites-available/vanilla.conf << 'NGINXEOF'
 server {
     listen 80;
-    server_name vanilla.local vanilla;
+    listen 443 ssl;
+    server_name vanilla.local vanilla localhost;
+
+    include /etc/nginx/snippets/cupcake-ssl.conf;
 
     client_max_body_size 2G;
 
