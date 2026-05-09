@@ -310,7 +310,7 @@ jobs:
             "sudo systemctl start postgresql redis-server nginx cupcake-backend"
           for i in $(seq 1 20); do
             code=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null)
+              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null) || true
             if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
               echo "Backend ready after ${i}x3s"
               break

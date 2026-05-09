@@ -32,7 +32,7 @@ check "transcribe active"    systemctl is-active cupcake-transcribe-worker
 echo ""
 echo "--- Waiting for Django to bind port 8000 ---"
 for i in $(seq 1 20); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v1/ 2>/dev/null)
+    code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v1/ 2>/dev/null) || true
     if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
         echo "Django ready after ${i}x3s"
         break
