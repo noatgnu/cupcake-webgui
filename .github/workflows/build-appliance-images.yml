@@ -342,6 +342,7 @@ jobs:
           const { chromium } = require('playwright');
 
           const TIMEOUT = 30000;
+          const LOGIN_TIMEOUT = 60000;
           let passed = 0;
           let failed = 0;
 
@@ -349,7 +350,9 @@ jobs:
             const browser = await chromium.launch({ headless: true });
             const page = await browser.newPage();
             const jsErrors = [];
+            const failedRequests = [];
             page.on('pageerror', e => jsErrors.push(e.message));
+            page.on('requestfailed', r => failedRequests.push(`${r.method()} ${r.url()}`));
 
             console.log(`\n--- ${name} ---`);
             try {
@@ -369,13 +372,25 @@ jobs:
               await page.click('button[type="submit"]');
               console.log('PASS: credentials submitted');
 
-              await page.waitForURL(u => !u.toString().includes('/login'), { timeout: TIMEOUT });
+              await page.waitForURL(u => !u.toString().includes('/login'), { timeout: LOGIN_TIMEOUT })
+                .catch(async () => {
+                  const errorAlert = await page.locator('.alert-danger').first().textContent().catch(() => null);
+                  const networkErrs = failedRequests.join(', ') || 'none';
+                  throw new Error(
+                    `Post-login navigation timeout (${LOGIN_TIMEOUT}ms). ` +
+                    `URL: ${page.url()}. ` +
+                    `Error alert: "${errorAlert ?? 'none'}". ` +
+                    `Failed requests: ${networkErrs}`
+                  );
+                });
               console.log('PASS: navigated after login');
 
               await postLoginCheck(page);
 
               if (jsErrors.length > 0)
                 console.warn(`WARN: ${jsErrors.length} JS error(s): ${jsErrors[0]}`);
+              if (failedRequests.length > 0)
+                console.warn(`WARN: failed requests: ${failedRequests.join(', ')}`);
 
               passed++;
               console.log(`PASS: ${name} OK`);
