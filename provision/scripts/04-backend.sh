@@ -63,8 +63,7 @@ cat > /opt/cupcake/first-boot.sh << 'FBEOF'
 set -e
 ENV_FILE=/opt/cupcake/.env
 if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-    SECRET_KEY=$(/opt/cupcake/venv/bin/python -c \
-        "import secrets, string; charset=string.ascii_letters+string.digits+'-_+@%^='; print(''.join(secrets.choice(charset) for _ in range(50)))")
+    SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
     sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
 fi
 FBEOF

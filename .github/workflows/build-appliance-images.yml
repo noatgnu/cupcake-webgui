@@ -206,17 +206,8 @@ jobs:
 
       - name: Create cloud-init seed
         run: |
-          cat > ci-user-data << EOF
-          #cloud-config
-          users:
-            - name: cupcake
-              sudo: ALL=(ALL) NOPASSWD:ALL
-              shell: /bin/bash
-              lock_passwd: false
-              ssh_authorized_keys:
-                - $SSH_PUBKEY
-          EOF
-          sed -i 's/^          //' ci-user-data
+          sed "s|SSH_PUBKEY_PLACEHOLDER|${SSH_PUBKEY}|" \
+            "$GITHUB_WORKSPACE/provision/http/cloud-init-user-data.tmpl" > ci-user-data
           cloud-localds seed.iso ci-user-data provision/http/meta-data
 
       - name: Boot VM and wait for SSH
@@ -263,18 +254,8 @@ jobs:
       - name: Restore seed database
         timeout-minutes: 30
         run: |
-          cat > restore-seed.sh << 'SCRIPT'
-          #!/bin/bash
-          set -e
-          sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='cupcake_vanilla_db';"
-          sudo -u postgres psql -c "DROP DATABASE IF EXISTS cupcake_vanilla_db;"
-          sudo -u postgres psql -c "CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;"
-          gunzip -c /tmp/cupcake-seed.sql.gz | sudo -u postgres psql cupcake_vanilla_db
-          rm -f /tmp/cupcake-seed.sql.gz
-          SCRIPT
-
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
-            cupcake-seed.sql.gz restore-seed.sh cupcake@localhost:/tmp/
+            cupcake-seed.sql.gz provision/scripts/restore-seed.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/restore-seed.sh && sudo /tmp/restore-seed.sh"
 
@@ -499,7 +480,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
             postgresql-16 postgresql-client-16 redis-server nginx \
             python3 python3-venv python3-dev libpq-dev \
-            avahi-daemon avahi-utils git ffmpeg \
+            avahi-daemon avahi-utils git ffmpeg jq \
             network-manager wireless-tools iw
 
           systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager
@@ -568,8 +549,7 @@ jobs:
           ENV_FILE=/opt/cupcake/.env
 
           if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-              SECRET_KEY=$(/opt/cupcake/venv/bin/python -c \
-                  "import secrets, string; charset=string.ascii_letters+string.digits+'-_+@%^='; print(''.join(secrets.choice(charset) for _ in range(50)))")
+              SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
               sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
           fi
 

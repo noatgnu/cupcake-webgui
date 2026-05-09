@@ -51,8 +51,7 @@ set +a
 TOKEN=$(curl -sf -X POST "$API/auth/token/" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"cupcake"}' \
-    | python3 -c \
-    'import sys, json; d = json.load(sys.stdin); print(d.get("access", ""))' \
+    | jq -r '.access // empty' \
     2>/dev/null)
 
 check "default admin login"  test -n "$TOKEN"
@@ -90,11 +89,7 @@ check_ontology() {
     local resp count
     resp=$(curl -sf "$API/${path}/?limit=1" \
         -H "Authorization: Bearer $TOKEN" 2>/dev/null)
-    count=$(echo "$resp" | python3 -c \
-        'import sys,json
-d=json.load(sys.stdin)
-print(d["count"] if isinstance(d,dict) and "count" in d else len(d) if isinstance(d,list) else 0)' \
-        2>/dev/null)
+    count=$(echo "$resp" | jq -r 'if type == "object" then (.count // 0) elif type == "array" then length else 0 end' 2>/dev/null)
     if [ "${count:-0}" -gt 0 ]; then
         echo "PASS: ontology $name ($count records)"
         PASS=$((PASS + 1))

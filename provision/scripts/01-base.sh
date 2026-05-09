@@ -19,6 +19,7 @@ apt-get install -y \
     nginx \
     avahi-daemon \
     avahi-utils \
+    jq \
     unzip \
     ca-certificates \
     ufw

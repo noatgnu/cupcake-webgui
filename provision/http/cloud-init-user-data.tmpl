@@ -1,0 +1,8 @@
+#cloud-config
+users:
+  - name: cupcake
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+      - SSH_PUBKEY_PLACEHOLDER
