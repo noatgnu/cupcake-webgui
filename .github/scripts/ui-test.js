@@ -16,15 +16,6 @@ async function testFrontend(name, url, postLoginCheck) {
   page.on('pageerror', e => jsErrors.push(e.message));
   page.on('requestfailed', r => failedRequests.push(`${r.method()} ${r.url()}`));
 
-  const parsed = new URL(url);
-  if (parsed.port && parsed.port !== '443' && parsed.port !== '80') {
-    const defaultOrigin = `${parsed.protocol}//${parsed.hostname}`;
-    await page.route(`${defaultOrigin}/**`, async route => {
-      const rewritten = route.request().url().replace(defaultOrigin + '/', parsed.origin + '/');
-      await route.continue({ url: rewritten });
-    });
-  }
-
   console.log(`\n--- ${name} ---`);
   try {
     await page.goto(url, { waitUntil: 'load', timeout: TIMEOUT });
@@ -76,7 +67,7 @@ async function testFrontend(name, url, postLoginCheck) {
 }
 
 (async () => {
-  await testFrontend('webgui', 'https://cupcake.local:8443/', async page => {
+  await testFrontend('webgui', 'https://cupcake.local/', async page => {
     await page.waitForSelector('app-sidebar', { timeout: TIMEOUT });
     console.log('PASS: sidebar rendered');
     const body = await page.locator('body').textContent();
@@ -84,7 +75,7 @@ async function testFrontend(name, url, postLoginCheck) {
     console.log('PASS: Dashboard visible');
   });
 
-  await testFrontend('vanilla-ng', 'https://vanilla.local:8443/', async page => {
+  await testFrontend('vanilla-ng', 'https://vanilla.local/', async page => {
     await page.waitForSelector('app-navbar', { timeout: TIMEOUT });
     console.log('PASS: navbar rendered');
   });

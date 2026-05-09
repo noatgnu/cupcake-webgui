@@ -11,7 +11,7 @@ git clone --depth 1 --branch "${WEBGUI_REF}" https://github.com/noatgnu/cupcake-
 cd cupcake-webgui
 WEBGUI_COMMIT=$(git rev-parse --short HEAD)
 npm ci
-npx ng build --configuration=production --base-href /
+npx ng build --configuration=appliance --base-href /
 mkdir -p /opt/cupcake/webgui
 cp -r dist/cupcake/browser/* /opt/cupcake/webgui/
 chown -R cupcake:cupcake /opt/cupcake/webgui
@@ -29,7 +29,7 @@ npx ng build @noatgnu/cupcake-macaron
 npx ng build @noatgnu/cupcake-mint-chocolate
 npx ng build @noatgnu/cupcake-red-velvet
 npx ng build @noatgnu/cupcake-salted-caramel
-npx ng build --configuration=production --base-href /
+npx ng build --configuration=appliance --base-href /
 mkdir -p /opt/cupcake/vanilla
 cp -r dist/cupcake-vanilla-ng/browser/* /opt/cupcake/vanilla/
 chown -R cupcake:cupcake /opt/cupcake/vanilla

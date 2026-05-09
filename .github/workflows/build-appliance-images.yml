@@ -40,8 +40,7 @@ jobs:
           git clone --depth 1 --branch "$WEBGUI_REF" https://github.com/noatgnu/cupcake-webgui.git /tmp/webgui
           cd /tmp/webgui
           npm ci
-          find src -name "*.ts" -exec sed -i "s|//localhost/|//cupcake.local/|g" {} +
-          npx ng build --configuration=production --base-href /
+          npx ng build --configuration=appliance --base-href /
           mkdir -p "$GITHUB_WORKSPACE/frontend/webgui"
           cp -r dist/cupcake/browser/* "$GITHUB_WORKSPACE/frontend/webgui/"
 
@@ -52,14 +51,13 @@ jobs:
           git clone --depth 1 --branch "$VANILLA_NG_REF" https://github.com/noatgnu/cupcake-vanilla-ng.git /tmp/vanilla-ng
           cd /tmp/vanilla-ng
           npm ci
-          find src -name "*.ts" -exec sed -i "s|//localhost/|//vanilla.local/|g" {} +
           npx ng build @noatgnu/cupcake-core
           npx ng build @noatgnu/cupcake-vanilla
           npx ng build @noatgnu/cupcake-macaron
           npx ng build @noatgnu/cupcake-mint-chocolate
           npx ng build @noatgnu/cupcake-red-velvet
           npx ng build @noatgnu/cupcake-salted-caramel
-          npx ng build --configuration=production --base-href /
+          npx ng build --configuration=appliance --base-href /
           mkdir -p "$GITHUB_WORKSPACE/frontend/vanilla"
           cp -r dist/cupcake-vanilla-ng/browser/* "$GITHUB_WORKSPACE/frontend/vanilla/"
 
@@ -316,6 +314,10 @@ jobs:
         run: |
           echo "127.0.0.1 cupcake.local vanilla.local" | sudo tee -a /etc/hosts
 
+          sudo apt-get install -y socat
+          sudo socat TCP-LISTEN:443,fork,reuseaddr TCP:127.0.0.1:8443 &
+          sudo socat TCP-LISTEN:80,fork,reuseaddr TCP:127.0.0.1:8080 &
+
           mkdir -p /tmp/ui-test && cd /tmp/ui-test
           npm init -y --quiet
           npm install --quiet playwright
@@ -537,7 +539,7 @@ jobs:
           ENABLE_CUPCAKE_SALTED_CARAMEL=True
           ENABLE_CUPCAKE_RED_VELVET=True
           ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
-          CORS_ALLOWED_ORIGINS=http://cupcake.local,http://vanilla.local,http://localhost
+          CORS_ALLOWED_ORIGINS=https://cupcake.local,https://vanilla.local,http://cupcake.local,http://vanilla.local,http://localhost
           WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
           WHISPERCPP_THREAD_COUNT=4
@@ -617,6 +619,23 @@ jobs:
           chown cupcake-svc:cupcake-svc /opt/cupcake/versions.txt
 
           echo "=== CUPCAKE: deploying nginx ==="
+          mkdir -p /etc/ssl/cupcake
+          openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+              -keyout /etc/ssl/cupcake/cupcake.key \
+              -out /etc/ssl/cupcake/cupcake.crt \
+              -subj "/CN=cupcake.local/O=Cupcake Appliance" \
+              -addext "subjectAltName=DNS:cupcake.local,DNS:cupcake,DNS:vanilla.local,DNS:vanilla,DNS:localhost,IP:127.0.0.1"
+          chmod 640 /etc/ssl/cupcake/cupcake.key
+
+          cat > /etc/nginx/snippets/cupcake-ssl.conf << SSLEOF
+          ssl_certificate     /etc/ssl/cupcake/cupcake.crt;
+          ssl_certificate_key /etc/ssl/cupcake/cupcake.key;
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+          ssl_session_cache   shared:SSL:10m;
+          ssl_session_timeout 10m;
+          SSLEOF
+
           cat > /etc/nginx/conf.d/cupcake-upstream.conf << NGXEOF
           upstream django_backend {
               server 127.0.0.1:8000;
@@ -626,10 +645,16 @@ jobs:
           cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
           server {
               listen 80;
+              listen 443 ssl;
               server_name cupcake.local cupcake;
+              include /etc/nginx/snippets/cupcake-ssl.conf;
               client_max_body_size 2G;
               root /opt/cupcake/webgui;
               index index.html;
+
+              gzip on;
+              gzip_types text/css application/javascript application/json image/svg+xml;
+              gzip_vary on;
 
               location / {
                   try_files \$uri \$uri/ /index.html;
@@ -647,6 +672,9 @@ jobs:
               location /admin/ {
                   proxy_pass http://django_backend;
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
               }
 
               location /ws/ {
@@ -655,15 +683,19 @@ jobs:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection "upgrade";
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                   proxy_read_timeout 86400s;
               }
 
               location /static/ {
                   alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
               }
 
               location /media/ {
                   alias /opt/cupcake/backend/media/;
+                  expires 7d;
               }
 
               location /internal/media/ {
@@ -676,10 +708,16 @@ jobs:
           cat > /etc/nginx/sites-available/vanilla.conf << NGXEOF
           server {
               listen 80;
-              server_name vanilla.local vanilla;
+              listen 443 ssl;
+              server_name vanilla.local vanilla localhost;
+              include /etc/nginx/snippets/cupcake-ssl.conf;
               client_max_body_size 2G;
               root /opt/cupcake/vanilla;
               index index.html;
+
+              gzip on;
+              gzip_types text/css application/javascript application/json image/svg+xml;
+              gzip_vary on;
 
               location / {
                   try_files \$uri \$uri/ /index.html;
@@ -697,6 +735,9 @@ jobs:
               location /admin/ {
                   proxy_pass http://django_backend;
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
               }
 
               location /ws/ {
@@ -705,15 +746,19 @@ jobs:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection "upgrade";
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                   proxy_read_timeout 86400s;
               }
 
               location /static/ {
                   alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
               }
 
               location /media/ {
                   alias /opt/cupcake/backend/media/;
+                  expires 7d;
               }
 
               location /internal/media/ {
