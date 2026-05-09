@@ -369,7 +369,7 @@ jobs:
               await page.click('button[type="submit"]');
               console.log('PASS: credentials submitted');
 
-              await page.waitForURL(u => !u.includes('/login'), { timeout: TIMEOUT });
+              await page.waitForURL(u => !u.toString().includes('/login'), { timeout: TIMEOUT });
               console.log('PASS: navigated after login');
 
               await postLoginCheck(page);
