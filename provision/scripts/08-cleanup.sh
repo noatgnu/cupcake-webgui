@@ -98,6 +98,14 @@ cp "$(dirname "$0")/update.sh" /opt/cupcake/update.sh
 chmod +x /opt/cupcake/update.sh
 chown root:root /opt/cupcake/update.sh
 
+cp "$(dirname "$0")/configure-tailscale.sh" /opt/cupcake/configure-tailscale.sh
+chmod +x /opt/cupcake/configure-tailscale.sh
+chown root:root /opt/cupcake/configure-tailscale.sh
+
+cp "$(dirname "$0")/configure-cloudflared.sh" /opt/cupcake/configure-cloudflared.sh
+chmod +x /opt/cupcake/configure-cloudflared.sh
+chown root:root /opt/cupcake/configure-cloudflared.sh
+
 apt-get clean
 apt-get autoremove -y
 rm -rf /var/lib/apt/lists/*
