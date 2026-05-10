@@ -4,7 +4,8 @@ set -eux
 cat > /etc/systemd/system/cupcake-firstboot.service << 'UNITEOF'
 [Unit]
 Description=Cupcake First Boot Setup
-After=local-fs.target
+After=network-online.target local-fs.target
+Wants=network-online.target
 Before=cupcake-backend.service
 
 [Service]

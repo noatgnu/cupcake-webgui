@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://cupcake.local/api/v1',
-  websocketUrl: 'wss://cupcake.local/ws',
+  apiUrl: '/api/v1',
+  websocketUrl: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`,
   features: {
     asyncTasks: true
   },

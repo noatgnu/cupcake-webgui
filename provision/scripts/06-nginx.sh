@@ -26,9 +26,9 @@ NGINXEOF
 
 cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
 server {
-    listen 80;
-    listen 443 ssl;
-    server_name cupcake.local cupcake;
+    listen 80 default_server;
+    listen 443 ssl default_server;
+    server_name cupcake.local cupcake _;
 
     include /etc/nginx/snippets/cupcake-ssl.conf;
 

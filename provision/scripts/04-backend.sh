@@ -48,7 +48,7 @@ ENABLE_CUPCAKE_MACARON=True
 ENABLE_CUPCAKE_MINT_CHOCOLATE=True
 ENABLE_CUPCAKE_SALTED_CARAMEL=True
 ENABLE_CUPCAKE_RED_VELVET=True
-ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
+ALLOWED_HOSTS=*
 CORS_ALLOWED_ORIGINS=https://cupcake.local,https://vanilla.local,http://cupcake.local,http://vanilla.local,http://localhost
 WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
 WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-medium.bin
@@ -62,9 +62,29 @@ cat > /opt/cupcake/first-boot.sh << 'FBEOF'
 #!/bin/bash
 set -e
 ENV_FILE=/opt/cupcake/.env
+
 if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
     SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
     sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+fi
+
+TAILSCALE_CONFIG=/opt/cupcake/tailscale-auth.txt
+if [ -f "$TAILSCALE_CONFIG" ]; then
+    AUTHKEY=$(grep "^AUTHKEY=" "$TAILSCALE_CONFIG" | cut -d= -f2-)
+    if [ -n "$AUTHKEY" ]; then
+        tailscale up --authkey "$AUTHKEY" --ssh 2>/dev/null || true
+    fi
+    rm -f "$TAILSCALE_CONFIG"
+fi
+
+CLOUDFLARED_CONFIG=/opt/cupcake/cloudflared-token.txt
+if [ -f "$CLOUDFLARED_CONFIG" ]; then
+    TOKEN=$(grep "^TUNNEL_TOKEN=" "$CLOUDFLARED_CONFIG" | cut -d= -f2-)
+    if [ -n "$TOKEN" ]; then
+        cloudflared service install "$TOKEN" 2>/dev/null || true
+        systemctl enable --now cloudflared 2>/dev/null || true
+    fi
+    rm -f "$CLOUDFLARED_CONFIG"
 fi
 FBEOF
 chmod +x /opt/cupcake/first-boot.sh

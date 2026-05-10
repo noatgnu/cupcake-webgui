@@ -238,7 +238,7 @@ jobs:
         timeout-minutes: 20
         run: |
           BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
-          for s in 01-base 02-postgresql 03-redis 04-backend; do
+          for s in 01-base 02-postgresql 03-redis 04-backend 10-tailscale 11-cloudflared; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
@@ -485,7 +485,21 @@ jobs:
             avahi-daemon avahi-utils git ffmpeg jq \
             network-manager wireless-tools iw
 
-          systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager
+          echo "=== CUPCAKE: installing Tailscale ==="
+          curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
+              -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main" \
+              > /etc/apt/sources.list.d/tailscale.list
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y tailscale
+
+          echo "=== CUPCAKE: installing cloudflared ==="
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb \
+              -o /tmp/cloudflared.deb
+          dpkg -i /tmp/cloudflared.deb
+          rm /tmp/cloudflared.deb
+
+          systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager tailscaled
 
           echo "=== CUPCAKE: creating users ==="
           mkdir -p /opt/cupcake/{backend,static,media,backups,venv}
@@ -538,7 +552,7 @@ jobs:
           ENABLE_CUPCAKE_MINT_CHOCOLATE=True
           ENABLE_CUPCAKE_SALTED_CARAMEL=True
           ENABLE_CUPCAKE_RED_VELVET=True
-          ALLOWED_HOSTS=cupcake.local,vanilla.local,cupcake,vanilla,localhost,127.0.0.1
+          ALLOWED_HOSTS=*
           CORS_ALLOWED_ORIGINS=https://cupcake.local,https://vanilla.local,http://cupcake.local,http://vanilla.local,http://localhost
           WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
@@ -578,6 +592,25 @@ jobs:
                   nmcli connection up "cupcake-wifi" 2>/dev/null || true
               fi
               rm -f "$WIFI_CONFIG"
+          fi
+
+          TAILSCALE_CONFIG=/boot/firmware/cupcake-tailscale.txt
+          if [ -f "$TAILSCALE_CONFIG" ]; then
+              AUTHKEY=$(grep "^AUTHKEY=" "$TAILSCALE_CONFIG" | cut -d= -f2-)
+              if [ -n "$AUTHKEY" ]; then
+                  tailscale up --authkey "$AUTHKEY" --ssh 2>/dev/null || true
+              fi
+              rm -f "$TAILSCALE_CONFIG"
+          fi
+
+          CLOUDFLARED_CONFIG=/boot/firmware/cupcake-cloudflared.txt
+          if [ -f "$CLOUDFLARED_CONFIG" ]; then
+              TOKEN=$(grep "^TUNNEL_TOKEN=" "$CLOUDFLARED_CONFIG" | cut -d= -f2-)
+              if [ -n "$TOKEN" ]; then
+                  cloudflared service install "$TOKEN" 2>/dev/null || true
+                  systemctl enable --now cloudflared 2>/dev/null || true
+              fi
+              rm -f "$CLOUDFLARED_CONFIG"
           fi
           FBEOF
           chmod +x /opt/cupcake/first-boot.sh
@@ -644,9 +677,9 @@ jobs:
 
           cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
           server {
-              listen 80;
-              listen 443 ssl;
-              server_name cupcake.local cupcake;
+              listen 80 default_server;
+              listen 443 ssl default_server;
+              server_name cupcake.local cupcake _;
               include /etc/nginx/snippets/cupcake-ssl.conf;
               client_max_body_size 2G;
               root /opt/cupcake/webgui;
@@ -776,7 +809,8 @@ jobs:
           cat > /etc/systemd/system/cupcake-firstboot.service << 'UNITEOF'
           [Unit]
           Description=Cupcake First Boot Setup
-          After=local-fs.target
+          After=network-online.target local-fs.target
+          Wants=network-online.target
           Before=cupcake-backend.service
 
           [Service]
