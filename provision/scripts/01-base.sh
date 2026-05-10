@@ -22,7 +22,10 @@ apt-get install -y \
     jq \
     unzip \
     ca-certificates \
-    ufw
+    ufw \
+    nfs-common \
+    cifs-utils \
+    exfatprogs
 
 mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
 mkdir -p /var/log/cupcake

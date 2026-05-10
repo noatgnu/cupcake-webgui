@@ -1,0 +1,19 @@
+# Cupcake WiFi Configuration  (Raspberry Pi only)
+#
+# Copy as  /boot/firmware/cupcake-wifi.txt  before first boot.
+# The file is read on every boot but only acted on when present.
+# It is deleted after the connection is created.
+# To reconfigure WiFi on a running appliance use nmcli or nmtui directly.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Network name (required)
+SSID=MyLabNetwork
+
+# WPA2 passphrase (required)
+PASSWORD=MySecretPassphrase
+
+# ISO 3166-1 alpha-2 country code for regulatory compliance.
+# Required in some regions. Defaults to GB if omitted.
+# Common codes: US  GB  DE  FR  AU  JP  CA
+#COUNTRY=GB

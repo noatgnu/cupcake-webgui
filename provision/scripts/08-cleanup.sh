@@ -106,6 +106,19 @@ cp "$(dirname "$0")/configure-cloudflared.sh" /opt/cupcake/configure-cloudflared
 chmod +x /opt/cupcake/configure-cloudflared.sh
 chown root:root /opt/cupcake/configure-cloudflared.sh
 
+cp "$(dirname "$0")/configure-storage.sh" /opt/cupcake/configure-storage.sh
+chmod +x /opt/cupcake/configure-storage.sh
+chown root:root /opt/cupcake/configure-storage.sh
+
+mkdir -p /opt/cupcake/examples
+EXAMPLES_DIR="$(dirname "$0")/../config-examples"
+if [ ! -d "$EXAMPLES_DIR" ]; then
+    EXAMPLES_DIR=/tmp/config-examples
+fi
+cp "${EXAMPLES_DIR}/"*.example /opt/cupcake/examples/
+chmod 644 /opt/cupcake/examples/*.example
+chown root:root /opt/cupcake/examples/*.example
+
 apt-get clean
 apt-get autoremove -y
 rm -rf /var/lib/apt/lists/*

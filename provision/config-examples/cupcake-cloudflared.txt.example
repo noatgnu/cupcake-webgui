@@ -1,0 +1,27 @@
+# Cupcake Cloudflare Tunnel Configuration
+#
+# RPi : copy as  /boot/firmware/cupcake-cloudflared.txt  before first boot
+# VM  : copy as  /opt/cupcake/cloudflared-token.txt       before first boot
+#
+# The file is read on every boot but only acted on when present.
+# It is deleted after the tunnel is installed.
+# To re-configure a running appliance use:
+#   sudo /opt/cupcake/configure-cloudflared.sh <token>
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# How to obtain a tunnel token:
+#   1. Go to https://one.dash.cloudflare.com
+#   2. Networks → Tunnels → Create a tunnel → Cloudflared
+#   3. Name the tunnel (e.g. "cupcake-lab")
+#   4. In the install step, copy the token from the --token flag shown
+#      in the connector command. It starts with  eyJ...
+#   5. Configure the tunnel Public Hostname in the Cloudflare dashboard:
+#        Subdomain : <your choice>
+#        Domain    : <your domain>
+#        Service   : HTTP  http://localhost
+#
+# The appliance serves the cupcake webgui by default for all tunnel traffic.
+# Cloudflare handles TLS — no certificate changes are needed on the appliance.
+#
+TUNNEL_TOKEN=eyJhIjoixxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

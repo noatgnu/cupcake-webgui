@@ -1,0 +1,22 @@
+# Cupcake Tailscale Configuration
+#
+# RPi : copy as  /boot/firmware/cupcake-tailscale.txt  before first boot
+# VM  : copy as  /opt/cupcake/tailscale-auth.txt        before first boot
+#
+# The file is read on every boot but only acted on when present.
+# It is deleted after the key is applied.
+# To re-key a running appliance use:
+#   sudo /opt/cupcake/configure-tailscale.sh <authkey>
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Tailscale auth key.
+# Generate one at:  https://login.tailscale.com/admin/settings/keys
+#
+# Key types:
+#   One-time    – single use, expires after first device login
+#   Reusable    – recommended for appliances that may be re-imaged
+#   Pre-approved – skips the manual device approval step in the admin console
+#   Ephemeral   – device is removed from the tailnet when it goes offline
+#
+AUTHKEY=tskey-auth-xxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

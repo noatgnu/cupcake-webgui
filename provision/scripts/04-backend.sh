@@ -86,6 +86,30 @@ if [ -f "$CLOUDFLARED_CONFIG" ]; then
     fi
     rm -f "$CLOUDFLARED_CONFIG"
 fi
+
+STORAGE_CONFIG=/opt/cupcake/storage-config.txt
+if [ -f "$STORAGE_CONFIG" ]; then
+    TYPE=$(grep "^TYPE=" "$STORAGE_CONFIG" | cut -d= -f2-)
+    case "$TYPE" in
+        usb)
+            LABEL=$(grep "^LABEL=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            FSTYPE=$(grep "^FSTYPE=" "$STORAGE_CONFIG" | cut -d= -f2- || echo "auto")
+            /opt/cupcake/configure-storage.sh usb "$LABEL" "$FSTYPE" || true
+            ;;
+        nfs)
+            SERVER=$(grep "^NFS_SERVER=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            SHARE=$(grep "^NFS_SHARE=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            /opt/cupcake/configure-storage.sh nfs "$SERVER" "$SHARE" || true
+            ;;
+        smb)
+            SERVER=$(grep "^SMB_SERVER=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            USERNAME=$(grep "^SMB_USERNAME=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            PASSWORD=$(grep "^SMB_PASSWORD=" "$STORAGE_CONFIG" | cut -d= -f2-)
+            /opt/cupcake/configure-storage.sh smb "$SERVER" "$USERNAME" "$PASSWORD" || true
+            ;;
+    esac
+    rm -f "$STORAGE_CONFIG"
+fi
 FBEOF
 chmod +x /opt/cupcake/first-boot.sh
 chown root:root /opt/cupcake/first-boot.sh

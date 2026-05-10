@@ -283,6 +283,10 @@ jobs:
             provision/scripts/update.sh \
             provision/scripts/configure-tailscale.sh \
             provision/scripts/configure-cloudflared.sh \
+            provision/scripts/configure-storage.sh \
+            cupcake@localhost:/tmp/
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 -r \
+            provision/config-examples \
             cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/08-cleanup.sh && sudo env /tmp/08-cleanup.sh"
@@ -458,6 +462,16 @@ jobs:
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-tailscale.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-cloudflared.sh" "${ROOTFS_DIR}/opt/cupcake/configure-cloudflared.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-cloudflared.sh"
+          cp "${GITHUB_WORKSPACE}/provision/scripts/configure-storage.sh" "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
+          chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
+
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/examples"
+          cp "${GITHUB_WORKSPACE}/provision/config-examples/"*.example "${ROOTFS_DIR}/opt/cupcake/examples/"
+          chmod 644 "${ROOTFS_DIR}/opt/cupcake/examples/"*.example
+
+          mkdir -p "${ROOTFS_DIR}/boot/firmware"
+          cp "${GITHUB_WORKSPACE}/provision/config-examples/"*.example "${ROOTFS_DIR}/boot/firmware/"
+          chmod 644 "${ROOTFS_DIR}/boot/firmware/"*.example
 
           git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper-build
           cd /tmp/whisper-build
@@ -489,7 +503,8 @@ jobs:
             postgresql-16 postgresql-client-16 redis-server nginx \
             python3 python3-venv python3-dev libpq-dev \
             avahi-daemon avahi-utils git ffmpeg jq \
-            network-manager wireless-tools iw
+            network-manager wireless-tools iw \
+            nfs-common cifs-utils exfatprogs
 
           echo "=== CUPCAKE: installing Tailscale ==="
           curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
@@ -617,6 +632,30 @@ jobs:
                   systemctl enable --now cloudflared 2>/dev/null || true
               fi
               rm -f "$CLOUDFLARED_CONFIG"
+          fi
+
+          STORAGE_CONFIG=/boot/firmware/cupcake-storage.txt
+          if [ -f "$STORAGE_CONFIG" ]; then
+              TYPE=$(grep "^TYPE=" "$STORAGE_CONFIG" | cut -d= -f2-)
+              case "$TYPE" in
+                  usb)
+                      LABEL=$(grep "^LABEL=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      FSTYPE=$(grep "^FSTYPE=" "$STORAGE_CONFIG" | cut -d= -f2- || echo "auto")
+                      /opt/cupcake/configure-storage.sh usb "$LABEL" "$FSTYPE" || true
+                      ;;
+                  nfs)
+                      SERVER=$(grep "^NFS_SERVER=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      SHARE=$(grep "^NFS_SHARE=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      /opt/cupcake/configure-storage.sh nfs "$SERVER" "$SHARE" || true
+                      ;;
+                  smb)
+                      SERVER=$(grep "^SMB_SERVER=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      USERNAME=$(grep "^SMB_USERNAME=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      PASSWORD=$(grep "^SMB_PASSWORD=" "$STORAGE_CONFIG" | cut -d= -f2-)
+                      /opt/cupcake/configure-storage.sh smb "$SERVER" "$USERNAME" "$PASSWORD" || true
+                      ;;
+              esac
+              rm -f "$STORAGE_CONFIG"
           fi
           FBEOF
           chmod +x /opt/cupcake/first-boot.sh

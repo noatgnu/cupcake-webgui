@@ -1,0 +1,49 @@
+# Cupcake Storage Configuration
+#
+# RPi : copy as  /boot/firmware/cupcake-storage.txt  before boot
+# VM  : copy as  /opt/cupcake/storage-config.txt      before boot
+#
+# The file is read on every boot but only acted on when present.
+# It is deleted after successful configuration.
+# To reconfigure storage on a running appliance use:
+#   sudo /opt/cupcake/configure-storage.sh <type> <args>
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Choose ONE type and fill in the matching section. Comment out the others.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Storage type: usb | nfs | smb
+TYPE=usb
+
+
+# ── USB / local block device ──────────────────────────────────────────────────
+#
+# Identify the drive by its filesystem LABEL, not by device path (/dev/sdX).
+# Labels are stable across reboots and port changes.
+#
+# How to label a drive before plugging it in:
+#   Linux (ext4)  :  sudo e2label /dev/sdX1 CUPCAKE-DATA
+#   Linux (exfat) :  sudo exfatlabel /dev/sdX1 CUPCAKE-DATA
+#   macOS         :  diskutil rename /Volumes/Untitled CUPCAKE-DATA
+#   Windows       :  right-click drive in Explorer → Properties → rename
+#
+LABEL=CUPCAKE-DATA
+#
+# Filesystem type. Omit or set to 'auto' to detect automatically.
+# Supported: auto | ext4 | ext3 | exfat | ntfs | vfat
+#FSTYPE=auto
+
+
+# ── NFS ───────────────────────────────────────────────────────────────────────
+# Uncomment the lines below and set TYPE=nfs above.
+#
+#NFS_SERVER=192.168.1.100
+#NFS_SHARE=/volume1/cupcake-data
+
+
+# ── SMB / CIFS (Windows share, Samba, Synology, QNAP) ────────────────────────
+# Uncomment the lines below and set TYPE=smb above.
+#
+#SMB_SERVER=//192.168.1.100/cupcake-data
+#SMB_USERNAME=labuser
+#SMB_PASSWORD=secret
