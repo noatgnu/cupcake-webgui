@@ -941,6 +941,59 @@ jobs:
 
           systemctl --root=/ enable cupcake-transcribe-worker.service
 
+          echo "=== CUPCAKE: deploying mDNS ==="
+          cat > /etc/avahi/services/cupcake.service << 'AVHEOF'
+          <?xml version="1.0" standalone='no'?>
+          <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+          <service-group>
+            <name>Cupcake Appliance</name>
+            <service>
+              <type>_http._tcp</type>
+              <port>80</port>
+              <txt-record>path=/</txt-record>
+            </service>
+          </service-group>
+          AVHEOF
+
+          cat > /etc/avahi/services/vanilla.service << 'AVHEOF'
+          <?xml version="1.0" standalone='no'?>
+          <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+          <service-group>
+            <name>Cupcake Vanilla Interface</name>
+            <service>
+              <type>_http._tcp</type>
+              <port>80</port>
+              <txt-record>path=/</txt-record>
+            </service>
+          </service-group>
+          AVHEOF
+
+          cat > /usr/local/bin/avahi-publish-vanilla.sh << 'AVHEOF'
+          #!/bin/bash
+          IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/{print $NF; exit}')
+          [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
+          exec /usr/bin/avahi-publish -a -R vanilla.local "$IP"
+          AVHEOF
+          chmod +x /usr/local/bin/avahi-publish-vanilla.sh
+
+          cat > /etc/systemd/system/avahi-alias-vanilla.service << 'UNITEOF'
+          [Unit]
+          Description=Publish vanilla.local mDNS alias
+          After=avahi-daemon.service network-online.target
+          Requires=avahi-daemon.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/avahi-publish-vanilla.sh
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          UNITEOF
+
+          systemctl --root=/ enable avahi-alias-vanilla.service
+
           chown -R cupcake-svc:cupcake-svc /opt/cupcake /var/log/cupcake
           chown root:cupcake-svc /opt/cupcake/.env
           chmod 640 /opt/cupcake/.env
@@ -965,7 +1018,7 @@ jobs:
           DEPLOY_COMPRESSION=xz
           COMPRESSION_LEVEL=9
           LOCALE_DEFAULT=en_US.UTF-8
-          TARGET_HOSTNAME=cupcake-pi
+          TARGET_HOSTNAME=cupcake
           KEYBOARD_KEYMAP=gb
           KEYBOARD_LAYOUT="English (UK)"
           TIMEZONE_DEFAULT=UTC
@@ -983,40 +1036,11 @@ jobs:
           export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
           sudo -E USE_DOCKER=0 ./build.sh
 
-      - name: Create model-specific images
-        run: |
-          mkdir -p deploy
-          cd pi-gen/deploy
-          shopt -s nullglob
-          for img in *.img.xz; do
-            base=$(basename "$img" .img.xz)
-            for model in pi3b pi4 pi5; do
-              cp "$img" "../../deploy/${base}-${model}.img.xz"
-            done
-          done
-          cd ../..
-          echo "Built images:"
-          ls -lh deploy/ || echo "No images found"
-
-      - name: Upload Pi 3B
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: cupcake-pi3b-arm64
-          path: deploy/*pi3b*.img.xz
-          retention-days: 30
-
-      - name: Upload Pi 4
-        uses: actions/upload-artifact@v4
-        with:
-          name: cupcake-pi4-arm64
-          path: deploy/*pi4*.img.xz
-          retention-days: 30
-
-      - name: Upload Pi 5
-        uses: actions/upload-artifact@v4
-        with:
-          name: cupcake-pi5-arm64
-          path: deploy/*pi5*.img.xz
+          name: cupcake-pi-arm64
+          path: pi-gen/deploy/*.img.xz
           retention-days: 30
 
   summary:
@@ -1032,6 +1056,4 @@ jobs:
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Seed DB | ${{ needs.build-db.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| VM (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| RPi 3B | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| RPi 4 | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| RPi 5 | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi (arm64) | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
