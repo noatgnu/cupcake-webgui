@@ -281,6 +281,8 @@ jobs:
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
             provision/scripts/08-cleanup.sh \
             provision/scripts/update.sh \
+            provision/scripts/configure-tailscale.sh \
+            provision/scripts/configure-cloudflared.sh \
             cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/08-cleanup.sh && sudo env /tmp/08-cleanup.sh"
