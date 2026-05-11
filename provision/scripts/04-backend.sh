@@ -70,12 +70,12 @@ set -e
 ENV_FILE=/opt/cupcake/.env
 
 if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-    SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
+    SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')
     sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
 fi
 
 if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-    COTURN_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40)
+    COTURN_SECRET=$(openssl rand -hex 20)
     sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
     sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
     systemctl restart coturn 2>/dev/null || true

@@ -323,6 +323,25 @@ jobs:
           sudo apt-get install -y socat
           sudo socat TCP-LISTEN:443,fork,reuseaddr TCP:127.0.0.1:8443 &
           sudo socat TCP-LISTEN:80,fork,reuseaddr TCP:127.0.0.1:8080 &
+          sleep 1
+
+          fail() { echo "FAIL: $*"; exit 1; }
+
+          CUPCAKE=$(curl -sfk https://cupcake.local/) \
+            || fail "cupcake.local did not return 200"
+          VANILLA=$(curl -sfk https://vanilla.local/) \
+            || fail "vanilla.local did not return 200"
+
+          echo "$CUPCAKE" | grep -q "<title>Cupcake</title>" \
+            || fail "cupcake.local does not have expected title 'Cupcake' — wrong frontend deployed"
+          echo "$VANILLA" | grep -q "<title>Cupcake Vanilla</title>" \
+            || fail "vanilla.local does not have expected title 'Cupcake Vanilla' — wrong frontend deployed"
+
+          API=$(curl -sk -o /dev/null -w "%{http_code}" https://cupcake.local/api/v1/)
+          echo "$API" | grep -qE "^[234]" \
+            || fail "API at cupcake.local returned unexpected status $API"
+
+          echo "PASS: cupcake.local serves 'Cupcake', vanilla.local serves 'Cupcake Vanilla', API reachable"
 
           mkdir -p /tmp/ui-test && cd /tmp/ui-test
           npm init -y --quiet
@@ -623,12 +642,12 @@ jobs:
           ENV_FILE=/opt/cupcake/.env
 
           if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-              SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
+              SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')
               sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
           fi
 
           if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-              COTURN_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40)
+              COTURN_SECRET=$(openssl rand -hex 20)
               sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
               sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
               systemctl restart coturn 2>/dev/null || true
@@ -1004,6 +1023,7 @@ jobs:
           <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
           <service-group>
             <name>Cupcake Vanilla Interface</name>
+            <host-name>vanilla.local</host-name>
             <service>
               <type>_http._tcp</type>
               <port>80</port>
@@ -1011,32 +1031,6 @@ jobs:
             </service>
           </service-group>
           AVHEOF
-
-          cat > /usr/local/bin/avahi-publish-vanilla.sh << 'AVHEOF'
-          #!/bin/bash
-          IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/{print $NF; exit}')
-          [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
-          exec /usr/bin/avahi-publish -a -R vanilla.local "$IP"
-          AVHEOF
-          chmod +x /usr/local/bin/avahi-publish-vanilla.sh
-
-          cat > /etc/systemd/system/avahi-alias-vanilla.service << 'UNITEOF'
-          [Unit]
-          Description=Publish vanilla.local mDNS alias
-          After=avahi-daemon.service network-online.target
-          Requires=avahi-daemon.service
-
-          [Service]
-          Type=simple
-          ExecStart=/usr/local/bin/avahi-publish-vanilla.sh
-          Restart=on-failure
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-          UNITEOF
-
-          systemctl --root=/ enable avahi-alias-vanilla.service
 
           chown -R cupcake-svc:cupcake-svc /opt/cupcake /var/log/cupcake
           chown root:cupcake-svc /opt/cupcake/.env
