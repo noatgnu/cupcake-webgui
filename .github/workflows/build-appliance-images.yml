@@ -504,8 +504,9 @@ jobs:
             python3 python3-venv python3-dev libpq-dev \
             avahi-daemon avahi-utils git ffmpeg jq \
             network-manager wireless-tools iw \
-            nfs-common cifs-utils exfatprogs \
-            coturn
+            nfs-common cifs-utils exfatprogs
+
+          DEBIAN_FRONTEND=noninteractive apt-get install -y coturn || true
 
           echo "=== CUPCAKE: installing Tailscale ==="
           curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
@@ -522,6 +523,9 @@ jobs:
           rm /tmp/cloudflared.deb
 
           systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager tailscaled
+          systemctl --root=/ enable coturn 2>/dev/null || true
+
+          sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
           echo "=== CUPCAKE: creating users ==="
           mkdir -p /opt/cupcake/{backend,static,media,backups,venv}
@@ -1045,6 +1049,7 @@ jobs:
           EOF
 
           echo "IMG_SUFFIX=-cupcake" > pi-gen/stage2a/EXPORT_IMAGE
+          rm -f pi-gen/stage2/EXPORT_IMAGE
           chmod +x pi-gen/stage2a/prerun.sh \
             pi-gen/stage2a/00-install-cupcake/00-run.sh \
             pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh

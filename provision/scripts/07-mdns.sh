@@ -51,5 +51,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
+
 systemctl enable avahi-daemon avahi-alias-vanilla.service
 systemctl restart avahi-daemon
