@@ -53,6 +53,12 @@ CORS_ALLOWED_ORIGINS=https://cupcake.local,https://vanilla.local,http://cupcake.
 WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
 WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-medium.bin
 WHISPERCPP_THREAD_COUNT=4
+COTURN_HOST=cupcake.local
+COTURN_PORT=3478
+COTURN_TLS_PORT=5349
+COTURN_SECRET=CHANGE-ON-FIRST-BOOT
+COTURN_REALM=cupcake.local
+COTURN_TTL=86400
 EOF
 
 chown root:cupcake-svc /opt/cupcake/.env
@@ -66,6 +72,13 @@ ENV_FILE=/opt/cupcake/.env
 if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
     SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
     sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+fi
+
+if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+    COTURN_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40)
+    sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
+    sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+    systemctl restart coturn 2>/dev/null || true
 fi
 
 TAILSCALE_CONFIG=/opt/cupcake/tailscale-auth.txt

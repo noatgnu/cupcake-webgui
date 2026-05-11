@@ -238,7 +238,7 @@ jobs:
         timeout-minutes: 20
         run: |
           BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
-          for s in 01-base 02-postgresql 03-redis 04-backend 10-tailscale 11-cloudflared; do
+          for s in 01-base 02-postgresql 03-redis 04-backend 10-tailscale 11-cloudflared 12-coturn; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
@@ -504,7 +504,8 @@ jobs:
             python3 python3-venv python3-dev libpq-dev \
             avahi-daemon avahi-utils git ffmpeg jq \
             network-manager wireless-tools iw \
-            nfs-common cifs-utils exfatprogs
+            nfs-common cifs-utils exfatprogs \
+            coturn
 
           echo "=== CUPCAKE: installing Tailscale ==="
           curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
@@ -578,7 +579,38 @@ jobs:
           WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
           WHISPERCPP_THREAD_COUNT=4
+          COTURN_HOST=cupcake.local
+          COTURN_PORT=3478
+          COTURN_TLS_PORT=5349
+          COTURN_SECRET=CHANGE-ON-FIRST-BOOT
+          COTURN_REALM=cupcake.local
+          COTURN_TTL=86400
           DOTENV
+
+          mkdir -p /var/log/coturn
+          chown turnserver:turnserver /var/log/coturn 2>/dev/null || true
+          cat > /etc/turnserver.conf << 'TURNEOF'
+          listening-port=3478
+          listening-ip=0.0.0.0
+          relay-ip=0.0.0.0
+          fingerprint
+          realm=cupcake.local
+          use-auth-secret
+          static-auth-secret=CHANGE-ON-FIRST-BOOT
+          no-tls
+          no-dtls
+          no-loopback-peers
+          no-multicast-peers
+          min-port=49152
+          max-port=65535
+          total-quota=100
+          user-quota=50
+          log-file=/var/log/coturn/turnserver.log
+          TURNEOF
+          chown turnserver:turnserver /etc/turnserver.conf 2>/dev/null || true
+          chmod 640 /etc/turnserver.conf
+          echo 'TURNSERVER_ENABLED=1' > /etc/default/coturn
+          systemctl --root=/ enable coturn
 
           cat > /opt/cupcake/first-boot.sh << 'FBEOF'
           #!/bin/bash
@@ -588,6 +620,13 @@ jobs:
           if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
               SECRET_KEY=$(tr -dc 'A-Za-z0-9-_+@%^=' < /dev/urandom | head -c 50)
               sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+          fi
+
+          if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+              COTURN_SECRET=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40)
+              sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
+              sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+              systemctl restart coturn 2>/dev/null || true
           fi
 
           WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
