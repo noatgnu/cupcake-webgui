@@ -473,6 +473,8 @@ jobs:
           cp "${GITHUB_WORKSPACE}/provision/config-examples/"*.example "${ROOTFS_DIR}/boot/firmware/"
           chmod 644 "${ROOTFS_DIR}/boot/firmware/"*.example
 
+          git clone --depth 1 https://github.com/noatgnu/cupcake_vanilla.git "${ROOTFS_DIR}/opt/cupcake/backend"
+
           git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper-build
           cd /tmp/whisper-build
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF \
@@ -558,8 +560,7 @@ jobs:
           python3 -m venv /opt/cupcake/venv
           /opt/cupcake/venv/bin/pip install --upgrade pip
 
-          echo "=== CUPCAKE: cloning backend ==="
-          git clone --depth 1 https://github.com/noatgnu/cupcake_vanilla.git /opt/cupcake/backend || true
+          echo "=== CUPCAKE: installing backend ==="
           /opt/cupcake/venv/bin/pip install -r /opt/cupcake/backend/requirements.txt
           /opt/cupcake/venv/bin/pip install gunicorn "uvicorn[standard]" psycopg2-binary
 
