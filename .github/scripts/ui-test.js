@@ -2,8 +2,8 @@
 
 const { chromium } = require('playwright');
 
-const TIMEOUT = 30000;
-const LOGIN_TIMEOUT = 60000;
+const TIMEOUT = parseInt(process.env.UI_TIMEOUT || '30000');
+const LOGIN_TIMEOUT = parseInt(process.env.LOGIN_TIMEOUT || '60000');
 let passed = 0;
 let failed = 0;
 

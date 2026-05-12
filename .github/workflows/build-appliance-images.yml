@@ -389,6 +389,7 @@ jobs:
           name: cupcake-vm-amd64
           path: cupcake-vm-amd64.qcow2.xz
           retention-days: 7
+          compression-level: 0
 
   build-rpi:
     name: RPi Image
@@ -661,18 +662,27 @@ jobs:
           cat > /opt/cupcake/first-boot.sh << 'FBEOF'
           #!/bin/bash
           set -e
+          LOG=/var/log/cupcake/first-boot.log
+          mkdir -p /var/log/cupcake
+          exec > >(tee -a "$LOG") 2>&1
+          echo "=== first-boot.sh started $(date -u) ==="
+
           ENV_FILE=/opt/cupcake/.env
 
           if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+              echo "Generating SECRET_KEY..."
               SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')
               sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+              echo "SECRET_KEY set"
           fi
 
           if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+              echo "Generating COTURN_SECRET..."
               COTURN_SECRET=$(openssl rand -hex 20)
               sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
               sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
               systemctl restart coturn 2>/dev/null || true
+              echo "COTURN_SECRET set"
           fi
 
           WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
@@ -742,6 +752,7 @@ jobs:
               esac
               rm -f "$STORAGE_CONFIG"
           fi
+          echo "=== first-boot.sh completed $(date -u) ==="
           FBEOF
           chmod +x /opt/cupcake/first-boot.sh
           chown root:root /opt/cupcake/first-boot.sh
@@ -764,6 +775,20 @@ jobs:
           su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\""
           gunzip -c /tmp/cupcake-seed.sql.gz | su - postgres -c "psql cupcake_vanilla_db"
           rm -f /tmp/cupcake-seed.sql.gz
+
+          echo "=== CUPCAKE: verifying admin user ==="
+          ADMIN_COUNT=$(su - postgres -c "psql -t -c \"SELECT COUNT(*) FROM auth_user WHERE username='admin' AND is_superuser=true;\" cupcake_vanilla_db" | tr -d ' \n')
+          if [ "${ADMIN_COUNT}" != "1" ]; then
+              echo "ERROR: admin superuser missing from seed DB (count=${ADMIN_COUNT}), creating it"
+              cd /opt/cupcake/backend
+              set -a; source /opt/cupcake/.env; set +a
+              DJANGO_SUPERUSER_USERNAME=admin \
+              DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
+              DJANGO_SUPERUSER_PASSWORD=cupcake \
+              /opt/cupcake/venv/bin/python manage.py createsuperuser --noinput
+          else
+              echo "Admin user verified OK"
+          fi
 
           BACKEND_COMMIT=$(git -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
           WEBGUI_COMMIT=$(grep "^WEBGUI_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
@@ -935,6 +960,9 @@ jobs:
           ln -sf /etc/nginx/sites-available/vanilla.conf /etc/nginx/sites-enabled/
           rm -f /etc/nginx/sites-enabled/default
 
+          echo "=== CUPCAKE: verifying nginx config ==="
+          nginx -t
+
           echo "=== CUPCAKE: deploying systemd ==="
           cat > /etc/systemd/system/cupcake-firstboot.service << 'UNITEOF'
           [Unit]
@@ -1097,12 +1125,104 @@ jobs:
           export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
           sudo -E USE_DOCKER=0 ./build.sh
 
+      - name: Post-build RPi image test
+        timeout-minutes: 45
+        run: |
+          ROOTFS=$(find pi-gen/work -name "rootfs" -path "*/stage2a/rootfs" | head -1)
+          echo "Testing with ROOTFS at: ${ROOTFS}"
+
+          fail() { echo "FAIL: $*"; exit 1; }
+
+          # Bind system filesystems so ARM64 daemons (via QEMU) can use /proc /sys
+          sudo mount --bind /proc  "${ROOTFS}/proc"
+          sudo mount --bind /sys   "${ROOTFS}/sys"
+          sudo mount --bind /dev   "${ROOTFS}/dev"
+          sudo mount --bind /dev/pts "${ROOTFS}/dev/pts"
+          sudo mount -t tmpfs tmpfs "${ROOTFS}/run"
+
+          cleanup() {
+            sudo chroot "${ROOTFS}" nginx -s stop 2>/dev/null || true
+            sudo chroot "${ROOTFS}" bash -c '
+              kill $(cat /tmp/gunicorn.pid 2>/dev/null) 2>/dev/null || true
+              service redis-server stop 2>/dev/null || true
+              service postgresql stop  2>/dev/null || true
+            ' 2>/dev/null || true
+            sudo umount "${ROOTFS}/run" \
+              "${ROOTFS}/dev/pts" "${ROOTFS}/dev" \
+              "${ROOTFS}/sys"     "${ROOTFS}/proc" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          # ── Services start (ARM64 binaries run via qemu-aarch64-static) ──
+          echo "=== Starting PostgreSQL ==="
+          sudo chroot "${ROOTFS}" service postgresql start \
+            || fail "PostgreSQL failed to start"
+
+          echo "=== Starting Redis ==="
+          sudo chroot "${ROOTFS}" service redis-server start \
+            || fail "Redis failed to start"
+
+          echo "=== Starting Django backend (gunicorn, 1 worker) ==="
+          sudo chroot "${ROOTFS}" bash -c '
+            cd /opt/cupcake/backend
+            set -a; source /opt/cupcake/.env; set +a
+            /opt/cupcake/venv/bin/gunicorn cupcake_vanilla.asgi:application \
+              --bind 127.0.0.1:8000 \
+              --workers 1 \
+              --timeout 300 \
+              -k uvicorn.workers.UvicornWorker \
+              --daemon \
+              --pid /tmp/gunicorn.pid
+          '
+
+          echo "=== Starting nginx ==="
+          sudo chroot "${ROOTFS}" nginx -t \
+            || fail "nginx -t failed inside ROOTFS — config error"
+          sudo chroot "${ROOTFS}" nginx \
+            || fail "nginx failed to start"
+
+          # ── /etc/hosts so the runner resolves the names ──
+          echo "127.0.0.1 cupcake.local vanilla.local" | sudo tee -a /etc/hosts
+
+          # ── Wait for Django (ARM64/QEMU: allow up to 10 min) ──
+          echo "=== Waiting for Django backend (QEMU ARM64, up to 10 min) ==="
+          for i in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://127.0.0.1:8000/api/v1/ 2>/dev/null) || true
+            if echo "$code" | grep -qE "^[234]"; then
+              echo "Backend ready after $((i * 5))s"
+              break
+            fi
+            [ "$i" -eq 120 ] && fail "Backend never became ready in 10 min"
+            sleep 5
+          done
+
+          # ── Playwright UI test — runner is the external client ──
+          # (services bind to host-network ports; runner connects from outside chroot)
+          mkdir -p /tmp/rpi-ui-test && cd /tmp/rpi-ui-test
+          npm init -y --quiet
+          npm install --quiet playwright
+          npx playwright install chromium --with-deps
+          cp "$GITHUB_WORKSPACE/.github/scripts/ui-test.js" .
+
+          # Use longer timeouts for QEMU-emulated ARM64 backend
+          UI_TIMEOUT=90000 LOGIN_TIMEOUT=300000 node ui-test.js
+
+      - name: Upload RPi UI test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpi-ui-test-screenshots
+          path: /tmp/rpi-ui-test/screenshot-*.png
+          retention-days: 3
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: cupcake-pi-arm64
           path: pi-gen/deploy/*.img.xz
           retention-days: 30
+          compression-level: 0
 
   summary:
     name: Summary
