@@ -463,10 +463,32 @@ jobs:
 
           cat > pi-gen/stage2a/00-install-cupcake/00-run.sh << 'EOF'
           #!/bin/bash -e
+
+          echo "=== CUPCAKE: copying frontend files ==="
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          echo "ROOTFS_DIR=${ROOTFS_DIR}"
+          echo "Webgui source files: $(ls "${GITHUB_WORKSPACE}/frontend/webgui/" | wc -l) items"
+          echo "Vanilla source files: $(ls "${GITHUB_WORKSPACE}/frontend/vanilla/" | wc -l) items"
+
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/webgui"
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/vanilla"
           cp -rT "${GITHUB_WORKSPACE}/frontend/webgui" "${ROOTFS_DIR}/opt/cupcake/webgui"
           cp -rT "${GITHUB_WORKSPACE}/frontend/vanilla" "${ROOTFS_DIR}/opt/cupcake/vanilla"
+
+          WEBGUI_TITLE=$(grep -o '<title>[^<]*</title>' "${ROOTFS_DIR}/opt/cupcake/webgui/index.html" 2>/dev/null || echo "MISSING")
+          VANILLA_TITLE=$(grep -o '<title>[^<]*</title>' "${ROOTFS_DIR}/opt/cupcake/vanilla/index.html" 2>/dev/null || echo "MISSING")
+          echo "Webgui index.html title: ${WEBGUI_TITLE}"
+          echo "Vanilla index.html title: ${VANILLA_TITLE}"
+
+          if [ "${WEBGUI_TITLE}" != "<title>Cupcake</title>" ]; then
+              echo "ERROR: webgui has wrong title '${WEBGUI_TITLE}', expected '<title>Cupcake</title>'"
+              exit 1
+          fi
+          if [ "${VANILLA_TITLE}" != "<title>Cupcake Vanilla</title>" ]; then
+              echo "ERROR: vanilla has wrong title '${VANILLA_TITLE}', expected '<title>Cupcake Vanilla</title>'"
+              exit 1
+          fi
+          echo "=== CUPCAKE: frontend titles verified ==="
 
           WEBGUI_COMMIT=$(git -C /tmp/webgui rev-parse --short HEAD 2>/dev/null || echo "unknown")
           VANILLA_NG_COMMIT=$(git -C /tmp/vanilla-ng rev-parse --short HEAD 2>/dev/null || echo "unknown")
