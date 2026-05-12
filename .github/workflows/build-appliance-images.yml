@@ -531,11 +531,41 @@ jobs:
           cd /tmp/whisper-build/models
           bash download-ggml-model.sh base
           cp ggml-base.bin "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models/"
-          gunzip -c "${GITHUB_WORKSPACE}/cupcake-seed.sql.gz" > "${ROOTFS_DIR}/tmp/cupcake-seed.sql"
+          echo "=== CUPCAKE: decompressing seed database ==="
+          df -h "${ROOTFS_DIR}"
+          gunzip -c "${GITHUB_WORKSPACE}/cupcake-seed.sql.gz" > "${ROOTFS_DIR}/opt/cupcake/cupcake-seed.sql"
+          SEED_BYTES=$(wc -c < "${ROOTFS_DIR}/opt/cupcake/cupcake-seed.sql")
+          echo "Seed decompressed: ${SEED_BYTES} bytes at ${ROOTFS_DIR}/opt/cupcake/cupcake-seed.sql"
+          test "$SEED_BYTES" -gt 1000 || { echo "ERROR: seed file too small (${SEED_BYTES} bytes) — disk full?"; exit 1; }
+          df -h "${ROOTFS_DIR}"
+          echo "=== CUPCAKE: 00-run.sh complete ==="
           EOF
 
           cat > pi-gen/stage2a/00-install-cupcake/01-run-chroot.sh << 'EOF'
           #!/bin/bash -e
+
+          echo "=== CUPCAKE: pre-flight checks ==="
+          df -h /
+          SEED=/opt/cupcake/cupcake-seed.sql
+          if [ ! -f "$SEED" ]; then
+              echo "FATAL: $SEED not found — 00-run.sh failed to decompress seed"
+              exit 1
+          fi
+          SEED_BYTES=$(wc -c < "$SEED")
+          if [ "$SEED_BYTES" -lt 1000 ]; then
+              echo "FATAL: $SEED is only ${SEED_BYTES} bytes — decompression failed or disk was full"
+              exit 1
+          fi
+          echo "seed OK: ${SEED_BYTES} bytes"
+          if [ ! -d /opt/cupcake/backend ]; then
+              echo "FATAL: /opt/cupcake/backend not found — git clone failed in 00-run.sh"
+              exit 1
+          fi
+          if [ ! -f /opt/cupcake/whisper.cpp/build/bin/whisper-cli ]; then
+              echo "FATAL: whisper-cli binary not found — cross-compilation failed in 00-run.sh"
+              exit 1
+          fi
+          echo "=== CUPCAKE: pre-flight passed — starting install ==="
 
           echo "=== CUPCAKE: installing packages ==="
           apt-get update
@@ -773,8 +803,8 @@ jobs:
           su - postgres -c "psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='cupcake_vanilla_db';\""
           su - postgres -c "psql -c \"DROP DATABASE IF EXISTS cupcake_vanilla_db;\""
           su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\""
-          su - postgres -c "psql cupcake_vanilla_db" < /tmp/cupcake-seed.sql
-          rm -f /tmp/cupcake-seed.sql
+          su - postgres -c "psql cupcake_vanilla_db < /opt/cupcake/cupcake-seed.sql"
+          rm -f /opt/cupcake/cupcake-seed.sql
 
           echo "=== CUPCAKE: verifying admin user ==="
           ADMIN_COUNT=$(su - postgres -c "psql -t -c \"SELECT COUNT(*) FROM auth_user WHERE username='admin' AND is_superuser=true;\" cupcake_vanilla_db" 2>/dev/null | tr -d ' \n' || echo "")
