@@ -78,11 +78,6 @@ server {
         expires 7d;
     }
 
-    location /media/ {
-        alias /opt/cupcake/backend/media/;
-        expires 7d;
-    }
-
     location /internal/media/ {
         internal;
         alias /opt/cupcake/backend/media/;
@@ -141,11 +136,6 @@ server {
 
     location /static/ {
         alias /opt/cupcake/backend/staticfiles/;
-        expires 7d;
-    }
-
-    location /media/ {
-        alias /opt/cupcake/backend/media/;
         expires 7d;
     }
 

@@ -51,6 +51,12 @@ async function testFrontend(name, url, postLoginCheck) {
 
     if (jsErrors.length > 0)
       console.warn(`WARN: ${jsErrors.length} JS error(s): ${jsErrors[0]}`);
+
+    const staticFailures = failedRequests.filter(r =>
+      /\.(woff2?|ttf|eot|otf|css|js)(\?|$)/.test(r)
+    );
+    if (staticFailures.length > 0)
+      throw new Error(`Static asset failures (font/css/js): ${staticFailures.join(', ')}`);
     if (failedRequests.length > 0)
       console.warn(`WARN: failed requests: ${failedRequests.join(', ')}`);
 
