@@ -306,23 +306,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/08-cleanup.sh && sudo env /tmp/08-cleanup.sh"
 
-      - name: Start services for smoke test
-        run: |
-          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "sudo systemctl start postgresql redis-server nginx cupcake-backend"
-          for i in $(seq 1 20); do
-            code=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null) || true
-            if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
-              echo "Backend ready after ${i}x3s"
-              break
-            fi
-            sleep 3
-          done
-          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "sudo systemctl start cupcake-rqworker cupcake-transcribe-worker"
-
-      - name: Configure appliance bridge NIC
+      - name: Configure appliance bridge NIC and start services
         run: |
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost << 'ENDSSH'
           BRIDGE_NIC=$(ip -o link show | awk -F': ' '!/LOOPBACK/{print $2}' | while read iface; do
@@ -335,10 +319,25 @@ jobs:
           echo "Bridge NIC: $BRIDGE_NIC"
           sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
           sudo ip link set "$BRIDGE_NIC" up
+          sudo systemctl start avahi-daemon
+          sudo systemctl start cupcake-mdns-alias
+          sudo systemctl start postgresql redis-server nginx cupcake-backend
           ENDSSH
 
+          for i in $(seq 1 20); do
+            code=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null) || true
+            if echo "$code" | grep -qE "^[234][0-9][0-9]$"; then
+              echo "Backend ready after ${i}x3s"
+              break
+            fi
+            sleep 3
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "sudo systemctl start cupcake-rqworker cupcake-transcribe-worker"
+
           for i in $(seq 1 15); do
-            if avahi-resolve --name cupcake.local 2>/dev/null; then
+            if avahi-resolve --name vanilla.local 2>/dev/null; then
               echo "mDNS ready after ${i}x2s"
               break
             fi
