@@ -15,7 +15,7 @@
               [class.btn-outline-primary]="selectedFilter() !== 'all'"
               (click)="setFilter('all')">
               All
-              <span class="badge ms-1" [class.bg-white]="selectedFilter() === 'all'" [class.text-primary]="selectedFilter() === 'all'" [class.bg-primary]="selectedFilter() !== 'all'">
+              <span class="badge ms-1" [class.badge-on-primary]="selectedFilter() === 'all'" [class.bg-primary]="selectedFilter() !== 'all'">
                 {{ allTasks().length }}
               </span>
             </button>
@@ -27,7 +27,7 @@
               (click)="setFilter('active')">
               <i class="bi bi-hourglass-split me-1"></i>
               Active
-              <span class="badge ms-1" [class.bg-white]="selectedFilter() === 'active'" [class.text-primary]="selectedFilter() === 'active'" [class.bg-primary]="selectedFilter() !== 'active'">
+              <span class="badge ms-1" [class.badge-on-primary]="selectedFilter() === 'active'" [class.bg-primary]="selectedFilter() !== 'active'">
                 {{ filteredTasks().length }}
               </span>
             </button>

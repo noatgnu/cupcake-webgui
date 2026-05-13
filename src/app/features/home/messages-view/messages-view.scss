@@ -101,7 +101,7 @@
     .threads-sidebar {
       width: 100%;
       position: absolute;
-      background: white;
+      background: var(--cupcake-bg);
       z-index: 10;
 
       &.has-selection {

@@ -319,8 +319,9 @@ jobs:
           echo "Bridge NIC: $BRIDGE_NIC"
           sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
           sudo ip link set "$BRIDGE_NIC" up
+          BRIDGE_IP=$(ip -4 addr show "$BRIDGE_NIC" | grep -oP '(?<=inet )\d+(\.\d+){3}')
+          echo "$BRIDGE_IP vanilla.local" | sudo tee /etc/avahi/hosts > /dev/null
           sudo systemctl start avahi-daemon
-          sudo systemctl start cupcake-mdns-alias
           sudo systemctl start postgresql redis-server nginx cupcake-backend
           ENDSSH
 
@@ -1124,37 +1125,29 @@ jobs:
           </service-group>
           AVHEOF
 
-          cat > /usr/local/bin/cupcake-mdns-alias.sh << 'MDNSEOF'
+          cat > /usr/local/bin/cupcake-mdns-hosts << 'MDNSEOF'
           #!/bin/bash
-          until avahi-daemon --check 2>/dev/null; do
-              sleep 2
-          done
-          IP=""
-          while [ -z "$IP" ]; do
-              IP=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
-              [ -z "$IP" ] && sleep 2
-          done
-          exec /usr/bin/avahi-publish -a --no-fail vanilla.local "$IP"
+          IP=$(ip -4 addr show scope global | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
+          [ -n "$IP" ] && echo "$IP vanilla.local" > /etc/avahi/hosts
           MDNSEOF
-          chmod +x /usr/local/bin/cupcake-mdns-alias.sh
+          chmod +x /usr/local/bin/cupcake-mdns-hosts
 
-          cat > /etc/systemd/system/cupcake-mdns-alias.service << 'UNITEOF'
+          cat > /etc/systemd/system/cupcake-mdns-hosts.service << 'UNITEOF'
           [Unit]
-          Description=Publish vanilla.local mDNS A record
-          After=avahi-daemon.service network-online.target
-          Requires=avahi-daemon.service
-          BindsTo=avahi-daemon.service
+          Description=Write vanilla.local into avahi hosts file
+          After=network-online.target
+          Before=avahi-daemon.service
+          Wants=network-online.target
 
           [Service]
-          Type=simple
-          ExecStart=/usr/local/bin/cupcake-mdns-alias.sh
-          Restart=always
-          RestartSec=5
+          Type=oneshot
+          ExecStart=/usr/local/bin/cupcake-mdns-hosts
+          RemainAfterExit=yes
 
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=network-online.target
           UNITEOF
-          systemctl --root=/ enable cupcake-mdns-alias.service
+          systemctl --root=/ enable cupcake-mdns-hosts.service
 
           chown -R cupcake-svc:cupcake-svc /opt/cupcake /var/log/cupcake
           chown root:cupcake-svc /opt/cupcake/.env

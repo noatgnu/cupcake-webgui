@@ -4,9 +4,9 @@
 
   canvas {
     display: block;
-    border: 1px solid #ddd;
+    border: 1px solid var(--cupcake-border);
     border-radius: 4px;
-    background-color: #f5f5f5;
+    background-color: var(--cupcake-bg-secondary);
   }
 
   .status-indicator {
@@ -15,7 +15,7 @@
     right: 8px;
     display: flex;
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: var(--cupcake-loading-overlay);
     padding: 4px 8px;
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

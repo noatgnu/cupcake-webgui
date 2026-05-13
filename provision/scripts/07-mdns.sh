@@ -16,39 +16,28 @@ EOF
 
 sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
-cat > /usr/local/bin/cupcake-mdns-alias << 'SCRIPT'
+cat > /usr/local/bin/cupcake-mdns-hosts << 'SCRIPT'
 #!/bin/bash
-until avahi-daemon --check 2>/dev/null; do
-    sleep 2
-done
-
-IP=""
-while [ -z "$IP" ]; do
-    IP=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
-    [ -z "$IP" ] && sleep 2
-done
-
-exec /usr/bin/avahi-publish -a --no-fail vanilla.local "$IP"
+IP=$(ip -4 addr show scope global | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
+[ -n "$IP" ] && echo "$IP vanilla.local" > /etc/avahi/hosts
 SCRIPT
-chmod +x /usr/local/bin/cupcake-mdns-alias
+chmod +x /usr/local/bin/cupcake-mdns-hosts
 
-cat > /etc/systemd/system/cupcake-mdns-alias.service << 'UNIT'
+cat > /etc/systemd/system/cupcake-mdns-hosts.service << 'UNIT'
 [Unit]
-Description=Publish vanilla.local mDNS A record
-After=avahi-daemon.service network-online.target
-Requires=avahi-daemon.service
-BindsTo=avahi-daemon.service
+Description=Write vanilla.local into avahi hosts file
+After=network-online.target
+Before=avahi-daemon.service
+Wants=network-online.target
 
 [Service]
-Type=simple
-ExecStart=/usr/local/bin/cupcake-mdns-alias
-Restart=always
-RestartSec=5
+Type=oneshot
+ExecStart=/usr/local/bin/cupcake-mdns-hosts
+RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=network-online.target
 UNIT
 
 systemctl enable avahi-daemon
-systemctl enable cupcake-mdns-alias.service
-systemctl restart avahi-daemon
+systemctl enable cupcake-mdns-hosts.service
