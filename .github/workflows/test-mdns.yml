@@ -1,0 +1,111 @@
+name: Test mDNS Resolution
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'provision/scripts/01-base.sh'
+      - 'provision/scripts/07-mdns.sh'
+      - '.github/workflows/test-mdns.yml'
+
+jobs:
+  test-mdns:
+    name: Test mDNS (Runner <-> VM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client \
+            iproute2 avahi-daemon avahi-utils libnss-mdns
+
+      - name: Setup test bridge network
+        run: |
+          sudo ip link add br0 type bridge stp_state 0 forward_delay 0
+          sudo ip link set br0 up
+          sudo ip addr add 10.0.5.1/24 dev br0
+          sudo ip tuntap add dev cupcake-tap mode tap
+          sudo ip link set cupcake-tap master br0
+          sudo ip link set cupcake-tap up
+          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0,lo/' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
+          sudo sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
+
+      - name: Generate SSH key
+        run: |
+          ssh-keygen -t ed25519 -f cupckey -N '' -q
+          echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
+
+      - name: Download minimal cloud image
+        run: |
+          wget -q "https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img" -O vm.img
+          qemu-img resize vm.img 5G
+
+      - name: Create cloud-init seed
+        run: |
+          cat > user-data <<EOF
+          #cloud-config
+          user: cupcake
+          password: cupcake
+          chpasswd: { expire: False }
+          sudo: ALL=(ALL) NOPASSWD:ALL
+          ssh_authorized_keys:
+            - ${{ env.SSH_PUBKEY }}
+          EOF
+          cloud-localds seed.iso user-data
+
+      - name: Boot VM
+        run: |
+          qemu-system-x86_64 \
+            -m 1024 -smp 1 \
+            -drive file=vm.img,format=qcow2,if=virtio \
+            -drive file=seed.iso,format=raw,if=virtio \
+            -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            -netdev tap,id=net1,ifname=cupcake-tap,script=no,downscript=no \
+            -device virtio-net-pci,netdev=net1 \
+            -machine type=pc,accel=kvm -cpu host \
+            -display none -daemonize
+
+          for i in $(seq 1 60); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -i cupckey -p 2222 cupcake@localhost 'echo OK' 2>/dev/null; then
+              echo "SSH ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Apply mDNS Provisioning
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/01-base.sh cupcake@localhost:/tmp/
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/07-mdns.sh cupcake@localhost:/tmp/
+          
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "sudo bash /tmp/01-base.sh && sudo bash /tmp/07-mdns.sh"
+
+      - name: Configure Bridge NIC in VM
+        run: |
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost << 'ENDSSH'
+          NIC=$(ip -o link show | awk -F': ' '!/LOOPBACK/{print $2}' | while read iface; do
+            [ "$iface" = lo ] && continue
+            ip -4 addr show "$iface" 2>/dev/null | grep -q "inet " || echo "$iface"
+          done | head -1)
+          sudo ip addr add 10.0.5.10/24 dev "$NIC"
+          sudo ip link set "$NIC" up
+          ENDSSH
+
+      - name: Verify Resolution from Runner
+        run: |
+          echo "Waiting for mDNS broadcast..."
+          for i in $(seq 1 15); do
+            if avahi-resolve --name vanilla.local 2>/dev/null; then
+              echo "PASS: vanilla.local resolved from runner"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: vanilla.local did not resolve"
+          exit 1
