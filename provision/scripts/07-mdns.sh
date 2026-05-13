@@ -14,25 +14,32 @@ cat > /etc/avahi/services/cupcake.service << 'EOF'
 </service-group>
 EOF
 
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/mdns.conf << 'EOF'
+[Resolve]
+MulticastDNS=yes
+EOF
+
 sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
-cat > /usr/local/bin/cupcake-mdns-hosts << 'SCRIPT'
+cat > /usr/local/bin/cupcake-vanilla-hosts << 'SCRIPT'
 #!/bin/bash
 IP=$(ip -4 addr show scope global | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
-[ -n "$IP" ] && echo "$IP vanilla.local" > /etc/avahi/hosts
+[ -n "$IP" ] || exit 0
+sed -i '/\bvanilla\b/d' /etc/hosts
+printf '%s\tvanilla\tvanilla.local\n' "$IP" >> /etc/hosts
 SCRIPT
-chmod +x /usr/local/bin/cupcake-mdns-hosts
+chmod +x /usr/local/bin/cupcake-vanilla-hosts
 
-cat > /etc/systemd/system/cupcake-mdns-hosts.service << 'UNIT'
+cat > /etc/systemd/system/cupcake-vanilla-hosts.service << 'UNIT'
 [Unit]
-Description=Write vanilla.local into avahi hosts file
+Description=Register vanilla.local in /etc/hosts for mDNS
 After=network-online.target
-Before=avahi-daemon.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/cupcake-mdns-hosts
+ExecStart=/usr/local/bin/cupcake-vanilla-hosts
 RemainAfterExit=yes
 
 [Install]
@@ -40,4 +47,4 @@ WantedBy=network-online.target
 UNIT
 
 systemctl enable avahi-daemon
-systemctl enable cupcake-mdns-hosts.service
+systemctl enable cupcake-vanilla-hosts.service
