@@ -187,10 +187,23 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client
+          sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils genisoimage wget openssh-client \
+            iproute2 avahi-daemon avahi-utils libnss-mdns
 
       - name: Fix /dev/kvm permissions
         run: sudo chmod 666 /dev/kvm 2>/dev/null || true
+
+      - name: Setup test bridge network
+        run: |
+          sudo ip link add br0 type bridge stp_state 0 forward_delay 0
+          sudo ip link set br0 up
+          sudo ip addr add 10.0.5.1/24 dev br0
+          sudo ip tuntap add dev cupcake-tap mode tap
+          sudo ip link set cupcake-tap master br0
+          sudo ip link set cupcake-tap up
+          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0/' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
+          sudo sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
 
       - name: Generate SSH key
         run: |
@@ -217,6 +230,8 @@ jobs:
             -drive file=seed.iso,format=raw,if=virtio \
             -netdev user,id=net0,hostfwd=tcp::2222-:22,hostfwd=tcp::8080-:80,hostfwd=tcp::8443-:443 \
             -device virtio-net-pci,netdev=net0 \
+            -netdev tap,id=net1,ifname=cupcake-tap,script=no,downscript=no \
+            -device virtio-net-pci,netdev=net1 \
             -machine type=pc,accel=kvm -cpu host \
             -display none -serial file:serial.log &
           QEMU_PID=$!
@@ -307,6 +322,18 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "sudo systemctl start cupcake-rqworker cupcake-transcribe-worker"
 
+      - name: Configure appliance bridge NIC
+        run: |
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "sudo ip addr add 10.0.5.10/24 dev eth1 && sudo ip link set eth1 up"
+          for i in $(seq 1 15); do
+            if avahi-resolve --name cupcake.local 2>/dev/null; then
+              echo "mDNS ready after ${i}x2s"
+              break
+            fi
+            sleep 2
+          done
+
       - name: Smoke test
         timeout-minutes: 10
         run: |
@@ -318,14 +345,12 @@ jobs:
       - name: UI smoke test
         timeout-minutes: 15
         run: |
-          echo "127.0.0.1 cupcake.local vanilla.local" | sudo tee -a /etc/hosts
-
-          sudo apt-get install -y socat
-          sudo socat TCP-LISTEN:443,fork,reuseaddr TCP:127.0.0.1:8443 &
-          sudo socat TCP-LISTEN:80,fork,reuseaddr TCP:127.0.0.1:8080 &
-          sleep 1
-
           fail() { echo "FAIL: $*"; exit 1; }
+
+          avahi-resolve --name cupcake.local \
+            || fail "cupcake.local did not resolve via mDNS"
+          avahi-resolve --name vanilla.local \
+            || fail "vanilla.local did not resolve via mDNS"
 
           CUPCAKE=$(curl -sfk https://cupcake.local/) \
             || fail "cupcake.local did not return 200"
@@ -333,15 +358,15 @@ jobs:
             || fail "vanilla.local did not return 200"
 
           echo "$CUPCAKE" | grep -q "<title>Cupcake</title>" \
-            || fail "cupcake.local does not have expected title 'Cupcake' — wrong frontend deployed"
+            || fail "cupcake.local wrong title — wrong frontend deployed"
           echo "$VANILLA" | grep -q "<title>Cupcake Vanilla</title>" \
-            || fail "vanilla.local does not have expected title 'Cupcake Vanilla' — wrong frontend deployed"
+            || fail "vanilla.local wrong title — wrong frontend deployed"
 
           API=$(curl -sk -o /dev/null -w "%{http_code}" https://cupcake.local/api/v1/)
           echo "$API" | grep -qE "^[234]" \
             || fail "API at cupcake.local returned unexpected status $API"
 
-          echo "PASS: cupcake.local serves 'Cupcake', vanilla.local serves 'Cupcake Vanilla', API reachable"
+          echo "PASS: mDNS resolved, cupcake.local and vanilla.local serve correct frontends"
 
           mkdir -p /tmp/ui-test && cd /tmp/ui-test
           npm init -y --quiet
@@ -1089,23 +1114,82 @@ jobs:
           </service-group>
           AVHEOF
 
-          cat > /etc/avahi/services/vanilla.service << 'AVHEOF'
-          <?xml version="1.0" standalone='no'?>
-          <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-          <service-group>
-            <name>Cupcake Vanilla Interface</name>
-            <host-name>vanilla.local</host-name>
-            <service>
-              <type>_http._tcp</type>
-              <port>80</port>
-              <txt-record>path=/</txt-record>
-            </service>
-          </service-group>
-          AVHEOF
+          cat > /usr/local/bin/cupcake-mdns-alias.sh << 'MDNSEOF'
+          #!/bin/bash
+          until avahi-daemon --check 2>/dev/null; do
+              sleep 2
+          done
+          IP=""
+          while [ -z "$IP" ]; do
+              IP=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
+              [ -z "$IP" ] && sleep 2
+          done
+          exec /usr/bin/avahi-publish -a --no-fail vanilla.local "$IP"
+          MDNSEOF
+          chmod +x /usr/local/bin/cupcake-mdns-alias.sh
+
+          cat > /etc/systemd/system/cupcake-mdns-alias.service << 'UNITEOF'
+          [Unit]
+          Description=Publish vanilla.local mDNS A record
+          After=avahi-daemon.service network-online.target
+          Requires=avahi-daemon.service
+          BindsTo=avahi-daemon.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/cupcake-mdns-alias.sh
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          UNITEOF
+          systemctl --root=/ enable cupcake-mdns-alias.service
 
           chown -R cupcake-svc:cupcake-svc /opt/cupcake /var/log/cupcake
           chown root:cupcake-svc /opt/cupcake/.env
           chmod 640 /opt/cupcake/.env
+
+          echo "=== CUPCAKE: SD card write optimizations ==="
+
+          # noatime: skip access-time update on every file read
+          sed -i '/ext4/s/defaults/defaults,noatime/' /etc/fstab
+
+          # /tmp on tmpfs — scratch writes go to RAM
+          printf 'tmpfs\t/tmp\ttmpfs\tdefaults,noatime,nosuid,size=128m\t0 0\n' >> /etc/fstab
+
+          # journald: store in RAM only (biggest continuous writer on an appliance)
+          mkdir -p /etc/systemd/journald.conf.d
+          cat > /etc/systemd/journald.conf.d/cupcake.conf << 'JEOF'
+          [Journal]
+          Storage=volatile
+          RuntimeMaxUse=64M
+          JEOF
+
+          # Redis: disable on-disk persistence — it is a job queue, not a database;
+          # in-flight jobs lost on crash are re-queued by the backend on restart
+          cat >> /etc/redis/redis.conf << 'REOF'
+
+          save ""
+          appendonly no
+          REOF
+
+          # PostgreSQL: reduce write amplification
+          # synchronous_commit=off — commits acknowledged before fsync (last few
+          # transactions may be lost on crash, schema integrity is preserved)
+          PG_CONF=$(find /etc/postgresql -name "postgresql.conf" 2>/dev/null | head -1)
+          if [ -n "$PG_CONF" ]; then
+              cat >> "$PG_CONF" << 'PGEOF'
+
+          synchronous_commit = off
+          checkpoint_completion_target = 0.9
+          max_wal_size = 256MB
+          wal_buffers = 16MB
+          PGEOF
+          fi
+
+          # nginx: disable access logging — error log is kept for debugging
+          sed -i 's|access_log /var/log/nginx/access.log;|access_log off;|' /etc/nginx/nginx.conf
 
           echo "=== CUPCAKE: stopping services ==="
           service postgresql stop || \
@@ -1202,9 +1286,6 @@ jobs:
           sudo chroot "${ROOTFS}" nginx \
             || fail "nginx failed to start"
 
-          # ── /etc/hosts so the runner resolves the names ──
-          echo "127.0.0.1 cupcake.local vanilla.local" | sudo tee -a /etc/hosts
-
           # ── Wait for Django (ARM64/QEMU: allow up to 10 min) ──
           echo "=== Waiting for Django backend (QEMU ARM64, up to 10 min) ==="
           for i in $(seq 1 120); do
@@ -1218,16 +1299,25 @@ jobs:
             sleep 5
           done
 
-          # ── Playwright UI test — runner is the external client ──
-          # (services bind to host-network ports; runner connects from outside chroot)
+          CUPCAKE=$(curl -sfk --resolve "cupcake.local:443:127.0.0.1" https://cupcake.local/) \
+            || fail "cupcake.local vhost did not return 200"
+          VANILLA=$(curl -sfk --resolve "vanilla.local:443:127.0.0.1" https://vanilla.local/) \
+            || fail "vanilla.local vhost did not return 200"
+          echo "$CUPCAKE" | grep -q "<title>Cupcake</title>" \
+            || fail "cupcake.local wrong title"
+          echo "$VANILLA" | grep -q "<title>Cupcake Vanilla</title>" \
+            || fail "vanilla.local wrong title"
+          echo "PASS: nginx vhost routing correct for both frontends"
+
           mkdir -p /tmp/rpi-ui-test && cd /tmp/rpi-ui-test
           npm init -y --quiet
           npm install --quiet playwright
           npx playwright install chromium --with-deps
           cp "$GITHUB_WORKSPACE/.github/scripts/ui-test.js" .
 
-          # Use longer timeouts for QEMU-emulated ARM64 backend
-          UI_TIMEOUT=90000 LOGIN_TIMEOUT=300000 node ui-test.js
+          UI_TIMEOUT=90000 LOGIN_TIMEOUT=300000 \
+            HOST_RESOLVER_RULES="MAP cupcake.local 127.0.0.1, MAP vanilla.local 127.0.0.1" \
+            node ui-test.js
 
       - name: Upload RPi UI test screenshots
         if: failure()

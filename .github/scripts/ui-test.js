@@ -4,11 +4,15 @@ const { chromium } = require('playwright');
 
 const TIMEOUT = parseInt(process.env.UI_TIMEOUT || '30000');
 const LOGIN_TIMEOUT = parseInt(process.env.LOGIN_TIMEOUT || '60000');
+const HOST_RESOLVER_RULES = process.env.HOST_RESOLVER_RULES || '';
 let passed = 0;
 let failed = 0;
 
 async function testFrontend(name, url, postLoginCheck) {
-  const browser = await chromium.launch({ headless: true });
+  const args = HOST_RESOLVER_RULES
+    ? [`--host-resolver-rules=${HOST_RESOLVER_RULES}`]
+    : ['--system-dns-resolver'];
+  const browser = await chromium.launch({ headless: true, args });
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
   const jsErrors = [];
