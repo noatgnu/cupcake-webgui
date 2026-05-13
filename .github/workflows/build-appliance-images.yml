@@ -324,8 +324,19 @@ jobs:
 
       - name: Configure appliance bridge NIC
         run: |
-          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "sudo ip addr add 10.0.5.10/24 dev eth1 && sudo ip link set eth1 up"
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost << 'ENDSSH'
+          BRIDGE_NIC=$(ip -o link show | awk -F': ' '!/LOOPBACK/{print $2}' | while read iface; do
+            [ "$iface" = lo ] && continue
+            ip -4 addr show "$iface" 2>/dev/null | grep -q "inet " || echo "$iface"
+          done | head -1)
+          if [ -z "$BRIDGE_NIC" ]; then
+            echo "ERROR: no unconfigured NIC found"; ip link show; exit 1
+          fi
+          echo "Bridge NIC: $BRIDGE_NIC"
+          sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
+          sudo ip link set "$BRIDGE_NIC" up
+          ENDSSH
+
           for i in $(seq 1 15); do
             if avahi-resolve --name cupcake.local 2>/dev/null; then
               echo "mDNS ready after ${i}x2s"
