@@ -56,8 +56,18 @@ jobs:
           EOF
           cloud-localds seed.iso user-data
 
+      - name: Fix /dev/kvm permissions
+        run: sudo chmod 666 /dev/kvm 2>/dev/null || true
+
       - name: Boot VM
         run: |
+          # Try to boot with KVM, fallback to TCG if needed
+          KVM_OPTS="-machine type=pc,accel=kvm -cpu host"
+          if ! [ -w /dev/kvm ]; then
+            echo "KVM not available, using TCG"
+            KVM_OPTS="-machine type=pc,accel=tcg -cpu max"
+          fi
+
           qemu-system-x86_64 \
             -m 1024 -smp 1 \
             -drive file=vm.img,format=qcow2,if=virtio \
@@ -66,7 +76,7 @@ jobs:
             -device virtio-net-pci,netdev=net0 \
             -netdev tap,id=net1,ifname=cupcake-tap,script=no,downscript=no \
             -device virtio-net-pci,netdev=net1 \
-            -machine type=pc,accel=kvm -cpu host \
+            $KVM_OPTS \
             -display none -daemonize
 
           for i in $(seq 1 60); do
