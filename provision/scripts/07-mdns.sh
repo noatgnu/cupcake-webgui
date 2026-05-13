@@ -24,15 +24,15 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-hosts << 'SCRIPT'
 #!/bin/bash
-sleep 5
-IP=$(ip -4 addr show scope global | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
-if [ -z "$IP" ]; then
-    echo "Error: No IP address found" >&2
-    exit 1
-fi
+while :; do
+    IP=$(hostname -I | awk '{print $1}')
+    if [ -n "$IP" ]; then
+        break
+    fi
+    sleep 2
+done
 sed -i '/\bvanilla\b/d' /etc/hosts
-printf '%s\tvanilla\tvanilla.local\n' "$IP" >> /etc/hosts
-echo "Registering vanilla.local at $IP"
+printf '%s\tvanilla\n' "$IP" >> /etc/hosts
 exec /usr/bin/avahi-publish-address vanilla.local "$IP"
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-hosts
@@ -47,11 +47,14 @@ Wants=network-online.target avahi-daemon.service
 Type=simple
 ExecStart=/usr/local/bin/cupcake-vanilla-hosts
 Restart=always
-RestartSec=10
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
+systemctl daemon-reload
 systemctl enable avahi-daemon
 systemctl enable cupcake-vanilla-hosts.service
+systemctl start avahi-daemon || true
+systemctl start cupcake-vanilla-hosts.service || true
