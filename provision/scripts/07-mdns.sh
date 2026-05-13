@@ -22,22 +22,21 @@ EOF
 
 sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
-cat > /usr/local/bin/cupcake-vanilla-hosts << 'SCRIPT'
+cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
 while :; do
     IP=$(hostname -I | awk '{print $1}')
-    if [ -n "$IP" ]; then
-        break
+    if [[ -n "$IP" && "$IP" != "127."* ]]; then
+        sed -i '/\bvanilla\b/d' /etc/hosts
+        echo "$IP vanilla.local vanilla" >> /etc/hosts
+        /usr/bin/avahi-publish-address vanilla.local "$IP"
     fi
-    sleep 2
+    sleep 5
 done
-sed -i '/\bvanilla\b/d' /etc/hosts
-printf '%s\tvanilla\n' "$IP" >> /etc/hosts
-exec /usr/bin/avahi-publish-address vanilla.local "$IP"
 SCRIPT
-chmod +x /usr/local/bin/cupcake-vanilla-hosts
+chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
-cat > /etc/systemd/system/cupcake-vanilla-hosts.service << 'UNIT'
+cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 [Unit]
 Description=Advertise vanilla.local via mDNS
 After=network-online.target avahi-daemon.service
@@ -45,7 +44,7 @@ Wants=network-online.target avahi-daemon.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/cupcake-vanilla-hosts
+ExecStart=/usr/local/bin/cupcake-vanilla-mdns
 Restart=always
 RestartSec=5
 
@@ -55,6 +54,13 @@ UNIT
 
 systemctl daemon-reload
 systemctl enable avahi-daemon
-systemctl enable cupcake-vanilla-hosts.service
-systemctl start avahi-daemon || true
-systemctl start cupcake-vanilla-hosts.service || true
+systemctl enable cupcake-vanilla-mdns.service
+systemctl restart avahi-daemon
+systemctl start cupcake-vanilla-mdns.service || true
+
+for i in {1..30}; do
+    if getent hosts vanilla.local | grep -v '127.0.0.1' >/dev/null; then
+        break
+    fi
+    sleep 1
+done

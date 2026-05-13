@@ -50,5 +50,5 @@ ufw allow 5353/udp
 ufw --force enable
 
 hostnamectl set-hostname cupcake
-echo "127.0.1.1 cupcake" > /etc/hosts
-echo "127.0.0.1 localhost" >> /etc/hosts
+echo "127.0.0.1 localhost" > /etc/hosts
+echo "127.0.1.1 cupcake.local cupcake" >> /etc/hosts

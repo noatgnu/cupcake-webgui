@@ -319,11 +319,6 @@ jobs:
           echo "Bridge NIC: $BRIDGE_NIC"
           sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
           sudo ip link set "$BRIDGE_NIC" up
-          BRIDGE_IP=$(ip -4 addr show "$BRIDGE_NIC" | grep -oP '(?<=inet )\d+(\.\d+){3}')
-          sed -i '/\bvanilla\b/d' /etc/hosts
-          printf '%s\tvanilla\tvanilla.local\n' "$BRIDGE_IP" | sudo tee -a /etc/hosts > /dev/null
-          sudo systemctl restart systemd-resolved
-          sudo systemctl start avahi-daemon
           sudo systemctl start postgresql redis-server nginx cupcake-backend
           ENDSSH
 

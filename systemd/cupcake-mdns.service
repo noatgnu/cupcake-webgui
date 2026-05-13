@@ -8,12 +8,6 @@ Type=simple
 ExecStart=/bin/bash -c "\
     /usr/bin/avahi-publish-service 'Cupcake' _http._tcp 80 'path=/' & \
     /usr/bin/avahi-publish-service 'Cupcake Vanilla' _http._tcp 80 'path=/' & \
-    while :; do \
-        IP=$$(hostname -I | awk '{print $$1}'); \
-        [ -n \"$$IP\" ] && break; \
-        sleep 2; \
-    done; \
-    /usr/bin/avahi-publish-address vanilla.local \"$$IP\" & \
     wait"
 Restart=always
 RestartSec=5
