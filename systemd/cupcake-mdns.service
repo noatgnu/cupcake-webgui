@@ -1,20 +1,18 @@
 [Unit]
 Description=Cupcake mDNS Advertisement
-After=network.target nginx.service
-Wants=network.target
+After=network.target nginx.service avahi-daemon.service
+Wants=network.target avahi-daemon.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/avahi-publish-service \
-    "Cupcake" _http._tcp 80 \
-    "WebGUI for metadata management" \
-    "path=/" \
-    "sub=cupcake"
-ExecStart=/usr/bin/avahi-publish-service \
-    "Cupcake Vanilla" _http._tcp 80 \
-    "Vanilla NG interface" \
-    "sub=vanilla"
+Type=simple
+ExecStart=/bin/bash -c "\
+    /usr/bin/avahi-publish-service 'Cupcake' _http._tcp 80 'WebGUI for metadata management' 'path=/' 'sub=cupcake' & \
+    /usr/bin/avahi-publish-service 'Cupcake Vanilla' _http._tcp 80 'Vanilla NG interface' 'path=/' 'sub=vanilla' & \
+    IP=$$(ip -4 addr show scope global | grep -oP '(?<=inet )\\d+(\\.\\d+){3}' | head -1); \
+    [ -n \"$$IP\" ] && /usr/bin/avahi-publish-address -R vanilla.local \"$$IP\" & \
+    wait"
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
