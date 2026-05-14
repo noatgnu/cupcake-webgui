@@ -326,7 +326,7 @@ jobs:
           echo "Bridge NIC: $BRIDGE_NIC"
           sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
           sudo ip link set "$BRIDGE_NIC" up
-          sudo systemctl start cupcake-vanilla-mdns
+          sudo systemctl restart cupcake-vanilla-mdns
           sudo systemctl restart avahi-daemon
           sudo systemctl start postgresql redis-server nginx cupcake-backend
           ENDSSH
