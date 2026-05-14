@@ -24,13 +24,18 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
-IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
-[ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
-if [ -n "$IP" ]; then
-    sed -i '/\bvanilla\b/d' /etc/hosts
-    echo "$IP vanilla.local vanilla" >> /etc/hosts
-    exec /usr/bin/avahi-publish-address vanilla.local "$IP"
-fi
+while :; do
+    IP=$(ip route get 10.0.5.1 2>/dev/null | grep -oP 'src \K\S+')
+    [ -z "$IP" ] && IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
+    [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
+
+    if [ -n "$IP" ]; then
+        sed -i '/\bvanilla\b/d' /etc/hosts
+        echo "$IP vanilla.local vanilla" >> /etc/hosts
+        exec /usr/bin/avahi-publish-address vanilla.local "$IP"
+    fi
+    sleep 2
+done
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
