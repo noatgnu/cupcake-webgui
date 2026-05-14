@@ -29,7 +29,7 @@ IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.)' | grep -v '^$' |
 if [ -n "$IP" ]; then
     sed -i '/\bvanilla\b/d' /etc/hosts
     echo "$IP vanilla.local vanilla" >> /etc/hosts
-    echo "$IP vanilla.local" > /etc/avahi/hosts
+    echo "$IP vanilla" > /etc/avahi/hosts
 fi
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
