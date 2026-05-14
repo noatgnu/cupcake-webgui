@@ -24,13 +24,26 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
+LAST_IP=""
+PUB_PID=""
+
+cleanup() {
+    [ -n "$PUB_PID" ] && kill "$PUB_PID" 2>/dev/null
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
+
 while :; do
-    IP=$(hostname -I | tr ' ' '\n' | grep -v '10.0.2.15' | head -1)
+    IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
     [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
-    if [[ -n "$IP" && "$IP" != "127."* ]]; then
+    
+    if [[ -n "$IP" && "$IP" != "$LAST_IP" ]]; then
+        [ -n "$PUB_PID" ] && kill "$PUB_PID" 2>/dev/null
         sed -i '/\bvanilla\b/d' /etc/hosts
         echo "$IP vanilla.local vanilla" >> /etc/hosts
-        /usr/bin/avahi-publish-address vanilla.local "$IP"
+        /usr/bin/avahi-publish-address vanilla.local "$IP" &
+        PUB_PID=$!
+        LAST_IP="$IP"
     fi
     sleep 5
 done
@@ -39,7 +52,7 @@ chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
 cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 [Unit]
-Description=Advertise vanilla.local via mDNS
+Description=Reactive mDNS Advertisement for vanilla.local
 After=network-online.target avahi-daemon.service
 Wants=network-online.target avahi-daemon.service
 

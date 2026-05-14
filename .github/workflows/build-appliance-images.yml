@@ -201,7 +201,7 @@ jobs:
           sudo ip tuntap add dev cupcake-tap mode tap
           sudo ip link set cupcake-tap master br0
           sudo ip link set cupcake-tap up
-          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0/' /etc/avahi/avahi-daemon.conf
+          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0,eth0,lo/' /etc/avahi/avahi-daemon.conf
           sudo systemctl restart avahi-daemon
           sudo sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
 
