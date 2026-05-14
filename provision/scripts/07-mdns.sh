@@ -44,7 +44,6 @@ Before=avahi-daemon.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-ExecStartPost=/bin/systemctl try-restart avahi-daemon
 RemainAfterExit=yes
 
 [Install]
