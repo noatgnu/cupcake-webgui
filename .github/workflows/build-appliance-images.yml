@@ -201,6 +201,7 @@ jobs:
           sudo ip tuntap add dev cupcake-tap mode tap
           sudo ip link set cupcake-tap master br0
           sudo ip link set cupcake-tap up
+          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0,eth0,lo/' /etc/avahi/avahi-daemon.conf
           sudo systemctl restart avahi-daemon
           sudo sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
 
@@ -280,7 +281,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/05-frontend.sh && sudo env WEBGUI_REF='${WEBGUI_REF}' VANILLA_NG_REF='${VANILLA_NG_REF}' /tmp/05-frontend.sh"
 
-      - name: Provision nginx
+      - name: Provision nginx and mDNS
         timeout-minutes: 10
         run: |
           for s in 06-nginx 07-mdns; do
@@ -288,6 +289,13 @@ jobs:
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo env /tmp/${s}.sh"
           done
+
+      - name: mDNS Checkpoint 1 (Provisioning phase)
+        run: |
+          echo "Checking resolution from Runner (should fail or point to NAT IP)..."
+          avahi-resolve --name vanilla.local 2>/dev/null || echo "vanilla.local not yet resolvable from runner"
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "echo 'Internal VM Check:'; getent hosts vanilla.local"
 
       - name: Install services
         timeout-minutes: 10
@@ -318,11 +326,27 @@ jobs:
           echo "Bridge NIC: $BRIDGE_NIC"
           sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
           sudo ip link set "$BRIDGE_NIC" up
-          sudo systemctl restart cupcake-vanilla-mdns
+          sudo systemctl start cupcake-vanilla-mdns
           sudo systemctl restart avahi-daemon
           sudo systemctl start postgresql redis-server nginx cupcake-backend
           ENDSSH
 
+      - name: mDNS Checkpoint 2 (Bridge active)
+        run: |
+          echo "Waiting for mDNS broadcast on bridge..."
+          for i in $(seq 1 10); do
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$V_IP" ]; then
+              echo "vanilla.local resolved to $V_IP"
+              break
+            fi
+            sleep 2
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "echo 'Internal VM Resolution:'; getent hosts vanilla.local"
+
+      - name: Start workers
+        run: |
           for i in $(seq 1 20); do
             code=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/" 2>/dev/null) || true
@@ -334,14 +358,6 @@ jobs:
           done
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "sudo systemctl start cupcake-rqworker cupcake-transcribe-worker"
-
-          for i in $(seq 1 15); do
-            if avahi-resolve --name vanilla.local 2>/dev/null; then
-              echo "mDNS ready after ${i}x2s"
-              break
-            fi
-            sleep 2
-          done
 
       - name: Smoke test
         timeout-minutes: 10
@@ -1139,30 +1155,34 @@ jobs:
           MulticastDNS=yes
           RESOLVEDEOF
 
-          cat > /usr/local/bin/cupcake-vanilla-hosts << 'MDNSEOF'
+          cat > /usr/local/bin/cupcake-vanilla-mdns << 'MDNSEOF'
           #!/bin/bash
-          IP=$(ip -4 addr show scope global | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -1)
-          [ -n "$IP" ] || exit 0
-          sed -i '/\bvanilla\b/d' /etc/hosts
-          printf '%s\tvanilla\tvanilla.local\n' "$IP" >> /etc/hosts
+          IP=\$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
+          [ -z "\$IP" ] && IP=\$(hostname -I | awk '{print \$1}')
+          if [ -n "\$IP" ]; then
+              sed -i '/\bvanilla\b/d' /etc/hosts
+              echo "\$IP vanilla.local vanilla" >> /etc/hosts
+              mkdir -p /etc/avahi
+              echo "\$IP vanilla.local" > /etc/avahi/hosts
+          fi
           MDNSEOF
-          chmod +x /usr/local/bin/cupcake-vanilla-hosts
+          chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
-          cat > /etc/systemd/system/cupcake-vanilla-hosts.service << 'UNITEOF'
+          cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNITEOF'
           [Unit]
-          Description=Register vanilla.local in /etc/hosts for mDNS
+          Description=Register vanilla.local mDNS alias
           After=network-online.target
           Wants=network-online.target
 
           [Service]
           Type=oneshot
-          ExecStart=/usr/local/bin/cupcake-vanilla-hosts
+          ExecStart=/usr/local/bin/cupcake-vanilla-mdns
           RemainAfterExit=yes
 
           [Install]
-          WantedBy=network-online.target
+          WantedBy=multi-user.target
           UNITEOF
-          systemctl --root=/ enable cupcake-vanilla-hosts.service
+          systemctl --root=/ enable cupcake-vanilla-mdns.service
 
           chown -R cupcake-svc:cupcake-svc /opt/cupcake /var/log/cupcake
           chown root:cupcake-svc /opt/cupcake/.env
