@@ -26,29 +26,25 @@ cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
 IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
 [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
-
 if [ -n "$IP" ]; then
     sed -i '/\bvanilla\b/d' /etc/hosts
     echo "$IP vanilla.local vanilla" >> /etc/hosts
-    
-    mkdir -p /etc/avahi
-    touch /etc/avahi/hosts
-    sed -i '/\bvanilla\.local\b/d' /etc/avahi/hosts
-    echo "$IP vanilla.local" >> /etc/avahi/hosts
+    exec /usr/bin/avahi-publish-address vanilla.local "$IP"
 fi
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
 cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 [Unit]
-Description=Write vanilla.local to avahi hosts
-After=network-online.target
-Wants=network-online.target
+Description=Advertise vanilla.local via mDNS
+After=network-online.target avahi-daemon.service
+Wants=network-online.target avahi-daemon.service
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-RemainAfterExit=yes
+Restart=always
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
@@ -57,5 +53,5 @@ UNIT
 systemctl daemon-reload
 systemctl enable avahi-daemon
 systemctl enable cupcake-vanilla-mdns.service
-systemctl start cupcake-vanilla-mdns.service || true
 systemctl restart avahi-daemon
+systemctl start cupcake-vanilla-mdns.service || true

@@ -357,10 +357,17 @@ jobs:
         run: |
           fail() { echo "FAIL: $*"; exit 1; }
 
-          avahi-resolve --name cupcake.local \
-            || fail "cupcake.local did not resolve via mDNS"
-          avahi-resolve --name vanilla.local \
-            || fail "vanilla.local did not resolve via mDNS"
+          echo "Waiting for mDNS resolution..."
+          for i in $(seq 1 30); do
+            if avahi-resolve --name cupcake.local >/dev/null 2>&1 && \
+               avahi-resolve --name vanilla.local >/dev/null 2>&1; then
+              echo "mDNS resolved after ${i}x2s"
+              RESOLVED=true
+              break
+            fi
+            sleep 2
+          done
+          [ "${RESOLVED:-false}" = "true" ] || fail "mDNS did not resolve cupcake.local or vanilla.local"
 
           CUPCAKE=$(curl -sfk https://cupcake.local/) \
             || fail "cupcake.local did not return 200"
