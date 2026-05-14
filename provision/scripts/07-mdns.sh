@@ -24,15 +24,12 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
-IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
+IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.)' | grep -v '^$' | head -1)
 [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
 if [ -n "$IP" ]; then
     sed -i '/\bvanilla\b/d' /etc/hosts
     echo "$IP vanilla.local vanilla" >> /etc/hosts
-    mkdir -p /etc/avahi
     echo "$IP vanilla.local" > /etc/avahi/hosts
-    echo "Configured vanilla.local to $IP"
-    cat /etc/avahi/hosts
 fi
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
@@ -42,10 +39,12 @@ cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 Description=Register vanilla.local mDNS alias
 After=network-online.target
 Wants=network-online.target
+Before=avahi-daemon.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
+ExecStartPost=/bin/systemctl try-restart avahi-daemon
 RemainAfterExit=yes
 
 [Install]

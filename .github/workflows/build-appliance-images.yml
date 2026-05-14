@@ -196,12 +196,14 @@ jobs:
       - name: Setup test bridge network
         run: |
           sudo ip link add br0 type bridge stp_state 0 forward_delay 0
+          sudo ip link set br0 promisc on
+          sudo ip link set br0 type bridge mcast_snooping 0
           sudo ip link set br0 up
           sudo ip addr add 10.0.5.1/24 dev br0
           sudo ip tuntap add dev cupcake-tap mode tap
           sudo ip link set cupcake-tap master br0
+          sudo ip link set cupcake-tap promisc on
           sudo ip link set cupcake-tap up
-          sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=br0,eth0,lo/' /etc/avahi/avahi-daemon.conf
           sudo systemctl restart avahi-daemon
           sudo sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
 
@@ -249,15 +251,155 @@ jobs:
           kill $QEMU_PID 2>/dev/null || true
           exit 1
 
-      - name: Provision base
-        timeout-minutes: 20
+      - name: Configure bridge NIC on VM
+        run: |
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost << 'ENDSSH'
+          NIC=$(ip -o link show | awk -F': ' '!/LOOPBACK/{print $2}' | while read iface; do
+            [ "$iface" = lo ] && continue
+            ip -4 addr show "$iface" 2>/dev/null | grep -q "inet " || echo "$iface"
+          done | head -1)
+          if [ -z "$NIC" ]; then echo "ERROR: bridge NIC not found"; ip link show; exit 1; fi
+          sudo ip addr add 10.0.5.10/24 dev "$NIC"
+          sudo ip link set "$NIC" up
+          echo "Bridge NIC configured: $NIC -> 10.0.5.10"
+          ENDSSH
+
+      - name: Provision — 01-base + 07-mdns
+        timeout-minutes: 10
         run: |
           BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
-          for s in 01-base 02-postgresql 03-redis 04-backend 10-tailscale 11-cloudflared 12-coturn; do
+          for s in 01-base 07-mdns; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
               "chmod +x /tmp/${s}.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/${s}.sh"
           done
+
+      - name: mDNS check — 01-base + 07-mdns
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 02-postgresql
+        timeout-minutes: 10
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/02-postgresql.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/02-postgresql.sh && sudo /tmp/02-postgresql.sh"
+
+      - name: mDNS check — 02-postgresql
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 03-redis
+        timeout-minutes: 5
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/03-redis.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/03-redis.sh && sudo /tmp/03-redis.sh"
+
+      - name: mDNS check — 03-redis
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 04-backend
+        timeout-minutes: 20
+        run: |
+          BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/04-backend.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/04-backend.sh && sudo env BACKEND_REF='${BACKEND_REF}' /tmp/04-backend.sh"
+
+      - name: mDNS check — 04-backend
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 10-tailscale
+        timeout-minutes: 10
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/10-tailscale.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/10-tailscale.sh && sudo /tmp/10-tailscale.sh"
+
+      - name: mDNS check — 10-tailscale
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 11-cloudflared
+        timeout-minutes: 10
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/11-cloudflared.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/11-cloudflared.sh && sudo /tmp/11-cloudflared.sh"
+
+      - name: mDNS check — 11-cloudflared
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 12-coturn
+        timeout-minutes: 5
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/12-coturn.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/12-coturn.sh && sudo /tmp/12-coturn.sh"
+
+      - name: mDNS check — 12-coturn
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
 
       - name: Download seed database
         uses: actions/download-artifact@v4
@@ -272,7 +414,19 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/restore-seed.sh && sudo /tmp/restore-seed.sh"
 
-      - name: Provision frontend
+      - name: mDNS check — seed restore
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 05-frontend
         timeout-minutes: 60
         run: |
           WEBGUI_REF="${{ inputs.webgui_ref || 'master' }}"
@@ -281,23 +435,38 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/05-frontend.sh && sudo env WEBGUI_REF='${WEBGUI_REF}' VANILLA_NG_REF='${VANILLA_NG_REF}' /tmp/05-frontend.sh"
 
-      - name: Provision nginx and mDNS
-        timeout-minutes: 10
+      - name: mDNS check — 05-frontend
         run: |
-          for s in 06-nginx 07-mdns; do
-            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
-            ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-              "chmod +x /tmp/${s}.sh && sudo env /tmp/${s}.sh"
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
           done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
 
-      - name: mDNS Checkpoint 1 (Provisioning phase)
+      - name: Provision — 06-nginx
+        timeout-minutes: 5
         run: |
-          echo "Checking resolution from Runner (should fail or point to NAT IP)..."
-          avahi-resolve --name vanilla.local 2>/dev/null || echo "vanilla.local not yet resolvable from runner"
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/06-nginx.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "echo 'Internal VM Check:'; getent hosts vanilla.local"
+            "chmod +x /tmp/06-nginx.sh && sudo /tmp/06-nginx.sh"
 
-      - name: Install services
+      - name: mDNS check — 06-nginx
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Provision — 08-cleanup
         timeout-minutes: 10
         run: |
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
@@ -313,37 +482,34 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/08-cleanup.sh && sudo env /tmp/08-cleanup.sh"
 
-      - name: Configure appliance bridge NIC and start services
+      - name: mDNS check — 08-cleanup
         run: |
-          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost << 'ENDSSH'
-          BRIDGE_NIC=$(ip -o link show | awk -F': ' '!/LOOPBACK/{print $2}' | while read iface; do
-            [ "$iface" = lo ] && continue
-            ip -4 addr show "$iface" 2>/dev/null | grep -q "inet " || echo "$iface"
-          done | head -1)
-          if [ -z "$BRIDGE_NIC" ]; then
-            echo "ERROR: no unconfigured NIC found"; ip link show; exit 1
-          fi
-          echo "Bridge NIC: $BRIDGE_NIC"
-          sudo ip addr add 10.0.5.10/24 dev "$BRIDGE_NIC"
-          sudo ip link set "$BRIDGE_NIC" up
-          sudo systemctl restart cupcake-vanilla-mdns
-          sudo systemctl restart avahi-daemon
-          sudo systemctl start postgresql redis-server nginx cupcake-backend
-          ENDSSH
-
-      - name: mDNS Checkpoint 2 (Bridge active)
-        run: |
-          echo "Waiting for mDNS broadcast on bridge..."
-          for i in $(seq 1 10); do
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
             V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
-            if [ -n "$V_IP" ]; then
-              echo "vanilla.local resolved to $V_IP"
-              break
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
             sleep 2
           done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
+
+      - name: Start services
+        run: |
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "echo 'Internal VM Resolution:'; getent hosts vanilla.local"
+            "sudo systemctl start postgresql redis-server nginx cupcake-backend"
+
+      - name: mDNS check — start services
+        run: |
+          for i in $(seq 1 15); do
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
+              echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
 
       - name: Start workers
         run: |
@@ -432,7 +598,7 @@ jobs:
               echo "QEMU exited after ${i}x3s"
               break
             fi
-            sleep 3
+            sleep 33
           done
           kill $QEMU_PID 2>/dev/null || true
           sleep 2
@@ -1157,7 +1323,7 @@ jobs:
 
           cat > /usr/local/bin/cupcake-vanilla-mdns << 'MDNSEOF'
           #!/bin/bash
-          IP=\$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
+          IP=\$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.)' | grep -v '^$' | head -1)
           [ -z "\$IP" ] && IP=\$(hostname -I | awk '{print \$1}')
           if [ -n "\$IP" ]; then
               sed -i '/\bvanilla\b/d' /etc/hosts
@@ -1173,10 +1339,12 @@ jobs:
           Description=Register vanilla.local mDNS alias
           After=network-online.target
           Wants=network-online.target
+          Before=avahi-daemon.service
 
           [Service]
           Type=oneshot
           ExecStart=/usr/local/bin/cupcake-vanilla-mdns
+          ExecStartPost=/bin/systemctl try-restart avahi-daemon
           RemainAfterExit=yes
 
           [Install]
