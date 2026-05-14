@@ -24,43 +24,31 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
-LAST_IP=""
-PUB_PID=""
+IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
+[ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
 
-cleanup() {
-    [ -n "$PUB_PID" ] && kill "$PUB_PID" 2>/dev/null
-    exit 0
-}
-trap cleanup SIGTERM SIGINT
-
-while :; do
-    IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
-    [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
+if [ -n "$IP" ]; then
+    sed -i '/\bvanilla\b/d' /etc/hosts
+    echo "$IP vanilla.local vanilla" >> /etc/hosts
     
-    if [[ -n "$IP" && "$IP" != "$LAST_IP" ]]; then
-        [ -n "$PUB_PID" ] && kill "$PUB_PID" 2>/dev/null
-        sed -i '/\bvanilla\b/d' /etc/hosts
-        echo "$IP vanilla.local vanilla" >> /etc/hosts
-        /usr/bin/avahi-publish-address vanilla.local "$IP" &
-        PUB_PID=$!
-        LAST_IP="$IP"
-    fi
-    sleep 5
-done
+    mkdir -p /etc/avahi
+    touch /etc/avahi/hosts
+    sed -i '/\bvanilla\.local\b/d' /etc/avahi/hosts
+    echo "$IP vanilla.local" >> /etc/avahi/hosts
+fi
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
 cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 [Unit]
-Description=Reactive mDNS Advertisement for vanilla.local
-After=network-online.target avahi-daemon.service
-Wants=network-online.target avahi-daemon.service
+Description=Write vanilla.local to avahi hosts
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-Restart=always
-RestartSec=5
+RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -69,12 +57,5 @@ UNIT
 systemctl daemon-reload
 systemctl enable avahi-daemon
 systemctl enable cupcake-vanilla-mdns.service
-systemctl restart avahi-daemon
 systemctl start cupcake-vanilla-mdns.service || true
-
-for i in {1..30}; do
-    if getent hosts vanilla.local | grep -v '127.0.0.1' >/dev/null; then
-        break
-    fi
-    sleep 1
-done
+systemctl restart avahi-daemon
