@@ -359,9 +359,12 @@ jobs:
 
           echo "Waiting for mDNS resolution..."
           for i in $(seq 1 30); do
-            if avahi-resolve --name cupcake.local >/dev/null 2>&1 && \
-               avahi-resolve --name vanilla.local >/dev/null 2>&1; then
+            C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "mDNS resolved after ${i}x2s"
+              echo "cupcake.local -> $C_IP"
+              echo "vanilla.local -> $V_IP"
               RESOLVED=true
               break
             fi
@@ -370,9 +373,9 @@ jobs:
           [ "${RESOLVED:-false}" = "true" ] || fail "mDNS did not resolve cupcake.local or vanilla.local"
 
           CUPCAKE=$(curl -sfk https://cupcake.local/) \
-            || fail "cupcake.local did not return 200"
+            || fail "cupcake.local ($C_IP) did not return 200"
           VANILLA=$(curl -sfk https://vanilla.local/) \
-            || fail "vanilla.local did not return 200"
+            || fail "vanilla.local ($V_IP) did not return 200"
 
           echo "$CUPCAKE" | grep -q "<title>Cupcake</title>" \
             || fail "cupcake.local wrong title — wrong frontend deployed"
