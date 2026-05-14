@@ -24,17 +24,27 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
+LAST_IP=""
+PUB_PID=""
+
 while :; do
     IP=$(ip route get 10.0.5.1 2>/dev/null | grep -oP 'src \K\S+')
     [ -z "$IP" ] && IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.15)' | head -1)
     [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
+    
+    if [ -n "$PUB_PID" ] && ! kill -0 "$PUB_PID" 2>/dev/null; then
+        LAST_IP=""
+    fi
 
-    if [ -n "$IP" ]; then
+    if [[ -n "$IP" && "$IP" != "$LAST_IP" ]]; then
+        [ -n "$PUB_PID" ] && kill "$PUB_PID" 2>/dev/null
         sed -i '/\bvanilla\b/d' /etc/hosts
         echo "$IP vanilla.local vanilla" >> /etc/hosts
-        exec /usr/bin/avahi-publish-address vanilla.local "$IP"
+        /usr/bin/avahi-publish-address vanilla.local "$IP" &
+        PUB_PID=$!
+        LAST_IP="$IP"
     fi
-    sleep 2
+    sleep 5
 done
 SCRIPT
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
@@ -49,7 +59,7 @@ Wants=network-online.target avahi-daemon.service
 Type=simple
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
 Restart=always
-RestartSec=3
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
