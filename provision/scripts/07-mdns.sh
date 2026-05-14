@@ -25,7 +25,8 @@ sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/
 cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
 #!/bin/bash
 while :; do
-    IP=$(hostname -I | awk '{print $1}')
+    IP=$(hostname -I | tr ' ' '\n' | grep -v '10.0.2.15' | head -1)
+    [ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
     if [[ -n "$IP" && "$IP" != "127."* ]]; then
         sed -i '/\bvanilla\b/d' /etc/hosts
         echo "$IP vanilla.local vanilla" >> /etc/hosts

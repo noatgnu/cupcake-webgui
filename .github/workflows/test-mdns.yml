@@ -105,6 +105,8 @@ jobs:
           done | head -1)
           sudo ip addr add 10.0.5.10/24 dev "$NIC"
           sudo ip link set "$NIC" up
+          sudo systemctl restart avahi-daemon
+          sudo systemctl restart cupcake-vanilla-mdns
           ENDSSH
 
       - name: Verify Resolution from Runner
