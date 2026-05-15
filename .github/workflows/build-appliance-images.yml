@@ -727,6 +727,8 @@ jobs:
               "VANILLA_NG_COMMIT=${VANILLA_NG_COMMIT}" \
               > "${ROOTFS_DIR}/opt/cupcake/.frontend-versions"
 
+          cp "${GITHUB_WORKSPACE}/provision/scripts/cupcake-vanilla-mdns.py" "${ROOTFS_DIR}/usr/local/bin/cupcake-vanilla-mdns"
+          chmod +x "${ROOTFS_DIR}/usr/local/bin/cupcake-vanilla-mdns"
           cp "${GITHUB_WORKSPACE}/provision/scripts/update.sh" "${ROOTFS_DIR}/opt/cupcake/update.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/update.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-tailscale.sh" "${ROOTFS_DIR}/opt/cupcake/configure-tailscale.sh"
@@ -1325,7 +1327,6 @@ jobs:
           MulticastDNS=yes
           RESOLVEDEOF
 
-          cp "${GITHUB_WORKSPACE}/provision/scripts/cupcake-vanilla-mdns.py" /usr/local/bin/cupcake-vanilla-mdns
           chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
           cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNITEOF'
