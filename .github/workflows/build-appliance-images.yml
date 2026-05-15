@@ -269,6 +269,8 @@ jobs:
         timeout-minutes: 10
         run: |
           BACKEND_REF="${{ inputs.backend_ref || 'master' }}"
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
+            provision/scripts/cupcake-vanilla-mdns.py cupcake@localhost:/tmp/
           for s in 01-base 07-mdns; do
             scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/${s}.sh cupcake@localhost:/tmp/
             ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
@@ -1323,30 +1325,20 @@ jobs:
           MulticastDNS=yes
           RESOLVEDEOF
 
-          cat > /usr/local/bin/cupcake-vanilla-mdns << 'MDNSEOF'
-          #!/bin/bash
-          IP=\$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.)' | grep -v '^$' | head -1)
-          [ -z "\$IP" ] && IP=\$(hostname -I | awk '{print \$1}')
-          if [ -n "\$IP" ]; then
-              sed -i '/\bvanilla\b/d' /etc/hosts
-              echo "\$IP vanilla.local vanilla" >> /etc/hosts
-              mkdir -p /etc/avahi
-              echo "\$IP vanilla" > /etc/avahi/hosts
-          fi
-          MDNSEOF
+          cp "${GITHUB_WORKSPACE}/provision/scripts/cupcake-vanilla-mdns.py" /usr/local/bin/cupcake-vanilla-mdns
           chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
           cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNITEOF'
           [Unit]
-          Description=Register vanilla.local mDNS alias
-          After=network-online.target
+          Description=Publish vanilla.local mDNS A record
+          After=network-online.target avahi-daemon.service
           Wants=network-online.target
-          Before=avahi-daemon.service
 
           [Service]
-          Type=oneshot
+          Type=simple
           ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-          RemainAfterExit=yes
+          Restart=always
+          RestartSec=5
 
           [Install]
           WantedBy=multi-user.target

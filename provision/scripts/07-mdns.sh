@@ -22,29 +22,20 @@ EOF
 
 sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
-cat > /usr/local/bin/cupcake-vanilla-mdns << 'SCRIPT'
-#!/bin/bash
-IP=$(hostname -I | tr ' ' '\n' | grep -vE '^(127\.|10\.0\.2\.)' | grep -v '^$' | head -1)
-[ -z "$IP" ] && IP=$(hostname -I | awk '{print $1}')
-if [ -n "$IP" ]; then
-    sed -i '/\bvanilla\b/d' /etc/hosts
-    echo "$IP vanilla.local vanilla" >> /etc/hosts
-    echo "$IP vanilla" > /etc/avahi/hosts
-fi
-SCRIPT
+cp /tmp/cupcake-vanilla-mdns.py /usr/local/bin/cupcake-vanilla-mdns
 chmod +x /usr/local/bin/cupcake-vanilla-mdns
 
 cat > /etc/systemd/system/cupcake-vanilla-mdns.service << 'UNIT'
 [Unit]
-Description=Register vanilla.local mDNS alias
-After=network-online.target
+Description=Publish vanilla.local mDNS A record
+After=network-online.target avahi-daemon.service
 Wants=network-online.target
-Before=avahi-daemon.service
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-RemainAfterExit=yes
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -53,8 +44,8 @@ UNIT
 systemctl daemon-reload
 systemctl enable avahi-daemon
 systemctl enable cupcake-vanilla-mdns.service
-systemctl start cupcake-vanilla-mdns.service || true
 systemctl restart avahi-daemon
+systemctl start cupcake-vanilla-mdns.service || true
 
 echo "Local resolution check:"
 getent hosts cupcake.local || echo "cupcake.local not yet resolvable locally"
