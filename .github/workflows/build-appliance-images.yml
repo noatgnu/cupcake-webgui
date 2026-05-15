@@ -263,9 +263,7 @@ jobs:
           sudo ip link set "$NIC" up
           echo "Bridge NIC configured: $NIC -> 10.0.5.10"
           ENDSSH
-          echo "10.0.5.10 vanilla.local" | sudo tee /etc/avahi/hosts
           echo "10.0.5.10 vanilla.local" | sudo tee -a /etc/hosts
-          sudo systemctl restart avahi-daemon
 
       - name: Provision — 01-base + 07-mdns
         timeout-minutes: 10
