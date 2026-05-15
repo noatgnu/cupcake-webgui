@@ -823,7 +823,8 @@ jobs:
           dpkg -i /tmp/cloudflared.deb
           rm /tmp/cloudflared.deb
 
-          systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager tailscaled systemd-resolved
+          systemctl --root=/ enable postgresql redis-server nginx avahi-daemon NetworkManager tailscaled
+          systemctl --root=/ enable systemd-resolved 2>/dev/null || true
           systemctl --root=/ enable coturn 2>/dev/null || true
 
           sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
