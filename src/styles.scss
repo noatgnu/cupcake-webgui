@@ -4,6 +4,9 @@
 
 @import 'quill/dist/quill.snow.css';
 
+// Cupcake core Bootstrap integration (defines --cupcake-* variables and global component overrides)
+@import '@noatgnu/cupcake-core/src/lib/styles/bootstrap-integration';
+
 // CSS Custom Properties for theme support
 :root {
   --cupcake-card-header-bg: rgba(0, 0, 0, 0.03);
@@ -111,7 +114,66 @@ ngb-alert,
   z-index: 100 !important;
 }
 
-// Demo mode banner offset
+[data-bs-theme="dark"] {
+  .ql-toolbar.ql-snow {
+    background-color: var(--cupcake-bg-tertiary);
+    border-color: var(--cupcake-border);
+
+    .ql-stroke {
+      stroke: var(--cupcake-text);
+    }
+
+    .ql-fill {
+      fill: var(--cupcake-text);
+    }
+
+    .ql-picker-label,
+    .ql-picker-item {
+      color: var(--cupcake-text);
+    }
+
+    button:hover .ql-stroke,
+    .ql-picker-label:hover .ql-stroke {
+      stroke: var(--cupcake-primary);
+    }
+
+    button:hover .ql-fill,
+    .ql-picker-label:hover .ql-fill {
+      fill: var(--cupcake-primary);
+    }
+
+    button.ql-active .ql-stroke,
+    .ql-picker-label.ql-active .ql-stroke {
+      stroke: var(--cupcake-primary);
+    }
+
+    button.ql-active .ql-fill,
+    .ql-picker-label.ql-active .ql-fill {
+      fill: var(--cupcake-primary);
+    }
+  }
+
+  .ql-container.ql-snow {
+    border-color: var(--cupcake-border);
+    background-color: var(--cupcake-card-bg);
+  }
+
+  .ql-editor {
+    color: var(--cupcake-text);
+  }
+
+  .ql-snow .ql-picker-options {
+    background-color: var(--cupcake-card-bg);
+    border-color: var(--cupcake-border);
+    color: var(--cupcake-text);
+  }
+
+  .ql-snow.ql-toolbar button:hover,
+  .ql-snow .ql-toolbar button:hover {
+    color: var(--cupcake-primary);
+  }
+}
+
 body.demo-mode-active {
   padding-top: 140px;
   transition: padding-top 0.3s ease;

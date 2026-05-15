@@ -6,6 +6,7 @@ on:
     paths:
       - 'provision/scripts/01-base.sh'
       - 'provision/scripts/07-mdns.sh'
+      - 'provision/scripts/cupcake-vanilla-mdns.py'
       - '.github/workflows/test-mdns.yml'
 
 jobs:
@@ -91,7 +92,8 @@ jobs:
         run: |
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/01-base.sh cupcake@localhost:/tmp/
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/07-mdns.sh cupcake@localhost:/tmp/
-          
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/cupcake-vanilla-mdns.py cupcake@localhost:/tmp/
+
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "sudo bash /tmp/01-base.sh && sudo bash /tmp/07-mdns.sh"
 
