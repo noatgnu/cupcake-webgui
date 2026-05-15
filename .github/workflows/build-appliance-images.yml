@@ -263,6 +263,9 @@ jobs:
           sudo ip link set "$NIC" up
           echo "Bridge NIC configured: $NIC -> 10.0.5.10"
           ENDSSH
+          echo "10.0.5.10 vanilla.local" | sudo tee /etc/avahi/hosts
+          echo "10.0.5.10 vanilla.local" | sudo tee -a /etc/hosts
+          sudo systemctl restart avahi-daemon
 
       - name: Provision — 01-base + 07-mdns
         timeout-minutes: 10
@@ -278,7 +281,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -297,7 +300,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -316,7 +319,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -336,7 +339,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -355,7 +358,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -374,7 +377,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -393,7 +396,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -418,7 +421,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -439,7 +442,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -458,7 +461,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -486,7 +489,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -503,7 +506,7 @@ jobs:
         run: |
           for i in $(seq 1 15); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "OK: cupcake.local=$C_IP vanilla.local=$V_IP"; exit 0
             fi
@@ -541,7 +544,7 @@ jobs:
           echo "Waiting for mDNS resolution..."
           for i in $(seq 1 30); do
             C_IP=$(avahi-resolve --name cupcake.local 2>/dev/null | awk '{print $2}')
-            V_IP=$(avahi-resolve --name vanilla.local 2>/dev/null | awk '{print $2}')
+            V_IP=$(getent hosts vanilla.local 2>/dev/null | awk '{print $1}')
             if [ -n "$C_IP" ] && [ -n "$V_IP" ]; then
               echo "mDNS resolved after ${i}x2s"
               echo "cupcake.local -> $C_IP"
