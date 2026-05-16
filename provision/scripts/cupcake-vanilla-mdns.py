@@ -9,20 +9,31 @@ from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
 
 def get_ip():
-    """Return the first non-loopback, non-SLIRP IPv4 address."""
+    """Return the first non-loopback, non-SLIRP IPv4 address, or None."""
     try:
         parts = subprocess.check_output(['hostname', '-I'], text=True).split()
         for ip in parts:
             if not ip.startswith(('127.', '10.0.2.')):
                 return ip
-        return parts[0] if parts else None
+        return None
     except Exception:
         return None
 
 
-ip = get_ip()
+def wait_for_ip(timeout=120, interval=5):
+    """Block until a routable IP is available, up to timeout seconds."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        ip = get_ip()
+        if ip:
+            return ip
+        time.sleep(interval)
+    return None
+
+
+ip = wait_for_ip()
 if not ip:
-    print('No suitable IP found', file=sys.stderr)
+    print('No suitable IP found after waiting', file=sys.stderr)
     sys.exit(1)
 
 with open('/etc/hosts', 'r') as f:

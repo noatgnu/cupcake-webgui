@@ -159,6 +159,8 @@ jobs:
           $MANAGE load_ms_mod
           $MANAGE load_ms_term
           $MANAGE load_ontologies --ontology all --no-limit
+          $MANAGE sync_schemas
+          $MANAGE load_column_templates
 
       - name: Dump database
         run: |
