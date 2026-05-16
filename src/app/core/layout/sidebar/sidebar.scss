@@ -21,12 +21,12 @@
     white-space: nowrap;
 
     &:hover {
-      background: var(--bs-secondary-bg);
-      color: var(--bs-primary);
+      background: var(--cupcake-bg-secondary);
+      color: var(--cupcake-primary);
     }
 
     &.active {
-      background: var(--bs-primary);
+      background: var(--cupcake-primary-brand, var(--cupcake-primary));
       color: #ffffff;
       font-weight: 500;
 

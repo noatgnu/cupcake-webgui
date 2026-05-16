@@ -92,6 +92,7 @@ export class App implements OnInit, OnDestroy {
     const darkerColor = this.adjustColorBrightness(adjustedPrimary, isDark ? -15 : -20);
     const lighterColor = this.adjustColorBrightness(adjustedPrimary, isDark ? 15 : 20);
 
+    root.style.setProperty('--cupcake-primary-brand', primaryColor);
     root.style.setProperty('--cupcake-primary', adjustedPrimary);
     root.style.setProperty('--cupcake-primary-rgb', rgbValues);
     root.style.setProperty('--cupcake-primary-dark', darkerColor);

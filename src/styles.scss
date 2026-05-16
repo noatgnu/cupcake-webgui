@@ -32,6 +32,10 @@
   --bs-primary-rgb: var(--cupcake-primary-rgb, 25, 118, 210);
 }
 
+.navbar.bg-primary {
+  background-color: var(--cupcake-primary-brand, var(--cupcake-primary)) !important;
+}
+
 // Make Bootstrap utilities respect the theme
 .card-header {
   background-color: var(--cupcake-card-header-bg) !important;
