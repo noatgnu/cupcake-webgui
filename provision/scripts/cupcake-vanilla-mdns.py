@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
-"""Direct mDNS A-record publisher for vanilla.local — bypasses avahi entirely."""
+"""Publish vanilla.local mDNS A record using python-zeroconf."""
 import socket
-import struct
 import subprocess
-import threading
-import time
 import sys
+import time
 
-MDNS_ADDR = '224.0.0.251'
-MDNS_PORT = 5353
-VANILLA_QNAME = b'\x07vanilla\x05local\x00'
-TTL = 120
+from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
 
 def get_ip():
+    """Return the first non-loopback, non-SLIRP IPv4 address."""
     try:
         parts = subprocess.check_output(['hostname', '-I'], text=True).split()
         for ip in parts:
@@ -22,22 +18,6 @@ def get_ip():
         return parts[0] if parts else None
     except Exception:
         return None
-
-
-def encode_name(name):
-    buf = b''
-    for label in name.rstrip('.').split('.'):
-        enc = label.encode()
-        buf += bytes([len(enc)]) + enc
-    return buf + b'\x00'
-
-
-def make_response(ip_str):
-    ip_bytes = socket.inet_aton(ip_str)
-    name = encode_name('vanilla.local')
-    header = struct.pack('!HHHHHH', 0, 0x8400, 0, 1, 0, 0)
-    rr = name + struct.pack('!HHIH', 1, 0x8001, TTL, 4) + ip_bytes
-    return header + rr
 
 
 ip = get_ip()
@@ -51,37 +31,23 @@ lines.append(f'{ip}\tvanilla.local\tvanilla\n')
 with open('/etc/hosts', 'w') as f:
     f.writelines(lines)
 
-response = make_response(ip)
+info = ServiceInfo(
+    type_='_http._tcp.local.',
+    name='Cupcake Vanilla._http._tcp.local.',
+    addresses=[socket.inet_aton(ip)],
+    port=80,
+    properties={'path': '/'},
+    server='vanilla.local.',
+)
 
-rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-rx.bind(('', MDNS_PORT))
-mreq = struct.pack('4s4s', socket.inet_aton(MDNS_ADDR), socket.inet_aton('0.0.0.0'))
-rx.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+zc = Zeroconf(interfaces=[ip], ip_version=IPVersion.V4Only)
+zc.register_service(info)
 
-tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
-
-
-def announcer():
+try:
     while True:
-        try:
-            tx.sendto(response, (MDNS_ADDR, MDNS_PORT))
-        except Exception:
-            pass
-        time.sleep(30)
-
-
-threading.Thread(target=announcer, daemon=True).start()
-tx.sendto(response, (MDNS_ADDR, MDNS_PORT))
-
-while True:
-    try:
-        data, _ = rx.recvfrom(4096)
-        if VANILLA_QNAME in data:
-            flags = struct.unpack_from('!H', data, 2)[0]
-            if not (flags & 0x8000):
-                tx.sendto(response, (MDNS_ADDR, MDNS_PORT))
-    except Exception:
-        pass
+        time.sleep(3600)
+except (KeyboardInterrupt, SystemExit):
+    pass
+finally:
+    zc.unregister_service(info)
+    zc.close()

@@ -25,7 +25,8 @@ apt-get install -y \
     ufw \
     nfs-common \
     cifs-utils \
-    exfatprogs
+    exfatprogs \
+    python3-zeroconf
 
 mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
 mkdir -p /var/log/cupcake
