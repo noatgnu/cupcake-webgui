@@ -406,6 +406,15 @@ jobs:
           done
           echo "FAIL: cupcake.local=${C_IP:-missing} vanilla.local=${V_IP:-missing}"; exit 1
 
+      - name: Provision — 13-storage-manager
+        timeout-minutes: 5
+        run: |
+          for f in configure-storage.sh cupcake-storage-manager cupcake-storage-manager.socket cupcake-storage-manager.service 13-storage-manager.sh; do
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/$f cupcake@localhost:/tmp/
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/13-storage-manager.sh && sudo /tmp/13-storage-manager.sh"
+
       - name: Download seed database
         uses: actions/download-artifact@v4
         with:

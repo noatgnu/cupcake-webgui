@@ -1,0 +1,10 @@
+[Unit]
+Description=Cupcake Storage Manager Socket
+
+[Socket]
+ListenStream=/run/cupcake-storage.sock
+SocketGroup=cupcake-svc
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

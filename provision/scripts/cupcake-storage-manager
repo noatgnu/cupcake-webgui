@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""
+Privileged storage manager for the Cupcake appliance.
+
+Activated by systemd socket (cupcake-storage-manager.socket). Reads a
+JSON command from the inherited socket fd, executes the requested mount or
+unmount operation as root, and writes back a JSON result.
+
+Accepted commands:
+  {"command": "mount",   "config": {...}}
+  {"command": "unmount"}
+
+Result shape:
+  {"ok": true,  "output": "..."}
+  {"ok": false, "error":  "..."}
+"""
+import json
+import os
+import socket
+import subprocess
+import sys
+from pathlib import Path
+
+CONFIG_PATH = Path("/opt/cupcake/storage-config.json")
+MOUNT_SCRIPT = Path("/opt/cupcake/configure-storage.sh")
+MOUNT_POINT = "/mnt/cupcake-data"
+SOCKET_FD = 3
+
+
+def recv_all(conn):
+    data = b""
+    while True:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+def send_result(conn, result):
+    conn.sendall(json.dumps(result).encode())
+    conn.shutdown(socket.SHUT_WR)
+
+
+def handle(conn):
+    raw = recv_all(conn)
+    try:
+        payload = json.loads(raw.decode())
+    except Exception as e:
+        send_result(conn, {"ok": False, "error": f"Invalid JSON: {e}"})
+        return
+
+    command = payload.get("command")
+
+    if command == "mount":
+        config = payload.get("config", {})
+        try:
+            CONFIG_PATH.write_text(json.dumps(config, indent=2))
+        except Exception as e:
+            send_result(conn, {"ok": False, "error": f"Could not write config: {e}"})
+            return
+
+        try:
+            result = subprocess.run(
+                [str(MOUNT_SCRIPT)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            output = result.stdout + result.stderr
+            if result.returncode == 0:
+                send_result(conn, {"ok": True, "output": output})
+            else:
+                send_result(conn, {"ok": False, "error": output})
+        except Exception as e:
+            send_result(conn, {"ok": False, "error": str(e)})
+
+    elif command == "unmount":
+        try:
+            result = subprocess.run(
+                ["umount", MOUNT_POINT],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            output = result.stdout + result.stderr
+            if result.returncode == 0:
+                send_result(conn, {"ok": True, "output": output})
+            else:
+                send_result(conn, {"ok": False, "error": output})
+        except Exception as e:
+            send_result(conn, {"ok": False, "error": str(e)})
+
+    else:
+        send_result(conn, {"ok": False, "error": f"Unknown command: {command}"})
+
+
+if __name__ == "__main__":
+    sock = socket.fromfd(SOCKET_FD, socket.AF_UNIX, socket.SOCK_STREAM)
+    conn, _ = sock.accept()
+    try:
+        handle(conn)
+    finally:
+        conn.close()
+        sock.close()

@@ -1,0 +1,9 @@
+[Unit]
+Description=Cupcake Storage Manager
+Requires=cupcake-storage-manager.socket
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cupcake-storage-manager
+StandardInput=socket
