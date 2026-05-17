@@ -1104,14 +1104,14 @@ jobs:
           }
           NGXEOF
 
-          cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
+          cat > /etc/nginx/sites-available/vanilla.conf << NGXEOF
           server {
               listen 80 default_server;
               listen 443 ssl default_server;
-              server_name cupcake.local cupcake _;
+              server_name vanilla.local vanilla localhost _;
               include /etc/nginx/snippets/cupcake-ssl.conf;
               client_max_body_size 2G;
-              root /opt/cupcake/webgui;
+              root /opt/cupcake/vanilla;
               index index.html;
 
               gzip on;
@@ -1162,14 +1162,16 @@ jobs:
           }
           NGXEOF
 
-          cat > /etc/nginx/sites-available/vanilla.conf << NGXEOF
+          cat > /etc/nginx/sites-available/cupcake.conf << NGXEOF
           server {
               listen 80;
               listen 443 ssl;
-              server_name vanilla.local vanilla localhost;
+              listen 8080 default_server;
+              listen 8443 ssl default_server;
+              server_name cupcake.local cupcake;
               include /etc/nginx/snippets/cupcake-ssl.conf;
               client_max_body_size 2G;
-              root /opt/cupcake/vanilla;
+              root /opt/cupcake/webgui;
               index index.html;
 
               gzip on;

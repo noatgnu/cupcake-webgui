@@ -24,7 +24,7 @@ ssl_session_cache   shared:SSL:10m;
 ssl_session_timeout 10m;
 NGINXEOF
 
-# vanilla: default on 80/443 — accessible by IP or vanilla.local
+# vanilla: default_server on 80/443 for IP access; also responds to vanilla.local
 cat > /etc/nginx/sites-available/vanilla.conf << 'NGINXEOF'
 server {
     listen 80 default_server;
@@ -86,12 +86,14 @@ server {
 }
 NGINXEOF
 
-# cupcake: non-default on 8080/8443 — accessible via cupcake.local or <ip>:8443
+# cupcake: named access on 80/443 via cupcake.local; IP access via <ip>:8080/<ip>:8443
 cat > /etc/nginx/sites-available/cupcake.conf << 'NGINXEOF'
 server {
-    listen 8080;
-    listen 8443 ssl;
-    server_name cupcake.local cupcake _;
+    listen 80;
+    listen 443 ssl;
+    listen 8080 default_server;
+    listen 8443 ssl default_server;
+    server_name cupcake.local cupcake;
 
     include /etc/nginx/snippets/cupcake-ssl.conf;
 
