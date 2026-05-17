@@ -47,6 +47,8 @@ chmod 775 /var/log/cupcake
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 8080/tcp
+ufw allow 8443/tcp
 ufw allow 5353/udp
 ufw --force enable
 
