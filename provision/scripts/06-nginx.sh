@@ -55,6 +55,11 @@ server {
         proxy_read_timeout 300s;
     }
 
+    location /admin/static/ {
+        alias /opt/cupcake/backend/staticfiles/;
+        expires 7d;
+    }
+
     location /admin/ {
         proxy_pass http://django_backend;
         proxy_set_header Host $host;
@@ -117,6 +122,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;
+    }
+
+    location /admin/static/ {
+        alias /opt/cupcake/backend/staticfiles/;
+        expires 7d;
     }
 
     location /admin/ {

@@ -20,11 +20,16 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
 
 jobs:
   build-frontend:
     name: Pre-build Frontends
-    if: inputs.image_type != 'vm'
+    if: github.event_name == 'release' || inputs.image_type != 'vm'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -180,7 +185,7 @@ jobs:
 
   build-vm:
     name: VM Image (amd64)
-    if: inputs.image_type != 'rpi'
+    if: github.event_name != 'release' && inputs.image_type != 'rpi'
     needs: build-db
     runs-on: ubuntu-latest
     steps:
@@ -633,7 +638,7 @@ jobs:
 
   build-rpi:
     name: RPi Image
-    if: inputs.image_type != 'vm'
+    if: github.event_name == 'release' || inputs.image_type != 'vm'
     needs: [build-frontend, build-db]
     runs-on: ubuntu-latest
     steps:
@@ -1131,6 +1136,11 @@ jobs:
                   proxy_read_timeout 300s;
               }
 
+              location /admin/static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
+              }
+
               location /admin/ {
                   proxy_pass http://django_backend;
                   proxy_set_header Host \$host;
@@ -1189,6 +1199,11 @@ jobs:
                   proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto \$scheme;
                   proxy_read_timeout 300s;
+              }
+
+              location /admin/static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
               }
 
               location /admin/ {
@@ -1547,6 +1562,26 @@ jobs:
           path: pi-gen/deploy/*.img.xz
           retention-days: 30
           compression-level: 0
+
+  publish-release:
+    name: Publish RPi image to release
+    needs: [build-rpi]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download RPi image
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-pi-arm64
+          path: release-assets/
+
+      - name: Upload to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" release-assets/*.img.xz \
+            --repo "${{ github.repository }}" \
+            --clobber
 
   summary:
     name: Summary
