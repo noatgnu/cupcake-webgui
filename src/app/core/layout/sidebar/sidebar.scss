@@ -26,12 +26,12 @@
     }
 
     &.active {
-      background: var(--cupcake-primary-brand, var(--cupcake-primary));
-      color: #ffffff;
+      background: var(--cupcake-primary);
+      color: var(--cupcake-primary-contrast);
       font-weight: 500;
 
       i {
-        color: #ffffff;
+        color: var(--cupcake-primary-contrast);
       }
     }
 

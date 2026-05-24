@@ -7,30 +7,11 @@
 // Cupcake core Bootstrap integration (defines --cupcake-* variables and global component overrides)
 @import '@noatgnu/cupcake-core/src/lib/styles/bootstrap-integration';
 
-// CSS Custom Properties for theme support
-:root {
-  --cupcake-card-header-bg: rgba(0, 0, 0, 0.03);
-  --cupcake-text: #212529;
-  --cupcake-text-muted: #6c757d;
-  --cupcake-bg-secondary: #f8f9fa;
-  --cupcake-bg-tertiary: #e9ecef;
+// Cupcake core component styles
+@import '@noatgnu/cupcake-core/src/lib/styles/components';
 
-  // Map cupcake primary to Bootstrap primary
-  --bs-primary: var(--cupcake-primary, #1976d2);
-  --bs-primary-rgb: var(--cupcake-primary-rgb, 25, 118, 210);
-}
-
-[data-bs-theme="dark"] {
-  --cupcake-card-header-bg: rgba(255, 255, 255, 0.03);
-  --cupcake-text: #ffffff;
-  --cupcake-text-muted: #adb5bd;
-  --cupcake-bg-secondary: #1e1e1e;
-  --cupcake-bg-tertiary: #2d2d2d;
-
-  // Map cupcake primary to Bootstrap primary in dark mode
-  --bs-primary: var(--cupcake-primary, #1976d2);
-  --bs-primary-rgb: var(--cupcake-primary-rgb, 25, 118, 210);
-}
+// Import palette themes — must come last so palette selectors win over :root
+@import '@noatgnu/cupcake-core/src/lib/styles/themes/eink';
 
 .navbar.bg-primary {
   background-color: var(--cupcake-primary-brand, var(--cupcake-primary)) !important;
@@ -176,6 +157,11 @@ ngb-alert,
   .ql-snow .ql-toolbar button:hover {
     color: var(--cupcake-primary);
   }
+}
+
+html.theme-eink,
+html.theme-eink body {
+  transition: none !important;
 }
 
 body.demo-mode-active {

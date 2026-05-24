@@ -22,7 +22,7 @@ describe('AppShell', () => {
       toggle$: toggleSubject.asObservable()
     });
 
-    const mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme', 'getThemeIcon', 'getThemeLabel'], {
+    const mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode', 'getThemeIcon', 'getThemeLabel'], {
       isDark: signal(false)
     });
 

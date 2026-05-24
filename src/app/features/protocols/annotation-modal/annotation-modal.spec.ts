@@ -28,7 +28,7 @@ describe('AnnotationModal', () => {
     mockSiteConfigService.getMaxChunkedUploadSize.and.returnValue(100 * 1024 * 1024);
     mockSiteConfigService.formatFileSize.and.returnValue('100 MB');
 
-    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme'], {
+    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode'], {
       isDark: signal(false)
     });
 

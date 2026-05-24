@@ -10,7 +10,7 @@ describe('SketchAnnotation', () => {
   let mockThemeService: jasmine.SpyObj<ThemeService>;
 
   beforeEach(async () => {
-    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme'], {
+    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode'], {
       isDark: signal(false)
     });
 

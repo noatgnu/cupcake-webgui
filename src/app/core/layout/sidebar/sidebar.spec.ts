@@ -23,7 +23,7 @@ describe('Sidebar', () => {
     toggleSubject = new Subject<void>();
     currentUserSignal = signal<any>(null);
 
-    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme', 'getThemeIcon', 'getThemeLabel'], {
+    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode', 'getThemeIcon', 'getThemeLabel'], {
       isDark: signal(false)
     });
 
@@ -93,9 +93,9 @@ describe('Sidebar', () => {
     expect(component.isDemoMode()).toBeFalse();
   });
 
-  it('toggleTheme() calls ThemeService.toggleTheme()', () => {
+  it('toggleTheme() calls ThemeService.toggleMode()', () => {
     component.toggleTheme();
-    expect(mockThemeService.toggleTheme).toHaveBeenCalled();
+    expect(mockThemeService.toggleMode).toHaveBeenCalled();
   });
 
   it('logout() calls AuthService.logout()', () => {

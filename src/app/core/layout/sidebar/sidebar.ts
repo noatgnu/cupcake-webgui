@@ -69,7 +69,9 @@ export class Sidebar implements OnInit, OnDestroy {
   });
 
   adminItems = [
-    { icon: 'bi-sliders', label: 'Site Config', route: '/admin/site-config', requiresSuperuser: false }
+    { icon: 'bi-sliders', label: 'Site Config', route: '/admin/site-config', requiresSuperuser: false },
+    { icon: 'bi-hdd-network', label: 'Storage', route: '/admin/storage', requiresSuperuser: false },
+    { icon: 'bi-archive', label: 'Backup', route: '/admin/backup', requiresSuperuser: false }
   ];
 
   superuserItems = [
@@ -87,7 +89,7 @@ export class Sidebar implements OnInit, OnDestroy {
   }
 
   toggleTheme(): void {
-    this.themeService.toggleTheme();
+    this.themeService.toggleMode();
   }
 
   getThemeIcon(): string {

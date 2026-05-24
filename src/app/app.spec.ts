@@ -21,7 +21,7 @@ describe('App', () => {
     });
     mockSiteConfigService.getSiteName.and.returnValue('cupcake');
 
-    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme', 'getThemeIcon', 'getThemeLabel'], {
+    mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode', 'getThemeIcon', 'getThemeLabel'], {
       isDark: signal(false)
     });
 

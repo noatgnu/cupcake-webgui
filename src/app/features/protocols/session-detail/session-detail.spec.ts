@@ -45,7 +45,7 @@ describe('SessionDetail', () => {
       siteConfig: signal({ uiFeaturesWithDefaults: {} })
     });
 
-    const mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleTheme'], {
+    const mockThemeService = jasmine.createSpyObj('ThemeService', ['toggleMode'], {
       isDark: signal(false)
     });
 
