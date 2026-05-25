@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit, OnDestroy, computed, effect } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
 import { ThemeService, AuthService, SiteConfigService, DemoModeService } from '@noatgnu/cupcake-core';
@@ -68,10 +69,14 @@ export class Sidebar implements OnInit, OnDestroy {
     });
   });
 
+  isAppliance = !!(environment as any).isAppliance;
+
   adminItems = [
     { icon: 'bi-sliders', label: 'Site Config', route: '/admin/site-config', requiresSuperuser: false },
-    { icon: 'bi-hdd-network', label: 'Storage', route: '/admin/storage', requiresSuperuser: false },
-    { icon: 'bi-archive', label: 'Backup', route: '/admin/backup', requiresSuperuser: false }
+    ...((environment as any).isAppliance ? [
+      { icon: 'bi-hdd-network', label: 'Storage', route: '/admin/storage', requiresSuperuser: false },
+      { icon: 'bi-archive', label: 'Backup', route: '/admin/backup', requiresSuperuser: false }
+    ] : [])
   ];
 
   superuserItems = [

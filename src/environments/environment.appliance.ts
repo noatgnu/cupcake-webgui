@@ -5,5 +5,6 @@ export const environment = {
   features: {
     asyncTasks: true
   },
-  isWails: false
+  isWails: false,
+  isAppliance: true
 };

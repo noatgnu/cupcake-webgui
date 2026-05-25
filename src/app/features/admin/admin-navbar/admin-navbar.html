@@ -22,6 +22,18 @@
             <i class="bi bi-cpu-fill me-1"></i>Worker Status
           </a>
         </li>
+        @if (isAppliance) {
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/admin/storage" routerLinkActive="active">
+              <i class="bi bi-hdd me-1"></i>Storage
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/admin/backup" routerLinkActive="active">
+              <i class="bi bi-archive me-1"></i>Backup
+            </a>
+          </li>
+        }
       </ul>
     </div>
   </div>
