@@ -1,261 +1,256 @@
-<app-billing-navbar></app-billing-navbar>
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <app-billing-navbar></app-billing-navbar>
 
-<div class="container-fluid p-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>
-      <i class="bi bi-receipt me-2"></i>Billing Records
-    </h2>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" (click)="toggleAdvancedFilters()">
-        <i class="bi bi-funnel me-2"></i>
-        {{ showAdvancedFilters() ? 'Hide' : 'Show' }} Advanced Filters
-      </button>
-      <button class="btn btn-outline-primary" (click)="exportToCSV()">
-        <i class="bi bi-download me-2"></i>
-        Export CSV
-      </button>
-    </div>
-  </div>
-
-  <!-- Basic Filters Card -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label for="searchQuery" class="form-label">Search</label>
-          <input
-            type="text"
-            class="form-control"
-            id="searchQuery"
-            [(ngModel)]="searchQuery"
-            (keyup.enter)="onSearch()"
-            placeholder="Search by description, cost center, or funder...">
-        </div>
-        <div class="col-md-4">
-          <label for="statusFilter" class="form-label">Status</label>
-          <select
-            class="form-select"
-            id="statusFilter"
-            [(ngModel)]="statusFilter"
-            (ngModelChange)="onStatusFilterChange($event)">
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="billed">Billed</option>
-            <option value="paid">Paid</option>
-            <option value="disputed">Disputed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-          <button class="btn btn-primary w-100" (click)="onSearch()">
-            <i class="bi bi-search me-1"></i>Search
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Advanced Filters Card -->
-  @if (showAdvancedFilters()) {
-    <div class="card mb-4">
-      <div class="card-header bg-secondary text-white">
-        <h6 class="mb-0">
-          <i class="bi bi-sliders me-2"></i>Advanced Filters
-        </h6>
-      </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-3">
-            <label for="costCenterFilter" class="form-label">Cost Center</label>
-            <input
-              type="text"
-              class="form-control"
-              id="costCenterFilter"
-              [(ngModel)]="costCenterFilter"
-              placeholder="Filter by cost center">
-          </div>
-          <div class="col-md-3">
-            <label for="funderFilter" class="form-label">Funder</label>
-            <input
-              type="text"
-              class="form-control"
-              id="funderFilter"
-              [(ngModel)]="funderFilter"
-              placeholder="Filter by funder">
-          </div>
-          <div class="col-md-3">
-            <label for="startDate" class="form-label">Start Date</label>
-            <input
-              type="date"
-              class="form-control"
-              id="startDate"
-              [(ngModel)]="startDate">
-          </div>
-          <div class="col-md-3">
-            <label for="endDate" class="form-label">End Date</label>
-            <input
-              type="date"
-              class="form-control"
-              id="endDate"
-              [(ngModel)]="endDate">
-          </div>
-          <div class="col-12 d-flex gap-2 justify-content-end">
-            <button class="btn btn-outline-secondary" (click)="clearFilters()">
-              <i class="bi bi-x-circle me-2"></i>Clear Filters
-            </button>
-            <button class="btn btn-primary" (click)="onSearch()">
-              <i class="bi bi-funnel me-2"></i>Apply Filters
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- Admin Actions Bar -->
-  @if (isAdmin() && selectedRecords().size > 0) {
-    <div class="alert alert-primary d-flex justify-content-between align-items-center mb-4">
-      <div>
-        <i class="bi bi-check-square me-2"></i>
-        <strong>{{ selectedRecords().size }}</strong> record(s) selected
-      </div>
+  <div class="flex-grow-1 p-4 overflow-auto">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="m-0 fw-bold">
+        <i class="bi bi-receipt me-2"></i>Billing Records
+      </h4>
       <div class="d-flex gap-2">
-        <button class="btn btn-sm btn-outline-primary" (click)="deselectAllRecords()">
-          <i class="bi bi-x me-2"></i>Deselect All
+        <button class="btn btn-sm btn-outline-secondary" (click)="toggleAdvancedFilters()">
+          <i class="bi bi-funnel me-1"></i>
+          {{ showAdvancedFilters() ? 'Hide' : 'Show' }} Advanced Filters
         </button>
-        <button class="btn btn-sm btn-success" (click)="bulkApprove()">
-          <i class="bi bi-check-circle me-2"></i>Approve Selected
+        <button class="btn btn-sm btn-outline-primary" (click)="exportToCSV()">
+          <i class="bi bi-download me-1"></i>
+          Export CSV
         </button>
       </div>
     </div>
-  }
 
-  @if (loading()) {
-    <div class="text-center p-5">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <div class="card mb-3">
+      <div class="card-body py-2">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label for="searchQuery" class="form-label small">Search</label>
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              id="searchQuery"
+              [(ngModel)]="searchQuery"
+              (keyup.enter)="onSearch()"
+              placeholder="Search by description, cost center, or funder...">
+          </div>
+          <div class="col-md-4">
+            <label for="statusFilter" class="form-label small">Status</label>
+            <select
+              class="form-select form-select-sm"
+              id="statusFilter"
+              [(ngModel)]="statusFilter"
+              (ngModelChange)="onStatusFilterChange($event)">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="billed">Billed</option>
+              <option value="paid">Paid</option>
+              <option value="disputed">Disputed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-sm btn-primary w-100" (click)="onSearch()">
+              <i class="bi bi-search me-1"></i>Search
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  } @else {
-    @if (billingRecords().length === 0) {
-      <div class="alert alert-info">
-        <i class="bi bi-info-circle me-2"></i>
-        No billing records found.
-      </div>
-    } @else {
-      <div class="card">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                @if (isAdmin()) {
-                  <th style="width: 40px;">
-                    <div class="form-check">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        [checked]="selectedRecords().size === billingRecords().length && billingRecords().length > 0"
-                        (change)="selectedRecords().size === billingRecords().length ? deselectAllRecords() : selectAllRecords()">
-                    </div>
-                  </th>
-                }
-                <th>Period</th>
-                <th>User</th>
-                <th>Item</th>
-                <th>Quantity</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Cost Center</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (record of billingRecords(); track record.id) {
-                <tr>
-                  @if (isAdmin()) {
-                    <td>
-                      <div class="form-check">
-                        <input
-                          class="form-check-input"
-                          type="checkbox"
-                          [checked]="selectedRecords().has(record.id)"
-                          (change)="toggleRecordSelection(record.id)">
-                      </div>
-                    </td>
-                  }
-                  <td>
-                    <small>
-                      {{ record.billingPeriodStart | date:'short' }}<br>
-                      to {{ record.billingPeriodEnd | date:'short' }}
-                    </small>
-                  </td>
-                  <td>
-                    <div>{{ record.username }}</div>
-                    @if (record.userEmail) {
-                      <small class="text-muted">{{ record.userEmail }}</small>
-                    }
-                  </td>
-                  <td>
-                    <div>{{ record.billableItemName }}</div>
-                    @if (record.description) {
-                      <small class="text-muted">{{ record.description }}</small>
-                    }
-                  </td>
-                  <td>
-                    {{ record.quantity }} {{ record.billingUnitDisplay }}
-                  </td>
-                  <td>
-                    <strong>{{ record.totalAmount | currency:record.currency }}</strong>
-                    <br>
-                    <small class="text-muted">
-                      Unit: {{ record.unitPrice | currency:record.currency }}
-                    </small>
-                  </td>
-                  <td>
-                    <span class="badge" [ngClass]="getStatusBadgeClass(record.status)">
-                      {{ record.statusDisplay }}
-                    </span>
-                  </td>
-                  <td>
-                    @if (record.costCenter) {
-                      <div>{{ record.costCenter }}</div>
-                    }
-                    @if (record.funder) {
-                      <small class="text-muted">Funder: {{ record.funder }}</small>
-                    }
-                  </td>
-                  <td>
-                    <button
-                      class="btn btn-sm btn-outline-primary"
-                      [ngbTooltip]="'View Details'"
-                      type="button"
-                      (click)="viewDetails(record)">
-                      <i class="bi bi-eye"></i>
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+
+    @if (showAdvancedFilters()) {
+      <div class="card mb-3">
+        <div class="card-header bg-secondary text-white py-2">
+          <h6 class="mb-0">
+            <i class="bi bi-sliders me-2"></i>Advanced Filters
+          </h6>
         </div>
-        <div class="card-footer">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="text-muted">
-              Showing {{ ((page() - 1) * pageSize) + 1 }} to {{ Math.min(page() * pageSize, total()) }} of {{ total() }} records
+        <div class="card-body py-2">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label for="costCenterFilter" class="form-label small">Cost Center</label>
+              <input
+                type="text"
+                class="form-control form-control-sm"
+                id="costCenterFilter"
+                [(ngModel)]="costCenterFilter"
+                placeholder="Filter by cost center">
             </div>
-            <ngb-pagination
-              [(page)]="page"
-              [pageSize]="pageSize"
-              [collectionSize]="total()"
-              [maxSize]="5"
-              [rotate]="true"
-              [boundaryLinks]="true"
-              (pageChange)="onPageChange($event)">
-            </ngb-pagination>
+            <div class="col-md-3">
+              <label for="funderFilter" class="form-label small">Funder</label>
+              <input
+                type="text"
+                class="form-control form-control-sm"
+                id="funderFilter"
+                [(ngModel)]="funderFilter"
+                placeholder="Filter by funder">
+            </div>
+            <div class="col-md-3">
+              <label for="startDate" class="form-label small">Start Date</label>
+              <input
+                type="date"
+                class="form-control form-control-sm"
+                id="startDate"
+                [(ngModel)]="startDate">
+            </div>
+            <div class="col-md-3">
+              <label for="endDate" class="form-label small">End Date</label>
+              <input
+                type="date"
+                class="form-control form-control-sm"
+                id="endDate"
+                [(ngModel)]="endDate">
+            </div>
+            <div class="col-12 d-flex gap-2 justify-content-end">
+              <button class="btn btn-sm btn-outline-secondary" (click)="clearFilters()">
+                <i class="bi bi-x-circle me-1"></i>Clear Filters
+              </button>
+              <button class="btn btn-sm btn-primary" (click)="onSearch()">
+                <i class="bi bi-funnel me-1"></i>Apply Filters
+              </button>
+            </div>
           </div>
         </div>
       </div>
     }
-  }
+
+    @if (isAdmin() && selectedRecords().size > 0) {
+      <div class="alert alert-primary d-flex justify-content-between align-items-center mb-3 py-2">
+        <div>
+          <i class="bi bi-check-square me-2"></i>
+          <strong>{{ selectedRecords().size }}</strong> record(s) selected
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" (click)="deselectAllRecords()">
+            <i class="bi bi-x me-1"></i>Deselect All
+          </button>
+          <button class="btn btn-sm btn-success" (click)="bulkApprove()">
+            <i class="bi bi-check-circle me-1"></i>Approve Selected
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (loading()) {
+      <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    } @else {
+      @if (billingRecords().length === 0) {
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          No billing records found.
+        </div>
+      } @else {
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  @if (isAdmin()) {
+                    <th style="width: 40px;">
+                      <div class="form-check">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          [checked]="selectedRecords().size === billingRecords().length && billingRecords().length > 0"
+                          (change)="selectedRecords().size === billingRecords().length ? deselectAllRecords() : selectAllRecords()">
+                      </div>
+                    </th>
+                  }
+                  <th>Period</th>
+                  <th>User</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Cost Center</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (record of billingRecords(); track record.id) {
+                  <tr>
+                    @if (isAdmin()) {
+                      <td>
+                        <div class="form-check">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            [checked]="selectedRecords().has(record.id)"
+                            (change)="toggleRecordSelection(record.id)">
+                        </div>
+                      </td>
+                    }
+                    <td>
+                      <small>
+                        {{ record.billingPeriodStart | date:'short' }}<br>
+                        to {{ record.billingPeriodEnd | date:'short' }}
+                      </small>
+                    </td>
+                    <td>
+                      <div>{{ record.username }}</div>
+                      @if (record.userEmail) {
+                        <small class="text-muted">{{ record.userEmail }}</small>
+                      }
+                    </td>
+                    <td>
+                      <div>{{ record.billableItemName }}</div>
+                      @if (record.description) {
+                        <small class="text-muted">{{ record.description }}</small>
+                      }
+                    </td>
+                    <td>{{ record.quantity }} {{ record.billingUnitDisplay }}</td>
+                    <td>
+                      <strong>{{ record.totalAmount | currency:record.currency }}</strong>
+                      <br>
+                      <small class="text-muted">Unit: {{ record.unitPrice | currency:record.currency }}</small>
+                    </td>
+                    <td>
+                      <span class="badge" [ngClass]="getStatusBadgeClass(record.status)">
+                        {{ record.statusDisplay }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (record.costCenter) {
+                        <div>{{ record.costCenter }}</div>
+                      }
+                      @if (record.funder) {
+                        <small class="text-muted">Funder: {{ record.funder }}</small>
+                      }
+                    </td>
+                    <td>
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        [ngbTooltip]="'View Details'"
+                        type="button"
+                        (click)="viewDetails(record)">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="text-muted small">
+                Showing {{ ((page() - 1) * pageSize) + 1 }} to {{ Math.min(page() * pageSize, total()) }} of {{ total() }} records
+              </div>
+              <ngb-pagination
+                [(page)]="page"
+                [pageSize]="pageSize"
+                [collectionSize]="total()"
+                [maxSize]="5"
+                [rotate]="true"
+                [boundaryLinks]="true"
+                (pageChange)="onPageChange($event)">
+              </ngb-pagination>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </div>
 </div>

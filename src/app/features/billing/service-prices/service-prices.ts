@@ -12,10 +12,12 @@ import {
   BillableItemTypeService
 } from '@noatgnu/cupcake-salted-caramel';
 import { ServicePriceFormModal } from '../service-price-form-modal/service-price-form-modal';
+import { BillingNavbar } from '../billing-navbar/billing-navbar';
+import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-service-prices',
-  imports: [FormsModule],
+  imports: [FormsModule, BillingNavbar, NgbTooltipModule],
   templateUrl: './service-prices.html',
   styleUrl: './service-prices.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

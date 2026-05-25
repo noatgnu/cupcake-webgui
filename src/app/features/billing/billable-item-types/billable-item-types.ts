@@ -10,10 +10,12 @@ import {
   BillingUnit
 } from '@noatgnu/cupcake-salted-caramel';
 import { BillableItemTypeFormModal } from '../billable-item-type-form-modal/billable-item-type-form-modal';
+import { BillingNavbar } from '../billing-navbar/billing-navbar';
+import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-billable-item-types',
-  imports: [FormsModule],
+  imports: [FormsModule, BillingNavbar, NgbTooltipModule],
   templateUrl: './billable-item-types.html',
   styleUrl: './billable-item-types.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

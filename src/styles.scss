@@ -1,21 +1,16 @@
-// Import Bootstrap
 @import 'bootstrap/scss/bootstrap';
 @import 'bootstrap-icons/font/bootstrap-icons.css';
-
 @import 'quill/dist/quill.snow.css';
 
-// Cupcake core Bootstrap integration (defines --cupcake-* variables and global component overrides)
+// Cupcake Bootstrap integration (theme-agnostic; uses :root prefix)
 @import '@noatgnu/cupcake-core/src/lib/styles/bootstrap-integration';
 
-// Cupcake core component styles
+// Cupcake component styles
 @import '@noatgnu/cupcake-core/src/lib/styles/components';
 
-// Import palette themes — must come last so palette selectors win over :root
+// Palette themes — default first, then palette overrides
+@import '@noatgnu/cupcake-core/src/lib/styles/themes/default';
 @import '@noatgnu/cupcake-core/src/lib/styles/themes/eink';
-
-.navbar.bg-primary {
-  background-color: var(--cupcake-primary-brand, var(--cupcake-primary)) !important;
-}
 
 // Make Bootstrap utilities respect the theme
 .card-header {

@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-
+import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService, ToastService, User, UserManagementService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService, User, UserManagementService, ThemeService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-user-profile',
-  imports: [FormsModule],
+  imports: [FormsModule, NgClass],
   templateUrl: './user-profile.html',
   styleUrl: './user-profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -14,6 +14,7 @@ export class UserProfile implements OnInit {
   private authService = inject(AuthService);
   private userManagementService = inject(UserManagementService);
   private toastService = inject(ToastService);
+  protected themeService = inject(ThemeService);
 
   currentUser = signal<User | null>(this.authService.currentUser());
   editMode = signal(false);
