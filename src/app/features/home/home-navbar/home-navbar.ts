@@ -11,14 +11,14 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
 export class HomeNavbar {
   private sidebarControl = inject(SidebarControl);
 
-  @Input() activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' = 'dashboard';
-  @Output() sectionChange = new EventEmitter<'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks'>();
+  @Input() activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' | 'devices' = 'dashboard';
+  @Output() sectionChange = new EventEmitter<'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' | 'devices'>();
 
   onToggleSidebar(): void {
     this.sidebarControl.toggle();
   }
 
-  navigateToSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks'): void {
+  navigateToSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' | 'devices'): void {
     this.sectionChange.emit(section);
   }
 }

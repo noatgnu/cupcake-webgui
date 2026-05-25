@@ -1,0 +1,17 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <h4 class="navbar-brand m-0 fw-bold">
+        <i class="bi bi-cpu me-2"></i>Device Tokens
+      </h4>
+      <div class="ms-auto">
+        <button class="btn btn-sm btn-primary" (click)="openCreate()">
+          <i class="bi bi-plus-lg me-1"></i>New Token
+        </button>
+      </div>
+    </div>
+  </nav>
+  <div class="flex-grow-1 p-4 overflow-auto">
+    <ccc-device-token-management></ccc-device-token-management>
+  </div>
+</div>

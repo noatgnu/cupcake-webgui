@@ -28,7 +28,7 @@ export class Home implements OnInit, OnDestroy {
   private siteConfigService = inject(SiteConfigService);
   private fragmentSubscription?: Subscription;
 
-  activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' = 'dashboard';
+  activeSection: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' | 'devices' = 'dashboard';
 
   recentSessions = signal<Session[]>([]);
   activeTimeKeeper = signal<TimeKeeper | null>(null);
@@ -145,14 +145,14 @@ export class Home implements OnInit, OnDestroy {
 
     if (fragment === 'tasks') {
       this.activeSection = 'tasks';
-    } else if (lastSegment === 'projects' || lastSegment === 'lab-groups' || lastSegment === 'users' || lastSegment === 'messages' || lastSegment === 'notifications' || lastSegment === 'profile' || lastSegment === 'site-config' || lastSegment === 'tasks') {
+    } else if (lastSegment === 'projects' || lastSegment === 'lab-groups' || lastSegment === 'users' || lastSegment === 'messages' || lastSegment === 'notifications' || lastSegment === 'profile' || lastSegment === 'site-config' || lastSegment === 'tasks' || lastSegment === 'devices') {
       this.activeSection = lastSegment as typeof this.activeSection;
     } else {
       this.activeSection = 'dashboard';
     }
   }
 
-  showSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks'): void {
+  showSection(section: 'dashboard' | 'projects' | 'lab-groups' | 'users' | 'messages' | 'notifications' | 'profile' | 'site-config' | 'tasks' | 'devices'): void {
     this.activeSection = section;
     if (section === 'dashboard') {
       this.router.navigate(['/home']);

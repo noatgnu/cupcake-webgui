@@ -37,6 +37,10 @@ export const routes: Routes = [
             loadComponent: () => import('./features/home/user-profile/user-profile').then(m => m.UserProfile)
           },
           {
+            path: 'devices',
+            loadComponent: () => import('./features/home/devices-view/devices-view').then(m => m.DevicesView)
+          },
+          {
             path: 'notifications',
             loadComponent: () => import('./features/home/notifications-view/notifications-view').then(m => m.NotificationsView)
           },
