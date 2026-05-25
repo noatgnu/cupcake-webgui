@@ -5,14 +5,6 @@
       <h4 class="navbar-brand m-0 fw-bold">
         <i class="bi bi-person-circle me-2"></i>User Profile
       </h4>
-      <div class="ms-auto">
-        <button
-          class="btn btn-sm btn-outline-secondary"
-          (click)="themeService.toggleMode()"
-          [title]="themeService.getThemeLabel()">
-          <i class="bi" [ngClass]="themeService.getThemeIcon()"></i>
-        </button>
-      </div>
     </div>
   </nav>
 
@@ -222,6 +214,76 @@
                 } @else {
                   <p class="text-muted mb-0">Click "Change Password" to update your password</p>
                 }
+              </div>
+            </div>
+
+            <div class="row mt-4">
+              <div class="col-md-12">
+                <h5 class="border-bottom pb-2 mb-3">Appearance</h5>
+
+                <div class="mb-3">
+                  <div class="small text-muted mb-2">Color Mode</div>
+                  <div class="btn-group" role="group">
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      [class.btn-primary]="themeService.mode() === 'light'"
+                      [class.btn-outline-secondary]="themeService.mode() !== 'light'"
+                      (click)="themeService.setMode('light')">
+                      <i class="bi bi-sun-fill me-1"></i>Light
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      [class.btn-primary]="themeService.mode() === 'dark'"
+                      [class.btn-outline-secondary]="themeService.mode() !== 'dark'"
+                      (click)="themeService.setMode('dark')">
+                      <i class="bi bi-moon-fill me-1"></i>Dark
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      [class.btn-primary]="themeService.mode() === 'auto'"
+                      [class.btn-outline-secondary]="themeService.mode() !== 'auto'"
+                      (click)="themeService.setMode('auto')">
+                      <i class="bi bi-circle-half me-1"></i>Auto
+                    </button>
+                  </div>
+                </div>
+
+                <div class="small text-muted mb-2">Theme</div>
+                <div class="d-flex gap-3">
+                  <div
+                    class="border rounded p-3 flex-fill"
+                    [class.border-primary]="themeService.palette() === 'default'"
+                    [class.border-2]="themeService.palette() === 'default'"
+                    role="button"
+                    (click)="themeService.setPalette('default')">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <i class="bi bi-display"></i>
+                      <strong>Default</strong>
+                      @if (themeService.palette() === 'default') {
+                        <i class="bi bi-check-circle-fill text-primary ms-auto"></i>
+                      }
+                    </div>
+                    <small class="text-muted">Full colour with standard animations</small>
+                  </div>
+                  <div
+                    class="border rounded p-3 flex-fill"
+                    [class.border-primary]="themeService.palette() === 'eink'"
+                    [class.border-2]="themeService.palette() === 'eink'"
+                    role="button"
+                    (click)="themeService.setPalette('eink')">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <i class="bi bi-book"></i>
+                      <strong>E-Ink</strong>
+                      @if (themeService.palette() === 'eink') {
+                        <i class="bi bi-check-circle-fill text-primary ms-auto"></i>
+                      }
+                    </div>
+                    <small class="text-muted">Monochrome, no animation, optimised for e-ink displays</small>
+                  </div>
+                </div>
               </div>
             </div>
           } @else {
