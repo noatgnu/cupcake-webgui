@@ -1,22 +1,27 @@
 <div class="container-fluid h-100 d-flex flex-column p-0">
   <app-billing-navbar></app-billing-navbar>
 
-  <div class="flex-grow-1 p-4 overflow-auto">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="m-0 fw-bold">
-        <i class="bi bi-receipt me-2"></i>Billing Records
-      </h4>
-      <div class="d-flex gap-2">
-        <button class="btn btn-sm btn-outline-secondary" (click)="toggleAdvancedFilters()">
-          <i class="bi bi-funnel me-1"></i>
-          {{ showAdvancedFilters() ? 'Hide' : 'Show' }} Advanced Filters
-        </button>
-        <button class="btn btn-sm btn-outline-primary" (click)="exportToCSV()">
-          <i class="bi bi-download me-1"></i>
-          Export CSV
-        </button>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 gap-3">
+        <span class="navbar-brand fw-bold mb-0 h4">
+          <i class="bi bi-receipt me-2"></i>Billing Records
+        </span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" (click)="toggleAdvancedFilters()">
+            <i class="bi bi-funnel me-1"></i>
+            {{ showAdvancedFilters() ? 'Hide' : 'Show' }} Advanced Filters
+          </button>
+          <button class="btn btn-sm btn-outline-primary" (click)="exportToCSV()">
+            <i class="bi bi-download me-1"></i>
+            Export CSV
+          </button>
+        </div>
       </div>
     </div>
+  </nav>
+
+  <div class="flex-grow-1 p-4 overflow-auto">
 
     <div class="card mb-3">
       <div class="card-body py-2">

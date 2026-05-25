@@ -1,25 +1,30 @@
 <div class="container-fluid h-100 d-flex flex-column p-0">
   <app-admin-navbar></app-admin-navbar>
 
-  <div class="flex-grow-1 p-4 overflow-auto">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h4 class="m-0 fw-bold">
-        <i class="bi bi-gear-fill me-2"></i>Site Configuration
-      </h4>
-      @if (canEdit()) {
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetForm()" [disabled]="saving() || loading()">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
-          </button>
-          <button type="button" class="btn btn-primary btn-sm" (click)="saveConfig()" [disabled]="saving() || loading()">
-            @if (saving()) {
-              <span class="spinner-border spinner-border-sm me-2"></span>
-            }
-            <i class="bi bi-save me-1"></i>Save Changes
-          </button>
-        </div>
-      }
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 gap-3">
+        <span class="navbar-brand fw-bold mb-0 h4">
+          <i class="bi bi-gear-fill me-2"></i>Site Configuration
+        </span>
+        @if (canEdit()) {
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetForm()" [disabled]="saving() || loading()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="saveConfig()" [disabled]="saving() || loading()">
+              @if (saving()) {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+              }
+              <i class="bi bi-save me-1"></i>Save Changes
+            </button>
+          </div>
+        }
+      </div>
     </div>
+  </nav>
+
+  <div class="flex-grow-1 p-4 overflow-auto">
 
       @if (loading()) {
         <div class="text-center py-5">

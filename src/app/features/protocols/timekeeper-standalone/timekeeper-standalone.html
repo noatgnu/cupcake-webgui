@@ -1,48 +1,47 @@
 <div class="container-fluid h-100 d-flex flex-column p-0">
-  <div class="timekeeper-header flex-shrink-0">
-    <div class="p-3 pb-2">
-      <h2 class="mb-0">
-        <i class="bi bi-stopwatch me-2"></i>Timers
-      </h2>
-    </div>
-
-    <div class="toolbar px-3 pb-3">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="btn-group" role="group">
-          <button
-            type="button"
-            class="btn"
-            [class.btn-primary]="filterType() === 'all'"
-            [class.btn-outline-primary]="filterType() !== 'all'"
-            (click)="setFilter('all')">
-            All ({{ timekeepers().length }})
-          </button>
-          <button
-            type="button"
-            class="btn"
-            [class.btn-primary]="filterType() === 'standalone'"
-            [class.btn-outline-primary]="filterType() !== 'standalone'"
-            (click)="setFilter('standalone')">
-            <i class="bi bi-stopwatch me-1"></i>
-            Standalone ({{ standaloneCount() }})
-          </button>
-          <button
-            type="button"
-            class="btn"
-            [class.btn-primary]="filterType() === 'session'"
-            [class.btn-outline-primary]="filterType() !== 'session'"
-            (click)="setFilter('session')">
-            <i class="bi bi-play-circle me-1"></i>
-            Session ({{ sessionCount() }})
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
+        <span class="navbar-brand fw-bold mb-0 h4">
+          <i class="bi bi-stopwatch me-2"></i>Timers
+        </span>
+        <div class="d-flex gap-2 align-items-center">
+          <div class="btn-group btn-group-sm" role="group">
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="filterType() === 'all'"
+              [class.btn-outline-primary]="filterType() !== 'all'"
+              (click)="setFilter('all')">
+              All ({{ timekeepers().length }})
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="filterType() === 'standalone'"
+              [class.btn-outline-primary]="filterType() !== 'standalone'"
+              (click)="setFilter('standalone')">
+              <i class="bi bi-stopwatch me-1"></i>
+              Standalone ({{ standaloneCount() }})
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="filterType() === 'session'"
+              [class.btn-outline-primary]="filterType() !== 'session'"
+              (click)="setFilter('session')">
+              <i class="bi bi-play-circle me-1"></i>
+              Session ({{ sessionCount() }})
+            </button>
+          </div>
+          <button class="btn btn-primary btn-sm" (click)="showCreateForm.set(true)">
+            <i class="bi bi-plus-circle me-1"></i>
+            New Timer
           </button>
         </div>
-        <button class="btn btn-primary" (click)="showCreateForm.set(true)">
-          <i class="bi bi-plus-circle me-2"></i>
-          New Timer
-        </button>
       </div>
     </div>
-  </div>
+  </nav>
 
   <div class="timekeeper-content flex-grow-1 p-3" style="min-height: 0;">
     @if (loading()) {
