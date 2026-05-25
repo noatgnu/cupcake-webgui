@@ -11,6 +11,7 @@
     &.active {
       border-color: var(--bs-primary) !important;
       background-color: rgba(var(--bs-primary-rgb), 0.05);
+      color: var(--bs-body-color);
 
       .cue-text {
         font-weight: 600;

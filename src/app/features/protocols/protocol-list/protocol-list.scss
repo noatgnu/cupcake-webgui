@@ -52,6 +52,7 @@
   &.active {
     background-color: rgba(var(--cupcake-primary-rgb), 0.1);
     border-left: 3px solid var(--cupcake-primary);
+    color: var(--bs-body-color);
   }
 }
 
