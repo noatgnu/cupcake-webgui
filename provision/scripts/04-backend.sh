@@ -123,6 +123,103 @@ if [ -f "$STORAGE_CONFIG" ]; then
     esac
     rm -f "$STORAGE_CONFIG"
 fi
+
+WIFI_CONFIG=""
+WIFI_CONFIG_DIR=""
+if [ -f /boot/firmware/cupcake-wifi.txt ]; then
+    WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
+    WIFI_CONFIG_DIR=/boot/firmware
+elif [ -f /opt/cupcake/wifi-config.txt ]; then
+    WIFI_CONFIG=/opt/cupcake/wifi-config.txt
+    WIFI_CONFIG_DIR=/opt/cupcake
+fi
+
+if [ -n "$WIFI_CONFIG" ]; then
+    _wget() { grep "^$1=" "$WIFI_CONFIG" 2>/dev/null | cut -d= -f2- || true; }
+    WF_SSID=$(_wget SSID)
+    WF_AUTH=${AUTH_TYPE:-$(_wget AUTH_TYPE)}
+    WF_AUTH=${WF_AUTH:-wpa2-personal}
+    WF_PASSWORD=$(_wget PASSWORD)
+    WF_IFACE=$(_wget INTERFACE)
+    WF_EAP=${EAP_METHOD:-$(_wget EAP_METHOD)}
+    WF_EAP=${WF_EAP:-peap}
+    WF_PHASE2=$(_wget PHASE2_AUTH)
+    WF_PHASE2=${WF_PHASE2:-mschapv2}
+    WF_IDENTITY=$(_wget IDENTITY)
+    WF_ANON=$(_wget ANONYMOUS_IDENTITY)
+    WF_CA=$(_wget CA_CERT)
+    WF_CLIENT_CERT=$(_wget CLIENT_CERT)
+    WF_CLIENT_KEY=$(_wget CLIENT_KEY)
+
+    if [ -z "$WF_IFACE" ]; then
+        WF_IFACE=$(find /sys/class/net -maxdepth 1 -mindepth 1 | while read -r p; do
+            i=$(basename "$p")
+            if [ -d "$p/wireless" ] || [ -d "$p/phy80211" ]; then echo "$i"; break; fi
+        done)
+    fi
+
+    if [ -n "$WF_SSID" ] && [ -n "$WF_IFACE" ]; then
+        mkdir -p /opt/cupcake/wifi-certs
+        chown cupcake-svc:cupcake-svc /opt/cupcake/wifi-certs
+        chmod 700 /opt/cupcake/wifi-certs
+
+        _copy_cert() {
+            local ref="$1" dst_name="$2" src=""
+            [ -z "$ref" ] && return
+            src="$WIFI_CONFIG_DIR/$ref"
+            [ -f "$ref" ] && src="$ref"
+            if [ -f "$src" ]; then
+                cp "$src" "/opt/cupcake/wifi-certs/$dst_name"
+                chown cupcake-svc:cupcake-svc "/opt/cupcake/wifi-certs/$dst_name"
+                chmod 640 "/opt/cupcake/wifi-certs/$dst_name"
+                echo "$dst_name"
+            fi
+        }
+
+        WF_CA_FILE=$(_copy_cert "$WF_CA" "ca.pem")
+        WF_CERT_FILE=$(_copy_cert "$WF_CLIENT_CERT" "client_cert.pem")
+        WF_KEY_FILE=$(_copy_cert "$WF_CLIENT_KEY" "client_key.pem")
+
+        WIFI_SSID="$WF_SSID" WIFI_IFACE="$WF_IFACE" WIFI_AUTH="$WF_AUTH" \
+        WIFI_PASSWORD="$WF_PASSWORD" WIFI_EAP="$WF_EAP" WIFI_PHASE2="$WF_PHASE2" \
+        WIFI_IDENTITY="$WF_IDENTITY" WIFI_ANON="$WF_ANON" \
+        WIFI_CA_FILE="$WF_CA_FILE" WIFI_CERT_FILE="$WF_CERT_FILE" WIFI_KEY_FILE="$WF_KEY_FILE" \
+        python3 -c "
+import json, os
+cfg = {
+    'ssid': os.environ['WIFI_SSID'],
+    'interfaceName': os.environ['WIFI_IFACE'],
+    'authType': os.environ['WIFI_AUTH'],
+}
+auth = cfg['authType']
+if auth == 'wpa2-personal':
+    cfg['password'] = os.environ['WIFI_PASSWORD']
+else:
+    cfg['eapMethod'] = os.environ.get('WIFI_EAP') or 'peap'
+    cfg['identity'] = os.environ['WIFI_IDENTITY']
+    anon = os.environ.get('WIFI_ANON', '')
+    if anon:
+        cfg['anonymousIdentity'] = anon
+    phase2 = os.environ.get('WIFI_PHASE2', '')
+    if phase2:
+        cfg['phase2Auth'] = phase2
+    eap = cfg['eapMethod']
+    if eap in ('peap', 'ttls'):
+        cfg['password'] = os.environ['WIFI_PASSWORD']
+    for env_key, cfg_key in [('WIFI_CA_FILE', 'caCertFilename'), ('WIFI_CERT_FILE', 'clientCertFilename'), ('WIFI_KEY_FILE', 'clientKeyFilename')]:
+        v = os.environ.get(env_key, '')
+        if v:
+            cfg[cfg_key] = v
+print(json.dumps(cfg, indent=2))
+" > /opt/cupcake/wifi-config.json
+
+        chown cupcake-svc:cupcake-svc /opt/cupcake/wifi-config.json
+        chmod 640 /opt/cupcake/wifi-config.json
+        /opt/cupcake/configure-wifi.sh apply 2>/dev/null || true
+    fi
+
+    rm -f "$WIFI_CONFIG"
+fi
 FBEOF
 chmod +x /opt/cupcake/first-boot.sh
 chown root:root /opt/cupcake/first-boot.sh

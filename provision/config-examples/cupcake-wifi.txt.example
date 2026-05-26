@@ -1,19 +1,61 @@
-# Cupcake WiFi Configuration  (Raspberry Pi only)
+# Cupcake WiFi Configuration
 #
-# Copy as  /boot/firmware/cupcake-wifi.txt  before first boot.
+# RPi     : copy as  /boot/firmware/cupcake-wifi.txt  onto the SD card boot
+#           partition before inserting it into the device.
+#
+# x86 VM  : WiFi is rarely needed on VMs (they use virtual NICs).
+#           Preferred: use the admin UI at /admin/wifi after first boot.
+#           Alternative: SSH in, write /opt/cupcake/wifi-config.txt, then
+#           reboot (or run  sudo /opt/cupcake/first-boot.sh  directly).
+#
 # The file is read on every boot but only acted on when present.
-# It is deleted after the connection is created.
-# To reconfigure WiFi on a running appliance use nmcli or nmtui directly.
+# It is deleted after the connection is applied.
 #
+# ─────────────────────────────────────────────────────────────────────────────
+# Choose ONE auth type and fill in the matching section. Comment out the other.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Network name (required)
 SSID=MyLabNetwork
 
-# WPA2 passphrase (required)
+# Wireless interface.  Leave blank to auto-detect the first wireless interface.
+#INTERFACE=wlan0
+
+# Auth type: wpa2-personal | wpa2-enterprise
+AUTH_TYPE=wpa2-personal
+
+
+# ── WPA2-Personal (standard home/office password) ────────────────────────────
+
 PASSWORD=MySecretPassphrase
 
-# ISO 3166-1 alpha-2 country code for regulatory compliance.
-# Required in some regions. Defaults to GB if omitted.
-# Common codes: US  GB  DE  FR  AU  JP  CA
-#COUNTRY=GB
+
+# ── WPA2-Enterprise (802.1X — used in universities and large organisations) ──
+#
+# Set AUTH_TYPE=wpa2-enterprise above, then uncomment the relevant lines below.
+#
+
+# EAP method: peap | ttls | tls
+#EAP_METHOD=peap
+
+# Your login username / identity
+#IDENTITY=user@example.com
+
+# Anonymous outer identity (optional — hides the real identity in phase 1)
+#ANONYMOUS_IDENTITY=anonymous@example.com
+
+# Inner authentication method used with PEAP/TTLS: mschapv2 | pap | chap
+#PHASE2_AUTH=mschapv2
+
+# Password (required for PEAP and TTLS; not used for TLS)
+#PASSWORD=MyEnterprisePassword
+
+# CA certificate file (recommended — verifies the RADIUS server).
+# Place the PEM file alongside this config file and set the filename here.
+# RPi: /boot/firmware/ca.pem   →  CA_CERT=ca.pem
+#CA_CERT=ca.pem
+
+# Client certificate and key (EAP-TLS only — mutual authentication).
+# Place both PEM files alongside this config file.
+#CLIENT_CERT=client.pem
+#CLIENT_KEY=client.key.pem
