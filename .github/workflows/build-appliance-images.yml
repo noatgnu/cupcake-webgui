@@ -32,9 +32,9 @@ jobs:
     if: github.event_name == 'release' || inputs.image_type != 'vm'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
@@ -67,14 +67,14 @@ jobs:
           cp -r dist/cupcake-vanilla-ng/browser/* "$GITHUB_WORKSPACE/frontend/vanilla/"
 
       - name: Upload webgui
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: cupcake-webgui-frontend
           path: frontend/webgui/
           retention-days: 1
 
       - name: Upload vanilla-ng
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: cupcake-vanilla-ng-frontend
           path: frontend/vanilla/
@@ -84,7 +84,7 @@ jobs:
     name: Build seeded database
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -177,7 +177,7 @@ jobs:
           echo "Seed dump size: $(du -sh cupcake-seed.sql.gz | cut -f1)"
 
       - name: Upload seed database
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: cupcake-seed-db
           path: cupcake-seed.sql.gz
@@ -189,7 +189,7 @@ jobs:
     needs: build-db
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install tools
         run: |
@@ -421,7 +421,7 @@ jobs:
             "chmod +x /tmp/13-storage-manager.sh && sudo /tmp/13-storage-manager.sh"
 
       - name: Download seed database
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: cupcake-seed-db
 
@@ -598,7 +598,7 @@ jobs:
 
       - name: Upload UI test screenshots
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ui-test-screenshots
           path: /tmp/ui-test/screenshot-*.png
@@ -629,7 +629,7 @@ jobs:
           ls -lh cupcake-vm-amd64.qcow2.xz
 
       - name: Upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: cupcake-vm-amd64
           path: cupcake-vm-amd64.qcow2.xz
@@ -642,22 +642,22 @@ jobs:
     needs: [build-frontend, build-db]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Download webgui frontend
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: cupcake-webgui-frontend
           path: frontend/webgui
 
       - name: Download vanilla-ng frontend
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: cupcake-vanilla-ng-frontend
           path: frontend/vanilla
 
       - name: Download seed database
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: cupcake-seed-db
 
@@ -1549,14 +1549,14 @@ jobs:
 
       - name: Upload RPi UI test screenshots
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: rpi-ui-test-screenshots
           path: /tmp/rpi-ui-test/screenshot-*.png
           retention-days: 3
 
       - name: Upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: cupcake-pi-arm64
           path: pi-gen/deploy/*.img.xz
@@ -1570,7 +1570,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download RPi image
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: cupcake-pi-arm64
           path: release-assets/
