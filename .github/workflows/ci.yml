@@ -27,7 +27,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -107,7 +107,7 @@ jobs:
             arch: arm64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -181,7 +181,7 @@ jobs:
             -o build/bin/${{ matrix.platform }}-${{ matrix.arch }}/cupcake.exe
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cupcake-${{ matrix.platform }}-${{ matrix.arch }}
           path: cupcake-wails/build/bin/${{ matrix.platform }}-${{ matrix.arch }}/
