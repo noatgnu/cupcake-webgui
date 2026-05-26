@@ -26,7 +26,10 @@ apt-get install -y \
     nfs-common \
     cifs-utils \
     exfatprogs \
-    python3-zeroconf
+    python3-zeroconf \
+    iw \
+    wpasupplicant \
+    wireless-regdb
 
 mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
 mkdir -p /var/log/cupcake
@@ -54,6 +57,10 @@ ufw --force enable
 
 mkdir -p /opt/cupcake/backups
 chown cupcake-svc:cupcake-svc /opt/cupcake/backups
+
+mkdir -p /opt/cupcake/wifi-certs
+chown cupcake-svc:cupcake-svc /opt/cupcake/wifi-certs
+chmod 700 /opt/cupcake/wifi-certs
 
 hostnamectl set-hostname cupcake
 echo "127.0.0.1 localhost" > /etc/hosts

@@ -75,7 +75,8 @@ export class Sidebar implements OnInit, OnDestroy {
     { icon: 'bi-sliders', label: 'Site Config', route: '/admin/site-config', requiresSuperuser: false },
     ...((environment as any).isAppliance ? [
       { icon: 'bi-hdd-network', label: 'Storage', route: '/admin/storage', requiresSuperuser: false },
-      { icon: 'bi-archive', label: 'Backup', route: '/admin/backup', requiresSuperuser: false }
+      { icon: 'bi-archive', label: 'Backup', route: '/admin/backup', requiresSuperuser: false },
+      { icon: 'bi-wifi', label: 'WiFi', route: '/admin/wifi', requiresSuperuser: false }
     ] : [])
   ];
 

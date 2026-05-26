@@ -7,6 +7,7 @@ import { SiteConfig } from './site-config/site-config';
 import { WorkerStatus } from './worker-status/worker-status';
 import { StorageAdmin } from './storage-admin/storage-admin';
 import { BackupAdmin } from './backup-admin/backup-admin';
+import { WifiAdmin } from './wifi-admin/wifi-admin';
 import { environment } from '../../../environments/environment';
 
 const applianceGuard = () => {
@@ -46,5 +47,11 @@ export const adminRoutes: Routes = [
     component: BackupAdmin,
     canActivate: [adminGuard, applianceGuard],
     title: 'Backup Management'
+  },
+  {
+    path: 'wifi',
+    component: WifiAdmin,
+    canActivate: [adminGuard, applianceGuard],
+    title: 'WiFi Management'
   }
 ];

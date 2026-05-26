@@ -1,0 +1,10 @@
+[Unit]
+Description=Cupcake Network Manager Socket
+
+[Socket]
+ListenStream=/run/cupcake-network.sock
+SocketGroup=cupcake-svc
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target
