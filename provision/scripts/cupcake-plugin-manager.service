@@ -1,0 +1,9 @@
+[Unit]
+Description=Cupcake Plugin Manager
+Requires=cupcake-plugin-manager.socket
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cupcake-plugin-manager
+StandardInput=socket

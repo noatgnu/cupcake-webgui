@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""
+CLI for managing Cupcake plugin lifecycle.
+
+Sends JSON commands to the cupcake-plugin-manager socket and prints results.
+
+Commands:
+  install   <name> <source>             Install plugin from URL or local path
+  uninstall <name>                      Stop, disable and remove plugin
+  start     <name>                      Start plugin service
+  stop      <name>                      Stop plugin service
+  restart   <name>                      Restart plugin service
+  enable    <name>                      Enable plugin service at boot
+  disable   <name>                      Disable plugin service at boot
+  status    <name>                      Show plugin service status
+  list                                  List all installed plugins
+  register  <name> <base_url> [ver]    Register plugin with the backend API
+"""
+import json
+import os
+import socket
+import subprocess
+import sys
+
+SOCKET_PATH = "/run/cupcake-plugin.sock"
+
+
+def send_command(payload: dict) -> dict:
+    """Send a command to the plugin manager socket and return the parsed response."""
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.connect(SOCKET_PATH)
+        sock.sendall(json.dumps(payload).encode())
+        sock.shutdown(socket.SHUT_WR)
+        data = b""
+        while True:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        return json.loads(data.decode())
+    finally:
+        sock.close()
+
+
+def print_result(result: dict) -> int:
+    """Display the manager response and return the appropriate exit code."""
+    if not result.get("ok"):
+        print(f"Error: {result.get('error', 'unknown')}", file=sys.stderr)
+        return 1
+
+    if "plugins" in result:
+        plugins = result["plugins"]
+        if not plugins:
+            print("No plugins installed")
+            return 0
+        print(f"{'NAME':<24} {'ACTIVE':<8} ENABLED")
+        print("-" * 44)
+        for p in plugins:
+            active = "yes" if p.get("active") else "no"
+            enabled = "yes" if p.get("enabled") else "no"
+            print(f"{p['name']:<24} {active:<8} {enabled}")
+        return 0
+
+    if "active" in result:
+        state = "active" if result["active"] else "inactive"
+        boot = "enabled" if result.get("enabled") else "disabled"
+        print(f"Status: {state}, {boot}")
+        if result.get("output"):
+            print(result["output"])
+        return 0
+
+    print(result.get("output", "OK"))
+    return 0
+
+
+def cmd_register(name: str, base_url: str, version: str) -> int:
+    """Delegate plugin registration to cupcake-plugin-register."""
+    proc = subprocess.run(
+        ["cupcake-plugin-register", name, base_url, version],
+        capture_output=False,
+    )
+    return proc.returncode
+
+
+def main() -> int:
+    """Parse arguments and dispatch to the appropriate command handler."""
+    args = sys.argv[1:]
+    if not args:
+        print(__doc__)
+        return 1
+
+    cmd = args[0]
+
+    if cmd == "list":
+        return print_result(send_command({"command": "list"}))
+
+    if cmd == "register":
+        if len(args) < 3:
+            print("Usage: cupcake-plugin register <name> <base_url> [version]", file=sys.stderr)
+            return 1
+        return cmd_register(args[1], args[2], args[3] if len(args) > 3 else "1.0.0")
+
+    if cmd == "install":
+        if len(args) < 3:
+            print("Usage: cupcake-plugin install <name> <source>", file=sys.stderr)
+            return 1
+        return print_result(send_command({"command": "install", "name": args[1], "source": args[2]}))
+
+    if cmd in ("uninstall", "start", "stop", "restart", "enable", "disable", "status"):
+        if len(args) < 2:
+            print(f"Usage: cupcake-plugin {cmd} <name>", file=sys.stderr)
+            return 1
+        return print_result(send_command({"command": cmd, "name": args[1]}))
+
+    print(f"Unknown command: {cmd}", file=sys.stderr)
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,10 @@
+[Unit]
+Description=Cupcake Plugin Manager Socket
+
+[Socket]
+ListenStream=/run/cupcake-plugin.sock
+SocketGroup=cupcake-svc
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

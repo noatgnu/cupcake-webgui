@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""
+Privileged plugin manager for the Cupcake appliance.
+
+Activated by systemd socket (cupcake-plugin-manager.socket). Reads a
+JSON command from the inherited socket fd, executes the requested plugin
+lifecycle operation as root, and writes back a JSON result.
+
+Accepted commands:
+  {"command": "install",   "name": "...", "source": "..."}
+  {"command": "uninstall", "name": "..."}
+  {"command": "start",     "name": "..."}
+  {"command": "stop",      "name": "..."}
+  {"command": "restart",   "name": "..."}
+  {"command": "enable",    "name": "..."}
+  {"command": "disable",   "name": "..."}
+  {"command": "status",    "name": "..."}
+  {"command": "list"}
+
+Result shape:
+  {"ok": true,  "output": "..."}
+  {"ok": false, "error":  "..."}
+  {"ok": true,  "plugins": [...]}   (list only)
+  {"ok": true,  "active": bool, "enabled": bool, "output": "..."}  (status only)
+"""
+import json
+import os
+import shutil
+import socket
+import subprocess
+import tarfile
+import tempfile
+import urllib.request
+from pathlib import Path
+
+PLUGINS_DIR = Path("/opt/cupcake/plugins")
+PLUGINS_ENV_DIR = Path("/etc/cupcake/plugins")
+PLUGIN_USER = "cupcake"
+SOCKET_FD = 3
+
+
+def recv_all(conn: socket.socket) -> bytes:
+    """Read all data from a connection until it is closed by the sender."""
+    data = b""
+    while True:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+def send_result(conn: socket.socket, result: dict) -> None:
+    """Serialise result as JSON and write it to the connection."""
+    conn.sendall(json.dumps(result).encode())
+    conn.shutdown(socket.SHUT_WR)
+
+
+def run_cmd(args: list, timeout: int = 30) -> tuple:
+    """Run a subprocess and return (returncode, combined output)."""
+    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    return result.returncode, result.stdout + result.stderr
+
+
+def validate_name(name: str) -> str | None:
+    """Return an error string if the plugin name is invalid, otherwise None."""
+    if not name or not all(c.isalnum() or c in "-_" for c in name):
+        return "Invalid plugin name: use only alphanumeric characters, dashes, and underscores"
+    return None
+
+
+def do_install(name: str, source: str) -> tuple:
+    """Download or copy a plugin archive to the plugins directory and enable its service."""
+    plugin_dir = PLUGINS_DIR / name
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+
+    if source.startswith(("http://", "https://")):
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            urllib.request.urlretrieve(source, tmp_path)
+            with tarfile.open(tmp_path) as tf:
+                try:
+                    tf.extractall(plugin_dir, filter="data")
+                except TypeError:
+                    tf.extractall(plugin_dir)
+        finally:
+            os.unlink(tmp_path)
+    elif os.path.isdir(source):
+        shutil.copytree(source, str(plugin_dir), dirs_exist_ok=True)
+    elif os.path.isfile(source) and source.endswith((".tar.gz", ".tgz")):
+        with tarfile.open(source) as tf:
+            try:
+                tf.extractall(plugin_dir, filter="data")
+            except TypeError:
+                tf.extractall(plugin_dir)
+    else:
+        return False, f"Source not found or unsupported format: {source}"
+
+    run_sh = plugin_dir / "run.sh"
+    if not run_sh.exists():
+        shutil.rmtree(plugin_dir)
+        return False, "Plugin archive must contain run.sh at the top level"
+
+    run_sh.chmod(0o755)
+
+    rc, out = run_cmd(["chown", "-R", f"{PLUGIN_USER}:{PLUGIN_USER}", str(plugin_dir)])
+    if rc != 0:
+        return False, f"chown failed: {out}"
+
+    run_cmd(["systemctl", "daemon-reload"])
+
+    rc, out = run_cmd(["systemctl", "enable", f"cupcake-plugin@{name}"])
+    if rc != 0:
+        return False, f"systemctl enable failed: {out}"
+
+    return True, f"Plugin '{name}' installed from {source} and enabled"
+
+
+def do_uninstall(name: str) -> tuple:
+    """Stop and disable a plugin service, then remove its files."""
+    run_cmd(["systemctl", "stop", f"cupcake-plugin@{name}"])
+    run_cmd(["systemctl", "disable", f"cupcake-plugin@{name}"])
+
+    plugin_dir = PLUGINS_DIR / name
+    if plugin_dir.exists():
+        shutil.rmtree(plugin_dir)
+
+    env_file = PLUGINS_ENV_DIR / f"{name}.env"
+    if env_file.exists():
+        env_file.unlink()
+
+    return True, f"Plugin '{name}' uninstalled"
+
+
+def handle(conn: socket.socket) -> None:
+    """Dispatch a single request from the socket connection."""
+    raw = recv_all(conn)
+    try:
+        payload = json.loads(raw.decode())
+    except Exception as exc:
+        send_result(conn, {"ok": False, "error": f"Invalid JSON: {exc}"})
+        return
+
+    command = payload.get("command")
+    name = payload.get("name", "")
+
+    if command == "list":
+        plugins = []
+        if PLUGINS_DIR.exists():
+            for entry in sorted(PLUGINS_DIR.iterdir()):
+                if entry.is_dir():
+                    rc_active, _ = run_cmd(["systemctl", "is-active", f"cupcake-plugin@{entry.name}"])
+                    rc_enabled, _ = run_cmd(["systemctl", "is-enabled", f"cupcake-plugin@{entry.name}"])
+                    plugins.append({
+                        "name": entry.name,
+                        "active": rc_active == 0,
+                        "enabled": rc_enabled == 0,
+                    })
+        send_result(conn, {"ok": True, "plugins": plugins})
+        return
+
+    err = validate_name(name)
+    if err:
+        send_result(conn, {"ok": False, "error": err})
+        return
+
+    if command == "install":
+        source = payload.get("source", "")
+        if not source:
+            send_result(conn, {"ok": False, "error": "'source' is required for install"})
+            return
+        ok, msg = do_install(name, source)
+        result = {"ok": ok}
+        result["output" if ok else "error"] = msg
+        send_result(conn, result)
+
+    elif command == "uninstall":
+        ok, msg = do_uninstall(name)
+        result = {"ok": ok}
+        result["output" if ok else "error"] = msg
+        send_result(conn, result)
+
+    elif command in ("start", "stop", "restart", "enable", "disable"):
+        rc, out = run_cmd(["systemctl", command, f"cupcake-plugin@{name}"])
+        if rc == 0:
+            send_result(conn, {"ok": True, "output": out or f"{command} succeeded"})
+        else:
+            send_result(conn, {"ok": False, "error": out})
+
+    elif command == "status":
+        rc_active, out = run_cmd(["systemctl", "status", f"cupcake-plugin@{name}"])
+        rc_enabled, _ = run_cmd(["systemctl", "is-enabled", f"cupcake-plugin@{name}"])
+        send_result(conn, {
+            "ok": True,
+            "active": rc_active == 0,
+            "enabled": rc_enabled == 0,
+            "output": out,
+        })
+
+    else:
+        send_result(conn, {"ok": False, "error": f"Unknown command: {command}"})
+
+
+if __name__ == "__main__":
+    sock = socket.fromfd(SOCKET_FD, socket.AF_UNIX, socket.SOCK_STREAM)
+    conn, _ = sock.accept()
+    try:
+        handle(conn)
+    finally:
+        conn.close()
+        sock.close()
