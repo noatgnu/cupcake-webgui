@@ -108,8 +108,6 @@ def do_install(name: str, source: str) -> tuple:
     if rc != 0:
         return False, f"chown failed: {out}"
 
-    run_cmd(["systemctl", "daemon-reload"])
-
     rc, out = run_cmd(["systemctl", "enable", f"cupcake-plugin@{name}"])
     if rc != 0:
         return False, f"systemctl enable failed: {out}"
