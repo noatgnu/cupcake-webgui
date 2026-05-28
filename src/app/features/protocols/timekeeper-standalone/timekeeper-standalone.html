@@ -100,7 +100,7 @@
                         </div>
                       </div>
 
-                      @if (timer.timeKeeper[tk.id.toString()]) {
+                      @if (timer.timeKeeper[tk.id.toString()] && timer.tick() >= 0) {
                         <div class="timer-compact text-center mb-2">
                           <div class="fw-bold timer-time">
                             {{ timer.convertTime(timer.timeKeeper[tk.id.toString()].current) }}
@@ -201,7 +201,7 @@
                     </h5>
                   </div>
                   <div class="card-body">
-                    @if (timer.timeKeeper[selectedTimer()!.id.toString()]) {
+                    @if (timer.timeKeeper[selectedTimer()!.id.toString()] && timer.tick() >= 0) {
                       <div class="timer-display-large text-center mb-3 p-4 rounded">
                         <div class="timer-time-display-large mb-2">
                           {{ timer.convertTime(timer.timeKeeper[selectedTimer()!.id.toString()].current) }}

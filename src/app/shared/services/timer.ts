@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import type { TimeKeeper } from '@noatgnu/cupcake-red-velvet';
 
 interface LocalTimerState {
@@ -14,6 +14,8 @@ interface LocalTimerState {
   providedIn: 'root'
 })
 export class TimerService {
+  readonly tick = signal(0);
+
   currentTrackingStep: number[] = [];
   remoteTimeKeeper: { [key: string]: TimeKeeper } = {};
   timeKeeper: { [key: string]: LocalTimerState } = {};
@@ -44,6 +46,7 @@ export class TimerService {
         }
       });
       this.calculatingTime = false;
+      this.tick.update(n => (n + 1) % 100000);
     }, 100);
   }
 
