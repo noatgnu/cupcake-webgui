@@ -118,12 +118,15 @@ def do_install(name: str, source: str) -> tuple:
 
 
 def do_uninstall(name: str) -> tuple:
-    """Stop and disable a plugin service, then remove its files."""
+    """Stop and disable a plugin service, revert its database migrations, then remove its files."""
     run_cmd(["systemctl", "stop", f"cupcake-plugin@{name}"])
     run_cmd(["systemctl", "disable", f"cupcake-plugin@{name}"])
 
     plugin_dir = PLUGINS_DIR / name
     if plugin_dir.exists():
+        uninstall_sh = plugin_dir / "uninstall.sh"
+        if uninstall_sh.exists():
+            run_cmd([str(uninstall_sh)], timeout=120)
         shutil.rmtree(plugin_dir)
 
     env_file = PLUGINS_ENV_DIR / f"{name}.env"

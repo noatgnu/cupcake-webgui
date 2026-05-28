@@ -83,6 +83,17 @@ def cmd_register(name: str, base_url: str, version: str) -> int:
     return proc.returncode
 
 
+def cmd_uninstall(name: str) -> int:
+    """Stop, disable, revert migrations, remove files, then deregister from the backend."""
+    result = send_command({"command": "uninstall", "name": name})
+    rc = print_result(result)
+    if rc == 0:
+        proc = subprocess.run(["cupcake-plugin-deregister", name], capture_output=False)
+        if proc.returncode != 0:
+            print(f"Warning: backend deregistration failed for '{name}'", file=sys.stderr)
+    return rc
+
+
 def main() -> int:
     """Parse arguments and dispatch to the appropriate command handler."""
     args = sys.argv[1:]
@@ -107,7 +118,13 @@ def main() -> int:
             return 1
         return print_result(send_command({"command": "install", "name": args[1], "source": args[2]}))
 
-    if cmd in ("uninstall", "start", "stop", "restart", "enable", "disable", "status"):
+    if cmd == "uninstall":
+        if len(args) < 2:
+            print("Usage: cupcake-plugin uninstall <name>", file=sys.stderr)
+            return 1
+        return cmd_uninstall(args[1])
+
+    if cmd in ("start", "stop", "restart", "enable", "disable", "status"):
         if len(args) < 2:
             print(f"Usage: cupcake-plugin {cmd} <name>", file=sys.stderr)
             return 1

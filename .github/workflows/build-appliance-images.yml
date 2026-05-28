@@ -552,6 +552,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/09-smoke-test.sh && sudo /tmp/09-smoke-test.sh"
 
+      - name: Plugin manager test
+        timeout-minutes: 10
+        run: |
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 \
+            provision/scripts/test-plugin-manager.sh cupcake@localhost:/tmp/
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/test-plugin-manager.sh && sudo /tmp/test-plugin-manager.sh"
+
       - name: UI smoke test
         timeout-minutes: 15
         run: |

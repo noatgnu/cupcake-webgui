@@ -81,6 +81,53 @@ SCRIPTEOF
 
 chmod +x /usr/local/bin/cupcake-plugin-register
 
+cat > /usr/local/bin/cupcake-plugin-deregister << 'SCRIPTEOF'
+#!/bin/bash
+set -e
+
+BACKEND=${CUPCAKE_BACKEND:-"http://localhost:8000"}
+PLUGIN_NAME=$1
+ADMIN_USER=${CUPCAKE_ADMIN:-"admin"}
+ADMIN_PASS=${CUPCAKE_ADMIN_PASS:-""}
+
+if [ -z "$PLUGIN_NAME" ]; then
+    echo "Usage: cupcake-plugin-deregister <name>"
+    exit 1
+fi
+
+JWT=$(curl -sf -X POST "$BACKEND/api/v1/auth/token/" \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['access'])")
+
+PLUGIN_ID=$(curl -sf "$BACKEND/api/v1/plugins/" \
+    -H "Authorization: Bearer $JWT" \
+    | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+plugins = data.get('results', data)
+match = next((p for p in plugins if p['name'] == '$PLUGIN_NAME'), None)
+print(match['id'] if match else '')
+")
+
+if [ -z "$PLUGIN_ID" ]; then
+    echo "Plugin '$PLUGIN_NAME' not found in backend, skipping deregistration"
+    exit 0
+fi
+
+curl -sf -X PATCH "$BACKEND/api/v1/plugins/$PLUGIN_ID/" \
+    -H "Authorization: Bearer $JWT" \
+    -H "Content-Type: application/json" \
+    -d '{"is_active": false}'
+
+curl -sf -X DELETE "$BACKEND/api/v1/plugins/$PLUGIN_ID/" \
+    -H "Authorization: Bearer $JWT"
+
+echo "Plugin '$PLUGIN_NAME' removed from backend"
+SCRIPTEOF
+
+chmod +x /usr/local/bin/cupcake-plugin-deregister
+
 if command -v ufw &>/dev/null; then
     ufw allow 8001:8099/tcp comment 'Cupcake plugin servers' || true
 fi
