@@ -420,6 +420,24 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/13-storage-manager.sh && sudo /tmp/13-storage-manager.sh"
 
+      - name: Provision — 14-network-manager
+        timeout-minutes: 5
+        run: |
+          for f in configure-wifi.sh cupcake-network-manager cupcake-network-manager.socket cupcake-network-manager.service 14-network-manager.sh; do
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/$f cupcake@localhost:/tmp/
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/14-network-manager.sh && sudo /tmp/14-network-manager.sh"
+
+      - name: Provision — 15-plugin
+        timeout-minutes: 5
+        run: |
+          for f in cupcake-plugin-manager cupcake-plugin cupcake-plugin-manager.socket cupcake-plugin-manager.service 15-plugin.sh; do
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/$f cupcake@localhost:/tmp/
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/15-plugin.sh && sudo /tmp/15-plugin.sh"
+
       - name: Download seed database
         uses: actions/download-artifact@v4
         with:
