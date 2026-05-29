@@ -34,26 +34,26 @@ def send_command(payload: dict, retries: int = 5, delay: float = 0.3) -> dict:
     resetting the socket for the next connection.
     """
     for attempt in range(retries):
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
-            sock.connect(SOCKET_PATH)
-            sock.sendall(json.dumps(payload).encode())
-            sock.shutdown(socket.SHUT_WR)
-            data = b""
-            while True:
-                chunk = sock.recv(4096)
-                if not chunk:
-                    break
-                data += chunk
-            return json.loads(data.decode())
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                sock.connect(SOCKET_PATH)
+                sock.sendall(json.dumps(payload).encode())
+                sock.shutdown(socket.SHUT_WR)
+                data = b""
+                while True:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+                return json.loads(data.decode())
+            finally:
+                sock.close()
         except (ConnectionRefusedError, FileNotFoundError):
-            sock.close()
             if attempt < retries - 1:
                 time.sleep(delay)
             else:
                 raise
-        finally:
-            sock.close()
 
 
 def print_result(result: dict) -> int:
