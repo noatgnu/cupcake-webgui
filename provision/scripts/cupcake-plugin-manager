@@ -108,9 +108,11 @@ def do_install(name: str, source: str) -> tuple:
     if rc != 0:
         return False, f"chown failed: {out}"
 
-    rc, out = run_cmd(["systemctl", "enable", f"cupcake-plugin@{name}"])
-    if rc != 0:
-        return False, f"systemctl enable failed: {out}"
+    wants_dir = Path("/etc/systemd/system/multi-user.target.wants")
+    wants_dir.mkdir(exist_ok=True)
+    link = wants_dir / f"cupcake-plugin@{name}.service"
+    if not link.exists():
+        link.symlink_to("/etc/systemd/system/cupcake-plugin@.service")
 
     return True, f"Plugin '{name}' installed from {source} and enabled"
 
@@ -118,7 +120,8 @@ def do_install(name: str, source: str) -> tuple:
 def do_uninstall(name: str) -> tuple:
     """Stop and disable a plugin service, revert its database migrations, then remove its files."""
     run_cmd(["systemctl", "stop", f"cupcake-plugin@{name}"])
-    run_cmd(["systemctl", "disable", f"cupcake-plugin@{name}"])
+    link = Path(f"/etc/systemd/system/multi-user.target.wants/cupcake-plugin@{name}.service")
+    link.unlink(missing_ok=True)
 
     plugin_dir = PLUGINS_DIR / name
     if plugin_dir.exists():
