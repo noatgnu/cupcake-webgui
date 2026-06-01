@@ -25,8 +25,8 @@ export class StoragePage {
     await this.page.getByRole("button", { name: /add reagent|new reagent/i }).click();
     await this.page.getByLabel(/name/i).fill(name);
     await this.page.getByLabel(/quantity/i).fill(String(qty));
-    const unitInput = this.page.getByLabel(/unit/i);
-    if (await unitInput.isVisible()) await unitInput.fill(unit);
+    const unitSelect = this.page.locator("select#reagentUnit");
+    if (await unitSelect.isVisible()) await unitSelect.selectOption(unit);
     await this.page.getByRole("button", { name: /save|add|confirm/i }).click();
     await expect(this.page.getByText(name)).toBeVisible({ timeout: 10000 });
   }

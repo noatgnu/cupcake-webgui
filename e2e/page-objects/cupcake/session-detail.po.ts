@@ -11,11 +11,11 @@ export class SessionDetailPage {
   }
 
   async createFromProtocol(protocolTitle: string): Promise<void> {
-    await this.page.getByRole("button", { name: /new session|create session/i }).click();
-    const protocolOption = this.page.getByText(protocolTitle).first();
-    await expect(protocolOption).toBeVisible({ timeout: 10000 });
-    await protocolOption.click();
-    await this.page.getByRole("button", { name: /create|start|confirm/i }).click();
+    await this.page.goto("/#/protocols");
+    await this.page.locator(".protocol-list-item").filter({ hasText: protocolTitle }).click();
+    await this.page.getByRole("button", { name: /start session/i }).click();
+    await this.page.locator("#sessionName").fill(`E2E Session ${Date.now()}`);
+    await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
   }
 

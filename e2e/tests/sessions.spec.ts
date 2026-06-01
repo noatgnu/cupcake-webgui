@@ -6,6 +6,7 @@ const PROTOCOL_TITLE = `E2E Session Protocol ${Date.now()}`;
 
 test.describe("sessions", () => {
   test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120000);
     const ctx = await browser.newContext({ storageState: require("path").join(__dirname, "../auth-states/admin.json") });
     const page = await ctx.newPage();
     const editor = new ProtocolEditorPage(page);

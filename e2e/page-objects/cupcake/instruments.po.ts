@@ -24,9 +24,9 @@ export class InstrumentsPage {
 
   async addMaintenanceLog(description: string): Promise<void> {
     await this.page.getByRole("tab", { name: /maintenance/i }).click();
-    await this.page.getByRole("button", { name: /add|new|log/i }).click();
-    await this.page.getByLabel(/description|note/i).fill(description);
-    await this.page.getByRole("button", { name: /save|add|confirm/i }).click();
+    await this.page.getByRole("button", { name: /add log|add first log/i }).click();
+    await this.page.locator("#maintenanceDescription").fill(description);
+    await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page.getByText(description)).toBeVisible({ timeout: 10000 });
   }
 

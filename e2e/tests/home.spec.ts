@@ -8,7 +8,7 @@ test.describe("home dashboard", () => {
 
   test("user profile shows admin info", async ({ adminPage }) => {
     await adminPage.goto("/#/home/profile");
-    await expect(adminPage.getByText(/admin|admin@cupcake\.local/i)).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.getByText(/admin|admin@cupcake\.local/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test("create project appears in list", async ({ adminPage }) => {
