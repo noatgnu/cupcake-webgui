@@ -13,7 +13,6 @@ test.describe("timekeepers", () => {
     const editor = new ProtocolEditorPage(page);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await editor.openEditor(PROTOCOL_TITLE);
     await editor.addSection("Section 1");
     await editor.addStep("Section 1", "Incubate 10 min", 10);
 

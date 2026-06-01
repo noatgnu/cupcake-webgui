@@ -7,7 +7,7 @@ export class LabGroupsPage {
   constructor(private readonly page: Page) {}
 
   async goto(): Promise<void> {
-    await this.page.goto("/#/lab-groups");
+    await this.page.goto("/#/home/lab-groups");
   }
 
   async create(name: string): Promise<void> {

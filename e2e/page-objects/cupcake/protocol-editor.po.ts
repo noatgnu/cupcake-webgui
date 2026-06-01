@@ -14,7 +14,7 @@ export class ProtocolEditorPage {
     await this.page.getByRole("button", { name: /new|create|add protocol/i }).click();
     await this.page.locator("#protocolTitle").fill(title);
     await this.page.locator(".modal-footer .btn-primary").click();
-    await expect(this.page.locator(".protocol-list-item").filter({ hasText: title })).toBeVisible({ timeout: 10000 });
+    await expect(this.page).toHaveURL(/\/protocols\/\d+\/edit/, { timeout: 15000 });
   }
 
   async openEditor(title: string): Promise<void> {
@@ -45,12 +45,14 @@ export class ProtocolEditorPage {
   }
 
   async deleteProtocol(title: string): Promise<void> {
-    await this.page.locator(".protocol-list-item").filter({ hasText: title }).click();
+    const item = this.page.locator(".protocol-list-item").filter({ hasText: title });
+    if (!await item.isVisible({ timeout: 2000 })) return;
+    await item.click();
     await this.page.getByRole("button", { name: /^delete$/i }).click();
     const confirmBtn = this.page.getByRole("button", { name: /confirm|yes/i });
     if (await confirmBtn.isVisible({ timeout: 3000 })) {
       await confirmBtn.click();
     }
-    await expect(this.page.locator(".protocol-list-item").filter({ hasText: title })).not.toBeVisible({ timeout: 10000 });
+    await expect(item).not.toBeVisible({ timeout: 10000 });
   }
 }

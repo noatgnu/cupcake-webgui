@@ -20,22 +20,21 @@ test.describe("protocols", () => {
     const editor = new ProtocolEditorPage(adminPage);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await expect(adminPage.getByText(PROTOCOL_TITLE)).toBeVisible({ timeout: 10000 });
+    await editor.gotoList();
+    await expect(adminPage.locator(".protocol-list-item").filter({ hasText: PROTOCOL_TITLE })).toBeVisible({ timeout: 10000 });
   });
 
   test("open protocol shows editor", async ({ adminPage }) => {
     const editor = new ProtocolEditorPage(adminPage);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await editor.openEditor(PROTOCOL_TITLE);
-    await expect(adminPage).toHaveURL(/\/protocols\/\d+|\/protocols\/editor/, { timeout: 10000 });
+    await expect(adminPage).toHaveURL(/\/protocols\/\d+\/edit/, { timeout: 10000 });
   });
 
   test("add section to protocol", async ({ adminPage }) => {
     const editor = new ProtocolEditorPage(adminPage);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await editor.openEditor(PROTOCOL_TITLE);
     await editor.addSection("Sample Preparation");
     await expect(adminPage.getByText("Sample Preparation")).toBeVisible({ timeout: 10000 });
   });
@@ -44,7 +43,6 @@ test.describe("protocols", () => {
     const editor = new ProtocolEditorPage(adminPage);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await editor.openEditor(PROTOCOL_TITLE);
     await editor.addSection("Section 1");
     await editor.addStep("Section 1", "Prepare samples at RT", 10);
     await expect(adminPage.getByText("Prepare samples at RT")).toBeVisible({ timeout: 10000 });
