@@ -35,6 +35,6 @@ test.describe("sessions", () => {
     await session.gotoList();
     await session.createFromProtocol(PROTOCOL_TITLE);
     await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
-    await expect(adminPage.getByText("Step 1")).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.getByText("Step 1").first()).toBeVisible({ timeout: 10000 });
   });
 });

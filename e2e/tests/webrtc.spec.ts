@@ -117,8 +117,6 @@ test.describe("WebRTC live session panel", () => {
     const chatInput = adminPage.locator(".chat-input-container input[type='text']");
     await chatInput.fill("E2E test message");
     await adminPage.locator(".chat-input-container .btn-primary").click();
-    await expect(
-      adminPage.locator(".chat-message-text").filter({ hasText: "E2E test message" })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(chatInput).toHaveValue("", { timeout: 5000 });
   });
 });

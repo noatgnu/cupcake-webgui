@@ -29,7 +29,7 @@ test.describe("job submission", () => {
       const apiBase = process.env.API_URL || "http://localhost:8000";
       const lgRes = await page.request.get(
         `${apiBase}/api/lab_groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }
       );
       const lgData = await lgRes.json();
       const lg = lgData.results?.find((g: { name: string; id: number }) => g.name === LAB_GROUP_NAME);
