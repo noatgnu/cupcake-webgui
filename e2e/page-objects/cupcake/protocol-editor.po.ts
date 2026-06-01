@@ -26,13 +26,13 @@ export class ProtocolEditorPage {
   async addSection(description: string): Promise<void> {
     await this.page.getByRole("button", { name: /add section/i }).click();
     await this.page.locator("#sectionDescription").fill(description);
-    await this.page.getByRole("button", { name: /^save$/i }).click();
+    await this.page.locator(".protocol-panel-left .card-footer button.btn-success").click();
     await expect(this.page.locator(".list-group-item").filter({ hasText: description })).toBeVisible({ timeout: 10000 });
   }
 
   async addStep(sectionText: string, stepDescription: string, durationMinutes: number): Promise<void> {
     await this.page.locator(".list-group-item-action").filter({ hasText: sectionText }).click();
-    await this.page.getByRole("button", { name: /add step/i }).click();
+    await this.page.locator("button.btn-sm.btn-primary", { hasText: /add step/i }).click();
     const editor = this.page.locator(".ql-editor[contenteditable='true']");
     await editor.click();
     await editor.fill(stepDescription);
@@ -48,7 +48,7 @@ export class ProtocolEditorPage {
     const item = this.page.locator(".protocol-list-item").filter({ hasText: title });
     if (!await item.isVisible({ timeout: 2000 })) return;
     await item.click();
-    await this.page.getByRole("button", { name: /^delete$/i }).click();
+    await this.page.getByRole("button", { name: /delete/i }).click();
     const confirmBtn = this.page.getByRole("button", { name: /confirm|yes/i });
     if (await confirmBtn.isVisible({ timeout: 3000 })) {
       await confirmBtn.click();

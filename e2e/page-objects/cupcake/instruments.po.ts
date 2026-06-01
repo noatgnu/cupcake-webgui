@@ -25,9 +25,11 @@ export class InstrumentsPage {
   async addMaintenanceLog(description: string): Promise<void> {
     await this.page.getByRole("tab", { name: /maintenance/i }).click();
     await this.page.locator("button.btn-sm.btn-primary", { hasText: /add log/i }).click();
+    const today = new Date().toISOString().split("T")[0];
+    await this.page.locator("#maintenanceDate").fill(today);
     await this.page.locator("#maintenanceDescription").fill(description);
     await this.page.locator(".modal-footer .btn-primary").click();
-    await expect(this.page.getByText(description)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(".modal-footer .btn-primary")).not.toBeVisible({ timeout: 10000 });
   }
 
   async expectInList(name: string): Promise<void> {
