@@ -24,7 +24,7 @@ export class ProtocolEditorPage {
   }
 
   async addSection(description: string): Promise<void> {
-    await this.page.getByRole("button", { name: /add section/i }).click();
+    await this.page.getByTitle("Add Section").click();
     await this.page.locator("#sectionDescription").fill(description);
     await this.page.locator(".protocol-panel-left .card-footer button.btn-success").click();
     await expect(this.page.locator(".list-group-item").filter({ hasText: description })).toBeVisible({ timeout: 10000 });
