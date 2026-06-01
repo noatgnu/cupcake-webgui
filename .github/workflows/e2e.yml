@@ -1,0 +1,245 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'src/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out frontend
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 python3-venv python3-dev libpq-dev \
+            postgresql postgresql-client redis-server nginx
+          sudo service redis-server start || true
+
+      - name: Set up PostgreSQL
+        run: |
+          sudo service postgresql start
+          sudo -u postgres psql -c "CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';"
+          sudo -u postgres psql -c "CREATE DATABASE cupcake_e2e OWNER cupcake_vanilla;"
+          sudo -u postgres psql -c "ALTER USER cupcake_vanilla CREATEDB;"
+
+      - name: Clone backend and install dependencies
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --upgrade pip --quiet
+          git clone --depth 1 https://github.com/noatgnu/cupcake_vanilla.git /tmp/backend
+          /tmp/venv/bin/pip install -r /tmp/backend/requirements.txt --quiet
+          /tmp/venv/bin/pip install gunicorn "uvicorn[standard]" --quiet
+
+      - name: Migrate and seed
+        env:
+          POSTGRES_DB: cupcake_e2e
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          REDIS_URL: redis://127.0.0.1:6379/0
+          REDIS_DB_RQ: '3'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: e2e-test-secret-key-not-for-production
+          DEBUG: 'True'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+          ALLOWED_HOSTS: localhost
+          MEDIA_ROOT: /tmp/backend/media
+        run: |
+          mkdir -p /tmp/backend/media /tmp/backend/staticfiles
+          cd /tmp/backend
+          MANAGE="/tmp/venv/bin/python manage.py"
+          $MANAGE migrate --noinput
+          DJANGO_SUPERUSER_USERNAME=admin \
+          DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
+          DJANGO_SUPERUSER_PASSWORD=cupcake \
+          $MANAGE createsuperuser --noinput
+          /tmp/venv/bin/python -c "
+          import django, os
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE','cupcake_vanilla.settings')
+          django.setup()
+          from django.contrib.auth import get_user_model
+          User = get_user_model()
+          User.objects.create_user('testuser','testuser@cupcake.local','testuser123')
+          "
+          $MANAGE load_species
+          $MANAGE load_tissue
+          $MANAGE load_human_disease
+          $MANAGE load_subcellular_location
+          $MANAGE load_ms_mod
+          $MANAGE load_ms_term
+          $MANAGE sync_schemas
+          $MANAGE load_column_templates
+          $MANAGE collectstatic --noinput
+
+      - name: Start backend
+        env:
+          POSTGRES_DB: cupcake_e2e
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          REDIS_URL: redis://127.0.0.1:6379/0
+          REDIS_DB_RQ: '3'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: e2e-test-secret-key-not-for-production
+          DEBUG: 'True'
+          ENABLE_RQ_TASKS: 'True'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+          ALLOWED_HOSTS: '*'
+          MEDIA_ROOT: /tmp/backend/media
+          COTURN_HOST: localhost
+          COTURN_PORT: '3478'
+          COTURN_SECRET: e2e-turn-secret
+          COTURN_TTL: '86400'
+        run: |
+          cd /tmp/backend
+          /tmp/venv/bin/gunicorn cupcake_vanilla.asgi:application \
+            --bind 127.0.0.1:8000 --workers 4 --timeout 300 \
+            -k uvicorn.workers.UvicornWorker --log-level info &
+
+      - name: Start RQ worker
+        env:
+          POSTGRES_DB: cupcake_e2e
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          REDIS_URL: redis://127.0.0.1:6379/0
+          REDIS_DB_RQ: '3'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: e2e-test-secret-key-not-for-production
+          DEBUG: 'True'
+          ENABLE_RQ_TASKS: 'True'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+        run: |
+          cd /tmp/backend
+          /tmp/venv/bin/python manage.py rqworker default high low &
+
+      - name: Wait for backend
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/ 2>/dev/null) || true
+            if echo "$code" | grep -qE "^[234]"; then
+              echo "Backend ready after $((i * 2))s"
+              break
+            fi
+            [ "$i" -eq 60 ] && echo "Backend never became ready" && exit 1
+            sleep 2
+          done
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Angular app
+        run: npx ng build cupcake --configuration=appliance --base-href /
+
+      - name: Configure nginx
+        run: |
+          DIST_DIR="$(pwd)/dist/cupcake/browser"
+          WEBROOT="/var/www/cupcake"
+          echo "Copying build from $DIST_DIR to $WEBROOT"
+          ls "$DIST_DIR/index.html"
+          sudo mkdir -p "$WEBROOT"
+          sudo cp -r "$DIST_DIR/." "$WEBROOT/"
+          sudo chown -R www-data:www-data "$WEBROOT"
+
+          sudo rm -f /etc/nginx/sites-enabled/default
+
+          NGINX_CONF="server {
+              listen 4201 default_server;
+              root $WEBROOT;
+              index index.html;
+              location / { try_files \$uri \$uri/ /index.html; }
+              location /api/ {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_read_timeout 300;
+              }
+              location /ws/ {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection upgrade;
+                  proxy_set_header Host \$host;
+                  proxy_read_timeout 3600;
+              }
+          }"
+
+          echo "$NGINX_CONF" | sudo tee /etc/nginx/conf.d/e2e.conf
+          sudo nginx -t
+          sudo nginx -s reload || sudo service nginx restart
+          sleep 2
+          sudo ss -tlnp | grep ':4201' || (echo "nginx not listening on 4201" && sudo nginx -T 2>&1 | head -60 && exit 1)
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Wait for frontend
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4201/ 2>/dev/null) || true
+            if echo "$code" | grep -qE "^[23]"; then
+              echo "nginx ready after $((i * 2))s"
+              break
+            fi
+            [ "$i" -eq 30 ] && echo "nginx not responding on port 4201" && sudo service nginx status && exit 1
+            sleep 2
+          done
+
+      - name: Run E2E tests
+        run: npm run e2e
+        env:
+          API_URL: http://localhost:8000
+          CUPCAKE_URL: http://localhost:4201
+          E2E_SKIP_BACKEND_CHECK: "1"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-cupcake
+          path: e2e/playwright-report/
+          retention-days: 14

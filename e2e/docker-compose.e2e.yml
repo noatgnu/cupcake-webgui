@@ -1,0 +1,152 @@
+services:
+  ssl:
+    build:
+      context: ../cupcake_vanilla
+      dockerfile: ./dockerfiles/Dockerfile-ssl
+    volumes:
+      - ssl:/certs
+    networks:
+      - cupcake-e2e-net
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: cupcake_e2e
+      POSTGRES_USER: cupcake_vanilla
+      POSTGRES_PASSWORD: cupcake_vanilla_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cupcake_vanilla"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cupcake-e2e-net
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - cupcake-e2e-net
+
+  app:
+    build:
+      context: ../cupcake_vanilla
+      dockerfile: ./dockerfiles/Dockerfile
+    volumes:
+      - media:/app/media/
+    environment:
+      - POSTGRES_NAME=cupcake_e2e
+      - POSTGRES_DB=cupcake_e2e
+      - POSTGRES_USER=cupcake_vanilla
+      - POSTGRES_PASSWORD=cupcake_vanilla_pass
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=e2e-test-secret-key-not-for-production
+      - DEBUG=True
+      - ALLOWED_HOSTS=*
+      - CORS_ALLOW_ALL_ORIGINS=True
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB_RQ=3
+      - ENABLE_RQ_TASKS=True
+      - ENABLE_CUPCAKE_MACARON=True
+      - ENABLE_CUPCAKE_MINT_CHOCOLATE=True
+      - ENABLE_CUPCAKE_SALTED_CARAMEL=True
+      - ENABLE_CUPCAKE_RED_VELVET=True
+      - USE_WHISPER=False
+      - COTURN_HOST=coturn
+      - COTURN_PORT=3478
+      - COTURN_SECRET=cupcake_vanilla_turn_secret_key_change_in_production
+      - COTURN_TTL=86400
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py setup_e2e_data &&
+        gunicorn --workers=4 cupcake_vanilla.asgi:application --bind 0.0.0.0:8000 --timeout 300 -k uvicorn.workers.UvicornWorker --log-level info
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8000/api/v1/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - cupcake-e2e-net
+
+  rq-worker:
+    build:
+      context: ../cupcake_vanilla
+      dockerfile: ./dockerfiles/Dockerfile-rqworker
+    volumes:
+      - media:/app/media/
+    environment:
+      - POSTGRES_NAME=cupcake_e2e
+      - POSTGRES_DB=cupcake_e2e
+      - POSTGRES_USER=cupcake_vanilla
+      - POSTGRES_PASSWORD=cupcake_vanilla_pass
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=e2e-test-secret-key-not-for-production
+      - DEBUG=True
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB_RQ=3
+      - ENABLE_RQ_TASKS=True
+      - ENABLE_CUPCAKE_MACARON=True
+      - ENABLE_CUPCAKE_MINT_CHOCOLATE=True
+      - ENABLE_CUPCAKE_SALTED_CARAMEL=True
+      - ENABLE_CUPCAKE_RED_VELVET=True
+      - USE_WHISPER=False
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - cupcake-e2e-net
+
+  nginx:
+    build:
+      context: ../cupcake_vanilla
+      dockerfile: ./dockerfiles/Dockerfile-nginx
+    ports:
+      - "8099:443"
+    volumes:
+      - ssl:/etc/nginx/ssl
+      - media:/media/
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://localhost/api/v1/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+    depends_on:
+      ssl:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+    networks:
+      - cupcake-e2e-net
+
+  coturn:
+    image: coturn/coturn:latest
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "40000-40100:40000-40100/udp"
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    networks:
+      - cupcake-e2e-net
+
+volumes:
+  ssl:
+  media:
+
+networks:
+  cupcake-e2e-net:
