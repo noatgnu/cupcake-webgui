@@ -14,9 +14,12 @@ export class SessionDetailPage {
     await this.page.goto("/#/protocols");
     await this.page.locator(".protocol-list-item").filter({ hasText: protocolTitle }).click();
     await this.page.getByRole("button", { name: /start session/i }).click();
-    await this.page.locator("#sessionName").fill(`E2E Session ${Date.now()}`);
+    const sessionName = `E2E Session ${Date.now()}`;
+    await this.page.locator("#sessionName").fill(sessionName);
     await this.page.locator(".modal-footer .btn-primary").click();
-    await expect(this.page).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+    await expect(this.page).toHaveURL(/\/protocols\/sessions/, { timeout: 15000 });
+    await this.page.locator(".list-group-item-action").filter({ hasText: sessionName }).first().dblclick();
+    await expect(this.page).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 10000 });
   }
 
   async addTextAnnotation(stepText: string, content: string): Promise<void> {

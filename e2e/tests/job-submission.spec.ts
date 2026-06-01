@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { test, expect } from "../fixtures/auth";
 import { InstrumentsPage } from "../page-objects/cupcake/instruments.po";
 import { LabGroupsPage } from "../page-objects/cupcake/lab-groups.po";
@@ -8,7 +10,7 @@ const INSTRUMENT_NAME = `E2E Job Spec ${Date.now()}`;
 test.describe("job submission", () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const ctx = await browser.newContext({ storageState: require("path").join(__dirname, "../auth-states/admin.json") });
+    const ctx = await browser.newContext({ storageState: path.join(__dirname, "../auth-states/admin.json") });
     const page = await ctx.newPage();
 
     const labGroups = new LabGroupsPage(page);
@@ -18,6 +20,26 @@ test.describe("job submission", () => {
     const instruments = new InstrumentsPage(page);
     await instruments.goto();
     await instruments.create(INSTRUMENT_NAME);
+
+    const storageState = JSON.parse(fs.readFileSync(path.join(__dirname, "../auth-states/admin.json"), "utf-8"));
+    const token = storageState.origins?.[0]?.localStorage
+      ?.find((item: { name: string; value: string }) => item.name === "ccvAccessToken")?.value;
+
+    if (token) {
+      const apiBase = process.env.API_URL || "http://localhost:8000";
+      const lgRes = await page.request.get(
+        `${apiBase}/api/lab_groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const lgData = await lgRes.json();
+      const lg = lgData.results?.find((g: { name: string; id: number }) => g.name === LAB_GROUP_NAME);
+      if (lg) {
+        await page.request.post(`${apiBase}/api/metadata_table_templates/`, {
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          data: { name: "E2E Job Template", lab_group: lg.id }
+        });
+      }
+    }
 
     await page.context().close();
   });

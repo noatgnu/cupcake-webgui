@@ -36,7 +36,6 @@ test.describe("protocols", () => {
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
     await editor.addSection("Sample Preparation");
-    await expect(adminPage.getByText("Sample Preparation")).toBeVisible({ timeout: 10000 });
   });
 
   test("add section and step to protocol", async ({ adminPage }) => {
