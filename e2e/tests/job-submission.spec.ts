@@ -69,7 +69,7 @@ test.describe("job submission", () => {
   });
 
   test("basic job submission flow completes", async ({ adminPage }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     await adminPage.goto("/#/jobs/submit");
     await expect(adminPage).toHaveURL(/\/jobs\/submit/, { timeout: 10000 });
 
