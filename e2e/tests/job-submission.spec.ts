@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { request as playwrightRequest } from "@playwright/test";
 import { test, expect } from "../fixtures/auth";
 import { InstrumentsPage } from "../page-objects/cupcake/instruments.po";
 import { LabGroupsPage } from "../page-objects/cupcake/lab-groups.po";
@@ -27,17 +28,30 @@ test.describe("job submission", () => {
 
     if (token) {
       const apiBase = process.env.API_URL || "http://localhost:8000";
-      const lgRes = await page.request.get(
-        `${apiBase}/api/lab_groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`,
-        { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }
-      );
-      const lgData = await lgRes.json();
-      const lg = lgData.results?.find((g: { name: string; id: number }) => g.name === LAB_GROUP_NAME);
-      if (lg) {
-        await page.request.post(`${apiBase}/api/metadata_table_templates/`, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          data: { name: "E2E Job Template", lab_group: lg.id }
+      try {
+        const apiContext = await playwrightRequest.newContext({
+          baseURL: apiBase,
+          extraHTTPHeaders: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
         });
+        const lgRes = await apiContext.get(
+          `/api/lab_groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`
+        );
+        if (lgRes.ok()) {
+          const lgData = await lgRes.json();
+          const lg = lgData.results?.find((g: { name: string; id: number }) => g.name === LAB_GROUP_NAME);
+          if (lg) {
+            await apiContext.post("/api/metadata_table_templates/", {
+              headers: { "Content-Type": "application/json" },
+              data: { name: "E2E Job Template", lab_group: lg.id },
+            });
+          }
+        }
+        await apiContext.dispose();
+      } catch {
+        /* template creation is best-effort; basic flow test handles missing template */
       }
     }
 

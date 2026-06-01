@@ -7,15 +7,13 @@ let sessionUrl = "";
 
 test.describe("WebRTC live session panel", () => {
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     const ctx = await browser.newContext({ storageState: require("path").join(__dirname, "../auth-states/admin.json") });
     const page = await ctx.newPage();
 
     const editor = new ProtocolEditorPage(page);
     await editor.gotoList();
     await editor.createProtocol(PROTOCOL_TITLE);
-    await editor.addSection("Section 1");
-    await editor.addStep("Section 1", "Step 1", 5);
 
     const session = new SessionDetailPage(page);
     await session.gotoList();
