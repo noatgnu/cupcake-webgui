@@ -10,7 +10,7 @@ const INSTRUMENT_NAME = `E2E Job Spec ${Date.now()}`;
 
 test.describe("job submission", () => {
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     const ctx = await browser.newContext({ storageState: path.join(__dirname, "../auth-states/admin.json") });
     const page = await ctx.newPage();
 

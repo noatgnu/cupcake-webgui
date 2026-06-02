@@ -1,25 +1,44 @@
+import fs from "fs";
+import path from "path";
+import { request as playwrightRequest } from "@playwright/test";
 import { test, expect } from "../fixtures/auth";
-import { ProtocolEditorPage } from "../page-objects/cupcake/protocol-editor.po";
-import { SessionDetailPage } from "../page-objects/cupcake/session-detail.po";
 
-const PROTOCOL_TITLE = `E2E WebRTC Protocol ${Date.now()}`;
+const API_BASE = process.env["API_URL"] || "http://localhost:8000";
+const BASE_URL = process.env["CUPCAKE_URL"] || "http://localhost:4201";
 let sessionUrl = "";
 
 test.describe("WebRTC live session panel", () => {
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180000);
-    const ctx = await browser.newContext({ storageState: require("path").join(__dirname, "../auth-states/admin.json") });
-    const page = await ctx.newPage();
+  test.beforeAll(async () => {
+    test.setTimeout(30000);
+    const storageState = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../auth-states/admin.json"), "utf-8")
+    );
+    const token = storageState.origins?.[0]?.localStorage
+      ?.find((item: { name: string; value: string }) => item.name === "ccvAccessToken")?.value;
+    if (!token) throw new Error("Admin auth token not found in storage state");
 
-    const editor = new ProtocolEditorPage(page);
-    await editor.gotoList();
-    await editor.createProtocol(PROTOCOL_TITLE);
+    const api = await playwrightRequest.newContext({
+      baseURL: API_BASE,
+      extraHTTPHeaders: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
 
-    const session = new SessionDetailPage(page);
-    await session.gotoList();
-    await session.createFromProtocol(PROTOCOL_TITLE);
-    sessionUrl = page.url();
-    await page.context().close();
+    const protocolRes = await api.post("/api/protocol/", {
+      headers: { "Content-Type": "application/json" },
+      data: { protocol_title: `E2E WebRTC Protocol ${Date.now()}`, protocol_description: "" },
+    });
+    const protocol = await protocolRes.json();
+
+    const sessionRes = await api.post("/api/session/", {
+      headers: { "Content-Type": "application/json" },
+      data: { name: `E2E WebRTC Session ${Date.now()}`, protocols: [protocol.id], enabled: true },
+    });
+    const session = await sessionRes.json();
+    await api.dispose();
+
+    sessionUrl = `${BASE_URL}/#/protocols/sessions/${session.id}`;
   });
 
   test("Live Session button is visible on session detail page", async ({ adminPage }) => {

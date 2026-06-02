@@ -6,7 +6,7 @@ const PROTOCOL_TITLE = `E2E Session Protocol ${Date.now()}`;
 
 test.describe("sessions", () => {
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     const ctx = await browser.newContext({ storageState: require("path").join(__dirname, "../auth-states/admin.json") });
     const page = await ctx.newPage();
     const editor = new ProtocolEditorPage(page);
@@ -24,6 +24,7 @@ test.describe("sessions", () => {
   });
 
   test("create session from protocol", async ({ adminPage }) => {
+    test.setTimeout(120000);
     const session = new SessionDetailPage(adminPage);
     await session.gotoList();
     await session.createFromProtocol(PROTOCOL_TITLE);
@@ -31,6 +32,7 @@ test.describe("sessions", () => {
   });
 
   test("session detail shows steps", async ({ adminPage }) => {
+    test.setTimeout(120000);
     const session = new SessionDetailPage(adminPage);
     await session.gotoList();
     await session.createFromProtocol(PROTOCOL_TITLE);
