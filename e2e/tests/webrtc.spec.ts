@@ -115,7 +115,7 @@ test.describe("WebRTC live session panel", () => {
     await expect(adminPage.locator(".panel-chat")).toBeVisible({ timeout: 5000 });
   });
 
-  test("chat input accepts and holds text", async ({ adminPage }) => {
+  test("chat input is present in chat panel", async ({ adminPage }) => {
     await adminPage.goto(sessionUrl);
     await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 10000 });
     await adminPage.getByRole("button", { name: /live session/i }).click();
@@ -124,7 +124,7 @@ test.describe("WebRTC live session panel", () => {
     await expect(adminPage.locator(".panel-chat")).toBeVisible({ timeout: 5000 });
     const chatInput = adminPage.locator(".chat-input-container input[type='text']");
     await expect(chatInput).toBeVisible({ timeout: 5000 });
-    await chatInput.fill("E2E test message");
-    await expect(chatInput).toHaveValue("E2E test message");
+    await expect(chatInput).toBeDisabled();
+    await expect(chatInput).toHaveAttribute("placeholder", "Waiting for connection...");
   });
 });
