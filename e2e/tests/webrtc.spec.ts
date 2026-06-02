@@ -25,13 +25,13 @@ test.describe("WebRTC live session panel", () => {
       },
     });
 
-    const protocolRes = await api.post("/api/protocol/", {
+    const protocolRes = await api.post("/api/v1/protocols/", {
       headers: { "Content-Type": "application/json" },
       data: { protocol_title: `E2E WebRTC Protocol ${Date.now()}`, protocol_description: "" },
     });
     const protocol = await protocolRes.json();
 
-    const sessionRes = await api.post("/api/session/", {
+    const sessionRes = await api.post("/api/v1/sessions/", {
       headers: { "Content-Type": "application/json" },
       data: { name: `E2E WebRTC Session ${Date.now()}`, protocols: [protocol.id], enabled: true },
     });

@@ -37,13 +37,13 @@ test.describe("job submission", () => {
           },
         });
         const lgRes = await apiContext.get(
-          `/api/lab_groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`
+          `/api/v1/lab-groups/?search=${encodeURIComponent(LAB_GROUP_NAME)}&limit=5`
         );
         if (lgRes.ok()) {
           const lgData = await lgRes.json();
           const lg = lgData.results?.find((g: { name: string; id: number }) => g.name === LAB_GROUP_NAME);
           if (lg) {
-            await apiContext.post("/api/metadata_table_templates/", {
+            await apiContext.post("/api/v1/metadata-table-templates/", {
               headers: { "Content-Type": "application/json" },
               data: { name: "E2E Job Template", lab_group: lg.id },
             });
