@@ -195,9 +195,11 @@ jobs:
           - distro: ubuntu
             image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
             python_version: "3.12"
+            pg_version: "16"
           - distro: debian
             image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-genericcloud-amd64-daily.qcow2
             python_version: "3.13"
+            pg_version: "17"
     steps:
       - uses: actions/checkout@v4
 
@@ -312,7 +314,7 @@ jobs:
         run: |
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/02-postgresql.sh cupcake@localhost:/tmp/
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "chmod +x /tmp/02-postgresql.sh && sudo /tmp/02-postgresql.sh"
+            "chmod +x /tmp/02-postgresql.sh && sudo env PG_VERSION='${{ matrix.pg_version }}' /tmp/02-postgresql.sh"
 
       - name: mDNS check — 02-postgresql
         run: |
