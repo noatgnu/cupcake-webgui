@@ -20,6 +20,9 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
 
@@ -185,7 +188,7 @@ jobs:
 
   build-vm:
     name: VM Image (${{ matrix.distro }}, amd64)
-    if: github.event_name != 'release' && inputs.image_type != 'rpi'
+    if: github.event_name == 'workflow_dispatch' && inputs.image_type != 'rpi'
     needs: build-db
     runs-on: ubuntu-latest
     strategy:
@@ -1605,22 +1608,28 @@ jobs:
   publish-release:
     name: Publish RPi image to release
     needs: [build-rpi]
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download RPi image
         uses: actions/download-artifact@v4
         with:
           name: cupcake-pi-arm64
           path: release-assets/
 
-      - name: Upload to GitHub release
+      - name: Publish to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
+          name: Cupcake ${{ github.event.release.name || github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: true
+          files: release-assets/*.img.xz
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "${{ github.event.release.tag_name }}" release-assets/*.img.xz \
-            --repo "${{ github.repository }}" \
-            --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   summary:
     name: Summary
