@@ -195,7 +195,7 @@ jobs:
           - distro: ubuntu
             image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
           - distro: debian
-            image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-genericcloud-amd64.qcow2
+            image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-genericcloud-amd64-daily.qcow2
     steps:
       - uses: actions/checkout@v4
 
