@@ -184,10 +184,18 @@ jobs:
           retention-days: 1
 
   build-vm:
-    name: VM Image (amd64)
+    name: VM Image (${{ matrix.distro }}, amd64)
     if: github.event_name != 'release' && inputs.image_type != 'rpi'
     needs: build-db
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+          - distro: debian
+            image_url: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
     steps:
       - uses: actions/checkout@v4
 
@@ -219,9 +227,9 @@ jobs:
           ssh-keygen -t ed25519 -f cupckey -N '' -q
           echo "SSH_PUBKEY=$(cat cupckey.pub)" >> $GITHUB_ENV
 
-      - name: Download Ubuntu cloud image
+      - name: Download ${{ matrix.distro }} cloud image
         run: |
-          wget -q --show-progress "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" -O vm-disk.qcow2
+          wget -q --show-progress "${{ matrix.image_url }}" -O vm-disk.qcow2
           qemu-img resize vm-disk.qcow2 20G
 
       - name: Create cloud-init seed
@@ -650,15 +658,15 @@ jobs:
 
       - name: Compact and compress
         run: |
-          qemu-img convert -O qcow2 -c vm-disk.qcow2 cupcake-vm-amd64.qcow2
-          xz -3 cupcake-vm-amd64.qcow2
-          ls -lh cupcake-vm-amd64.qcow2.xz
+          qemu-img convert -O qcow2 -c vm-disk.qcow2 cupcake-vm-amd64-${{ matrix.distro }}.qcow2
+          xz -3 cupcake-vm-amd64-${{ matrix.distro }}.qcow2
+          ls -lh cupcake-vm-amd64-${{ matrix.distro }}.qcow2.xz
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: cupcake-vm-amd64
-          path: cupcake-vm-amd64.qcow2.xz
+          name: cupcake-vm-amd64-${{ matrix.distro }}
+          path: cupcake-vm-amd64-${{ matrix.distro }}.qcow2.xz
           retention-days: 7
           compression-level: 0
 
@@ -1621,5 +1629,6 @@ jobs:
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Seed DB | ${{ needs.build-db.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| VM (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| VM ubuntu (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| VM debian (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| RPi (arm64) | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
