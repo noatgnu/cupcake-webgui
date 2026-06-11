@@ -13,9 +13,9 @@ apt-get install -y \
     wget \
     git \
     libpq-dev \
-    python3.12 \
-    python3.12-venv \
-    python3.12-dev \
+    python${PYTHON_VERSION:-3.12} \
+    python${PYTHON_VERSION:-3.12}-venv \
+    python${PYTHON_VERSION:-3.12}-dev \
     nginx \
     avahi-daemon \
     avahi-utils \

@@ -2,7 +2,7 @@
 set -eux
 
 # Create virtualenv
-python3.12 -m venv /opt/cupcake/venv
+python${PYTHON_VERSION:-3.12} -m venv /opt/cupcake/venv
 chown -R cupcake-svc:cupcake-svc /opt/cupcake/venv
 
 # Clone backend
