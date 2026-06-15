@@ -3,14 +3,22 @@
     <button
       class="btn btn-link nav-link me-2"
       (click)="onToggleSidebar()"
-      aria-label="Toggle sidebar"
-     >
+      aria-label="Toggle sidebar">
       <i class="bi bi-list fs-4"></i>
     </button>
 
     <span class="navbar-brand mb-0">Admin</span>
 
-    <div class="collapse navbar-collapse">
+    <button
+      class="navbar-toggler"
+      type="button"
+      (click)="isMenuCollapsed.set(!isMenuCollapsed())"
+      [attr.aria-expanded]="!isMenuCollapsed()"
+      aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" [ngbCollapse]="isMenuCollapsed()">
       <ul class="navbar-nav ms-auto">
         <li class="nav-item">
           <a class="nav-link" routerLink="/admin/site-config" routerLinkActive="active">

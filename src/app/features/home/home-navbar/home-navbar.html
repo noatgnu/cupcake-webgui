@@ -1,91 +1,98 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
   <div class="container-fluid">
-    <!-- Sidebar Toggle Button -->
     <button
       class="btn btn-link nav-link me-2"
       (click)="onToggleSidebar()"
-      aria-label="Toggle sidebar"
-     >
+      aria-label="Toggle sidebar">
       <i class="bi bi-list fs-4"></i>
     </button>
 
-    <!-- Section Name -->
     <span class="navbar-brand mb-0">Dashboard</span>
 
-    <!-- Navigation Links -->
-    <div class="navbar-nav ms-auto flex-row gap-2">
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'dashboard'"
-        (click)="navigateToSection('dashboard')"
-        style="cursor: pointer;">
-        <i class="bi bi-house-door me-1"></i>
-        Home
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'projects'"
-        (click)="navigateToSection('projects')"
-        style="cursor: pointer;">
-        <i class="bi bi-folder me-1"></i>
-        Projects
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'lab-groups'"
-        (click)="navigateToSection('lab-groups')"
-        style="cursor: pointer;">
-        <i class="bi bi-people me-1"></i>
-        Lab Groups
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'users'"
-        (click)="navigateToSection('users')"
-        style="cursor: pointer;">
-        <i class="bi bi-person-gear me-1"></i>
-        Users
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'messages'"
-        (click)="navigateToSection('messages')"
-        style="cursor: pointer;">
-        <i class="bi bi-chat-dots me-1"></i>
-        Messages
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'notifications'"
-        (click)="navigateToSection('notifications')"
-        style="cursor: pointer;">
-        <i class="bi bi-bell me-1"></i>
-        Notifications
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'tasks'"
-        (click)="navigateToSection('tasks')"
-        style="cursor: pointer;">
-        <i class="bi bi-list-task me-1"></i>
-        Tasks
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'profile'"
-        (click)="navigateToSection('profile')"
-        style="cursor: pointer;">
-        <i class="bi bi-person-circle me-1"></i>
-        Profile
-      </a>
-      <a
-        class="nav-link"
-        [class.active]="activeSection === 'devices'"
-        (click)="navigateToSection('devices')"
-        style="cursor: pointer;">
-        <i class="bi bi-cpu me-1"></i>
-        Devices
-      </a>
+    <button
+      class="navbar-toggler"
+      type="button"
+      (click)="isMenuCollapsed.set(!isMenuCollapsed())"
+      [attr.aria-expanded]="!isMenuCollapsed()"
+      aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" [ngbCollapse]="isMenuCollapsed()">
+      <div class="navbar-nav ms-auto flex-row gap-2">
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'dashboard'"
+          (click)="navigateToSection('dashboard')"
+          style="cursor: pointer;">
+          <i class="bi bi-house-door me-1"></i>
+          Home
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'projects'"
+          (click)="navigateToSection('projects')"
+          style="cursor: pointer;">
+          <i class="bi bi-folder me-1"></i>
+          Projects
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'lab-groups'"
+          (click)="navigateToSection('lab-groups')"
+          style="cursor: pointer;">
+          <i class="bi bi-people me-1"></i>
+          Lab Groups
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'users'"
+          (click)="navigateToSection('users')"
+          style="cursor: pointer;">
+          <i class="bi bi-person-gear me-1"></i>
+          Users
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'messages'"
+          (click)="navigateToSection('messages')"
+          style="cursor: pointer;">
+          <i class="bi bi-chat-dots me-1"></i>
+          Messages
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'notifications'"
+          (click)="navigateToSection('notifications')"
+          style="cursor: pointer;">
+          <i class="bi bi-bell me-1"></i>
+          Notifications
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'tasks'"
+          (click)="navigateToSection('tasks')"
+          style="cursor: pointer;">
+          <i class="bi bi-list-task me-1"></i>
+          Tasks
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'profile'"
+          (click)="navigateToSection('profile')"
+          style="cursor: pointer;">
+          <i class="bi bi-person-circle me-1"></i>
+          Profile
+        </a>
+        <a
+          class="nav-link"
+          [class.active]="activeSection === 'devices'"
+          (click)="navigateToSection('devices')"
+          style="cursor: pointer;">
+          <i class="bi bi-cpu me-1"></i>
+          Devices
+        </a>
+      </div>
     </div>
   </div>
 </nav>
