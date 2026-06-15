@@ -7,7 +7,7 @@
       Create New Protocol
     }
   </h5>
-  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
 </div>
 
 <div class="modal-body">
@@ -19,7 +19,7 @@
         [class.btn-primary]="!isImportMode()"
         [class.btn-outline-secondary]="isImportMode()"
         (click)="toggleMode()"
-        [disabled]="saving">
+        [disabled]="saving()">
         <i class="bi bi-plus-lg me-1"></i>
         Create New
       </button>
@@ -29,7 +29,7 @@
         [class.btn-primary]="isImportMode()"
         [class.btn-outline-secondary]="!isImportMode()"
         (click)="toggleMode()"
-        [disabled]="saving">
+        [disabled]="saving()">
         <i class="bi bi-cloud-download me-1"></i>
         Import from protocols.io
       </button>
@@ -120,7 +120,7 @@
 </div>
 
 <div class="modal-footer">
-  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
     Cancel
   </button>
   @if (isImportMode()) {

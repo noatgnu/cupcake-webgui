@@ -28,7 +28,7 @@ export class ProtocolCreateModal {
     protocolsIOUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/(www\.)?protocols\.io\/.+/)]]
   });
 
-  saving = false;
+  saving = signal(false);
   isImportMode = signal(false);
 
   createProtocol(): void {
@@ -37,7 +37,7 @@ export class ProtocolCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.protocolForm.value;
 
     this.protocolService.createProtocol({
@@ -51,7 +51,7 @@ export class ProtocolCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create protocol');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }
@@ -68,7 +68,7 @@ export class ProtocolCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const url = this.importForm.value.protocolsIOUrl;
 
     this.protocolService.importFromProtocolsIO(url).subscribe({
@@ -78,7 +78,7 @@ export class ProtocolCreateModal {
       },
       error: (err) => {
         this.toastService.error(err?.error?.error || 'Failed to import protocol from protocols.io');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }
