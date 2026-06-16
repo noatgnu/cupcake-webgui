@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel } from '@noatgnu/cupcake-red-velvet';
@@ -98,21 +99,18 @@ export class SessionList implements OnInit {
 
   loadSessionProtocols(sessionId: number, protocolIds: number[]): void {
     this.loadingProtocols.set(true);
-    const protocolRequests = protocolIds.map(id =>
-      this.protocolService.getProtocol(id)
-    );
-
-    Promise.all(protocolRequests.map(req => req.toPromise()))
-      .then(protocols => {
+    forkJoin(protocolIds.map(id => this.protocolService.getProtocol(id))).subscribe({
+      next: (protocols) => {
         const protocolsMap = new Map(this.sessionProtocols());
-        protocolsMap.set(sessionId, protocols.filter((p): p is ProtocolModel => p !== undefined));
+        protocolsMap.set(sessionId, protocols);
         this.sessionProtocols.set(protocolsMap);
         this.loadingProtocols.set(false);
-      })
-      .catch(err => {
+      },
+      error: () => {
         this.toastService.error('Failed to load session protocols');
         this.loadingProtocols.set(false);
-      });
+      }
+    });
   }
 
   onSearchChange(): void {

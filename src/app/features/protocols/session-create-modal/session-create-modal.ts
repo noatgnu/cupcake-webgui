@@ -1,4 +1,4 @@
-import { Component, inject, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, signal } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -11,7 +11,8 @@ import { Router } from '@angular/router';
   selector: 'app-session-create-modal',
   imports: [ReactiveFormsModule],
   templateUrl: './session-create-modal.html',
-  styleUrl: './session-create-modal.scss'
+  styleUrl: './session-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionCreateModal {
   private fb = inject(FormBuilder);
@@ -27,7 +28,7 @@ export class SessionCreateModal {
     enabled: [true]
   });
 
-  saving = false;
+  saving = signal(false);
 
   createSession(): void {
     if (!this.sessionForm.valid) {
@@ -35,7 +36,7 @@ export class SessionCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.sessionForm.value;
 
     this.sessionService.createSession({
@@ -47,9 +48,9 @@ export class SessionCreateModal {
         this.toastService.success('Session created successfully');
         this.activeModal.close(session);
       },
-      error: (err) => {
+      error: () => {
         this.toastService.error('Failed to create session');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

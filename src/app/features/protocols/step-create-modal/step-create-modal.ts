@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, Input, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, Input, signal, ViewChild } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -13,7 +13,8 @@ import type { ContentChange } from 'ngx-quill';
   selector: 'app-step-create-modal',
   imports: [ReactiveFormsModule, DurationInput, QuillModule],
   templateUrl: './step-create-modal.html',
-  styleUrl: './step-create-modal.scss'
+  styleUrl: './step-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StepCreateModal {
   private fb = inject(FormBuilder);
@@ -32,7 +33,7 @@ export class StepCreateModal {
     stepDuration: [0]
   });
 
-  saving = false;
+  saving = signal(false);
   showTemplateHelp = false;
   reagents: StepReagent[] = [];
   currentCursorIndex = 0;
@@ -62,7 +63,7 @@ export class StepCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.stepForm.value;
 
     this.stepService.createProtocolStep({
@@ -78,7 +79,7 @@ export class StepCreateModal {
       },
       error: (err) => {
         this.toastService.error('Failed to create step');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

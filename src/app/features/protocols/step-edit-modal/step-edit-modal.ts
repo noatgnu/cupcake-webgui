@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, Input, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, Input, OnInit, signal, ViewChild } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -14,7 +14,8 @@ import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
   selector: 'app-step-edit-modal',
   imports: [ReactiveFormsModule, DurationInput, QuillModule, StepTemplatePipe],
   templateUrl: './step-edit-modal.html',
-  styleUrl: './step-edit-modal.scss'
+  styleUrl: './step-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StepEditModal implements OnInit {
   private fb = inject(FormBuilder);
@@ -31,7 +32,7 @@ export class StepEditModal implements OnInit {
     stepDuration: [0]
   });
 
-  saving = false;
+  saving = signal(false);
   showTemplateHelp = false;
   showPreview = false;
   reagents: StepReagent[] = [];
@@ -172,7 +173,7 @@ export class StepEditModal implements OnInit {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.stepForm.value;
 
     this.stepService.patchProtocolStep(this.step.id, {
@@ -185,7 +186,7 @@ export class StepEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update step');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

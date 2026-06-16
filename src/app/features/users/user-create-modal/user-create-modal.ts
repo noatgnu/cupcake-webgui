@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -9,7 +9,8 @@ import { UserManagementService } from '@noatgnu/cupcake-core';
   selector: 'app-user-create-modal',
   imports: [FormsModule],
   templateUrl: './user-create-modal.html',
-  styleUrl: './user-create-modal.scss'
+  styleUrl: './user-create-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserCreateModal {
   private activeModal = inject(NgbActiveModal);
@@ -25,7 +26,7 @@ export class UserCreateModal {
   isStaff = false;
   isSuperuser = false;
   isActive = true;
-  saving = false;
+  saving = signal(false);
 
   save(): void {
     if (!this.username.trim()) {
@@ -48,7 +49,7 @@ export class UserCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     this.userManagementService.createUser({
       username: this.username.trim(),
       email: this.email.trim(),
@@ -62,12 +63,12 @@ export class UserCreateModal {
     }).subscribe({
       next: (response) => {
         this.toastService.success('User created successfully');
-        this.saving = false;
+        this.saving.set(false);
         this.activeModal.close(response.user);
       },
       error: (err) => {
         this.toastService.error('Failed to create user');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

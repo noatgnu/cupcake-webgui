@@ -23,7 +23,7 @@ export class LabGroupCreateModal {
   description = '';
   allowMemberInvites = true;
   allowProcessJobs = false;
-  saving = false;
+  saving = signal(false);
 
   isStaff = computed(() => {
     const user = this.authService.currentUser();
@@ -36,7 +36,7 @@ export class LabGroupCreateModal {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const payload: any = {
       name: this.name.trim(),
       description: this.description.trim(),
@@ -54,12 +54,12 @@ export class LabGroupCreateModal {
           ? `Sub-group created under "${this.parentGroup.name}"`
           : 'Lab group created successfully';
         this.toastService.success(message);
-        this.saving = false;
+        this.saving.set(false);
         this.activeModal.close(created);
       },
       error: (err) => {
         this.toastService.error('Failed to create lab group');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

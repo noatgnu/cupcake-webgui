@@ -3,7 +3,7 @@
     <i class="bi bi-flask me-2"></i>
     {{ stepReagent ? 'Edit' : 'Add' }} Step Reagent
   </h5>
-  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving"></button>
+  <button type="button" class="btn-close" (click)="cancel()" [disabled]="saving()"></button>
 </div>
 
 <div class="modal-body">
@@ -139,15 +139,15 @@
 </div>
 
 <div class="modal-footer">
-  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving">
+  <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
     Cancel
   </button>
   <button
     type="button"
     class="btn btn-primary"
     (click)="save()"
-    [disabled]="!reagentForm.valid || saving">
-    @if (saving) {
+    [disabled]="!reagentForm.valid || saving()">
+    @if (saving()) {
       <span class="spinner-border spinner-border-sm me-1"></span>
     }
     <i class="bi bi-save me-1"></i>

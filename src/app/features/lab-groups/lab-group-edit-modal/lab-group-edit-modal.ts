@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, Input, OnInit, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, computed, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -24,7 +24,7 @@ export class LabGroupEditModal implements OnInit {
   allowMemberInvites = false;
   allowProcessJobs = false;
   isActive = true;
-  saving = false;
+  saving = signal(false);
 
   isStaff = computed(() => {
     const user = this.authService.currentUser();
@@ -45,7 +45,7 @@ export class LabGroupEditModal implements OnInit {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     this.labGroupService.updateLabGroup(this.labGroup.id, {
       name: this.name.trim(),
       description: this.description.trim(),
@@ -55,12 +55,12 @@ export class LabGroupEditModal implements OnInit {
     }).subscribe({
       next: (updated) => {
         this.toastService.success('Lab group updated successfully');
-        this.saving = false;
+        this.saving.set(false);
         this.activeModal.close(updated);
       },
       error: (err) => {
         this.toastService.error('Failed to update lab group');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

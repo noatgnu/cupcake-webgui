@@ -6,6 +6,7 @@ import { InstrumentPermissionService } from '@noatgnu/cupcake-macaron';
 import type { Instrument, InstrumentPermission } from '@noatgnu/cupcake-macaron';
 import { ToastService, UserManagementService } from '@noatgnu/cupcake-core';
 import type { User } from '@noatgnu/cupcake-core';
+import { forkJoin, Observable } from 'rxjs';
 
 interface UserWithPermission {
   user: User;
@@ -113,7 +114,7 @@ export class InstrumentPermissionModal implements OnInit {
 
   save(): void {
     this.saving.set(true);
-    const updates: Promise<any>[] = [];
+    const updates: Observable<any>[] = [];
 
     this.users().forEach(userWithPermission => {
       const hasAnyPermission = userWithPermission.canView ||
@@ -130,7 +131,7 @@ export class InstrumentPermissionModal implements OnInit {
                 canBook: userWithPermission.canBook,
                 canManage: userWithPermission.canManage
               }
-            ).toPromise()
+            )
           );
         } else {
           updates.push(
@@ -140,28 +141,29 @@ export class InstrumentPermissionModal implements OnInit {
               canView: userWithPermission.canView,
               canBook: userWithPermission.canBook,
               canManage: userWithPermission.canManage
-            }).toPromise()
+            })
           );
         }
       } else if (userWithPermission.permission) {
         updates.push(
           this.instrumentPermissionService.deleteInstrumentPermission(
             userWithPermission.permission.id
-          ).toPromise()
+          )
         );
       }
     });
 
-    Promise.all(updates)
-      .then(() => {
+    forkJoin(updates).subscribe({
+      next: () => {
         this.toastService.success('Permissions updated successfully');
         this.saving.set(false);
         this.activeModal.close(true);
-      })
-      .catch((err: unknown) => {
+      },
+      error: (err: unknown) => {
         this.toastService.error('Failed to update permissions');
         this.saving.set(false);
-      });
+      }
+    });
   }
 
   close(): void {

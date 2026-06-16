@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal, NgbTypeahead } from '@ng-bootstrap/ng-bootstrap';
@@ -13,7 +13,8 @@ import { debounceTime, map, Observable, of, switchMap } from 'rxjs';
   selector: 'app-step-reagent-modal',
   imports: [ReactiveFormsModule, NgbTypeahead],
   templateUrl: './step-reagent-modal.html',
-  styleUrl: './step-reagent-modal.scss'
+  styleUrl: './step-reagent-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StepReagentModal implements OnInit {
   private fb = inject(FormBuilder);
@@ -25,7 +26,7 @@ export class StepReagentModal implements OnInit {
   @Input() stepId!: number;
   @Input() stepReagent?: StepReagent;
 
-  saving = false;
+  saving = signal(false);
 
   reagentForm: FormGroup = this.fb.group({
     reagentName: ['', Validators.required],
@@ -104,7 +105,7 @@ export class StepReagentModal implements OnInit {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.reagentForm.value;
 
     this.reagentService.getReagents({
@@ -162,7 +163,7 @@ export class StepReagentModal implements OnInit {
             ? 'Failed to update step reagent'
             : 'Failed to create step reagent'
         );
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

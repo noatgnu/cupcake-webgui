@@ -10,6 +10,7 @@ import {
   ToastService,
   AuthService
 } from '@noatgnu/cupcake-core';
+import { forkJoin, Observable } from 'rxjs';
 
 interface MemberWithPermission {
   member: LabGroupMember;
@@ -88,7 +89,7 @@ export class LabGroupPermissionsModal implements OnInit {
 
   save(): void {
     this.saving.set(true);
-    const updates: Promise<any>[] = [];
+    const updates: Observable<any>[] = [];
 
     this.members().forEach(memberWithPermission => {
       const hasAnyPermission = memberWithPermission.canView ||
@@ -107,7 +108,7 @@ export class LabGroupPermissionsModal implements OnInit {
                 canManage: memberWithPermission.canManage,
                 canProcessJobs: memberWithPermission.canProcessJobs
               }
-            ).toPromise()
+            )
           );
         } else {
           updates.push(
@@ -118,28 +119,29 @@ export class LabGroupPermissionsModal implements OnInit {
               canInvite: memberWithPermission.canInvite,
               canManage: memberWithPermission.canManage,
               canProcessJobs: memberWithPermission.canProcessJobs
-            }).toPromise()
+            })
           );
         }
       } else if (memberWithPermission.permission) {
         updates.push(
           this.labGroupService.deleteLabGroupPermission(
             memberWithPermission.permission.id
-          ).toPromise()
+          )
         );
       }
     });
 
-    Promise.all(updates)
-      .then(() => {
+    forkJoin(updates).subscribe({
+      next: () => {
         this.toastService.success('Permissions updated successfully');
         this.saving.set(false);
         this.activeModal.close(true);
-      })
-      .catch((err) => {
+      },
+      error: (err) => {
         this.toastService.error('Failed to update permissions');
         this.saving.set(false);
-      });
+      }
+    });
   }
 
   close(): void {

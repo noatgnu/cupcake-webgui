@@ -17,7 +17,7 @@ import { SessionDateEditModal } from '../session-date-edit-modal/session-date-ed
 import { WebvttEditor } from '../webvtt-editor/webvtt-editor';
 import { SessionWebrtcPanel } from '../session-webrtc-panel/session-webrtc-panel';
 import { PeerRole } from '@noatgnu/cupcake-mint-chocolate';
-import { Subject } from 'rxjs';
+import { forkJoin, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 
@@ -494,8 +494,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       this.protocolService.getProtocol(id)
     );
 
-    Promise.all(protocolRequests.map(req => req.toPromise()))
-      .then(protocols => {
+    forkJoin(protocolRequests).subscribe({
+      next: (protocols) => {
         const validProtocols = protocols.filter((p): p is ProtocolModel => p !== undefined);
         this.protocols.set(validProtocols);
         this.loading.set(false);
@@ -503,11 +503,12 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         if (validProtocols.length > 0) {
           this.selectProtocol(0);
         }
-      })
-      .catch(err => {
+      },
+      error: (err) => {
         this.toastService.error('Failed to load protocols');
         this.loading.set(false);
-      });
+      }
+    });
   }
 
   selectProtocol(index: number): void {
@@ -543,11 +544,11 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       this.stepService.getProtocolSteps({
         stepSection: section.id,
         ordering: 'order'
-      }).toPromise()
+      })
     );
 
-    Promise.all(stepRequests)
-      .then(responses => {
+    forkJoin(stepRequests).subscribe({
+      next: (responses) => {
         const stepsMap = new Map<number, ProtocolStep[]>();
         responses.forEach((response, index) => {
           if (response) {
@@ -570,11 +571,12 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         this.initializeTimers();
         this.loadTimersFromBackend();
         this.loadStepAnnotations();
-      })
-      .catch(err => {
+      },
+      error: (err) => {
         this.toastService.error('Failed to load steps');
         this.loadingSteps.set(false);
-      });
+      }
+    });
   }
 
   loadStepReagents(stepId: number): void {

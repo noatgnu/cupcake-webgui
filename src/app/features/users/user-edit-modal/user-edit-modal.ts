@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -9,7 +9,8 @@ import { UserManagementService } from '@noatgnu/cupcake-core';
   selector: 'app-user-edit-modal',
   imports: [FormsModule],
   templateUrl: './user-edit-modal.html',
-  styleUrl: './user-edit-modal.scss'
+  styleUrl: './user-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserEditModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
@@ -25,7 +26,7 @@ export class UserEditModal implements OnInit {
   isStaff = false;
   isSuperuser = false;
   isActive = true;
-  saving = false;
+  saving = signal(false);
 
   ngOnInit(): void {
     this.username = this.user.username;
@@ -48,7 +49,7 @@ export class UserEditModal implements OnInit {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     this.userManagementService.updateUser(this.user.id, {
       username: this.username.trim(),
       email: this.email.trim(),
@@ -60,12 +61,12 @@ export class UserEditModal implements OnInit {
     }).subscribe({
       next: (updated) => {
         this.toastService.success('User updated successfully');
-        this.saving = false;
+        this.saving.set(false);
         this.activeModal.close(updated);
       },
       error: (err) => {
         this.toastService.error('Failed to update user');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }

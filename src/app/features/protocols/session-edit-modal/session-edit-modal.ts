@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -10,7 +10,8 @@ import { ToastService } from '@noatgnu/cupcake-core';
   selector: 'app-session-edit-modal',
   imports: [ReactiveFormsModule],
   templateUrl: './session-edit-modal.html',
-  styleUrl: './session-edit-modal.scss'
+  styleUrl: './session-edit-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionEditModal implements OnInit {
   private fb = inject(FormBuilder);
@@ -20,7 +21,7 @@ export class SessionEditModal implements OnInit {
 
   @Input() session!: Session;
 
-  saving = false;
+  saving = signal(false);
 
   sessionForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
@@ -46,7 +47,7 @@ export class SessionEditModal implements OnInit {
       return;
     }
 
-    this.saving = true;
+    this.saving.set(true);
     const formValue = this.sessionForm.value;
 
     this.sessionService.updateSession(this.session.id, {
@@ -61,7 +62,7 @@ export class SessionEditModal implements OnInit {
       },
       error: (err) => {
         this.toastService.error('Failed to update session');
-        this.saving = false;
+        this.saving.set(false);
       }
     });
   }
