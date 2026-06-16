@@ -35,4 +35,23 @@ export class SessionDetailPage {
     const step = this.page.locator("[class*='step']").filter({ hasText: stepText }).first();
     await step.getByRole("checkbox", { name: /complete|done/i }).check();
   }
+
+  async startStepTimer(): Promise<void> {
+    await this.page.getByTitle("Start Timer").click();
+    await expect(this.page.getByTitle("Pause Timer")).toBeVisible({ timeout: 8000 });
+  }
+
+  async pauseStepTimer(): Promise<void> {
+    await this.page.getByTitle("Pause Timer").click();
+    await expect(this.page.getByTitle("Start Timer")).toBeVisible({ timeout: 8000 });
+  }
+
+  async resetStepTimer(): Promise<void> {
+    await this.page.getByTitle("Reset Timer").click();
+    await expect(this.page.getByTitle("Start Timer")).toBeVisible({ timeout: 5000 });
+  }
+
+  async getStepTimerDisplay(): Promise<string> {
+    return this.page.locator(".timer-compact .fw-bold, .timer-display .fw-bold").first().innerText();
+  }
 }

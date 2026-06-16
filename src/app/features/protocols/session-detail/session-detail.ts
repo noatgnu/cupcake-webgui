@@ -984,15 +984,22 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
             }
 
             if (this.timer.timeKeeper[stepKey]) {
-              if (tk.started) {
+              if (tk.started && tk.startTime) {
                 const utcDate = new Date(tk.startTime).getTime();
-                this.timer.timeKeeper[stepKey].startTime = utcDate;
-                this.timer.timeKeeper[stepKey].started = true;
-                if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
-                  this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
-                }
-                if (!this.timer.currentTrackingStep.includes(tk.step)) {
-                  this.timer.currentTrackingStep.push(tk.step);
+                if (utcDate > 0) {
+                  this.timer.timeKeeper[stepKey].startTime = utcDate;
+                  this.timer.timeKeeper[stepKey].started = true;
+                  if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
+                    this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
+                  }
+                  if (!this.timer.currentTrackingStep.includes(tk.step)) {
+                    this.timer.currentTrackingStep.push(tk.step);
+                  }
+                } else {
+                  if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
+                    this.timer.timeKeeper[stepKey].current = tk.currentDuration;
+                    this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
+                  }
                 }
               } else {
                 if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
@@ -1017,10 +1024,28 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     if (!step) return;
 
     const localTimer = this.timer.timeKeeper[stepId.toString()];
-    if (localTimer && localTimer.started) {
+    if (localTimer?.started) {
       this.toastService.info('Timer is already running');
       return;
     }
+
+    const doStart = (timekeeperId: number) => {
+      this.timeKeeperService.startTimer(timekeeperId).subscribe({
+        next: (response) => {
+          this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
+          const utcDate = new Date(response.timeKeeper.startTime).getTime();
+          this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
+          this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
+          this.timer.timeKeeper[stepId.toString()].started = true;
+          if (!this.timer.currentTrackingStep.includes(stepId)) {
+            this.timer.currentTrackingStep.push(stepId);
+          }
+        },
+        error: () => {
+          this.toastService.error('Failed to start timer');
+        }
+      });
+    };
 
     const remoteTimer = this.timer.remoteTimeKeeper[stepId.toString()];
 
@@ -1034,51 +1059,43 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       }).subscribe({
         next: (created) => {
           this.timer.remoteTimeKeeper[stepId.toString()] = created;
-          this.timeKeeperService.startTimer(created.id).subscribe({
-            next: (response) => {
-              this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
-              const utcDate = new Date(response.timeKeeper.startTime).getTime();
-              this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
-              this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
-              this.timer.timeKeeper[stepId.toString()].started = true;
-              if (!this.timer.currentTrackingStep.includes(stepId)) {
-                this.timer.currentTrackingStep.push(stepId);
-              }
-            },
-            error: () => {
-              this.toastService.error('Failed to start timer');
-            }
-          });
-        },
-        error: () => {
-          this.toastService.error('Failed to create timer');
-        }
-      });
-    } else if (remoteTimer.started) {
-      const utcDate = new Date(remoteTimer.startTime).getTime();
-      this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
-      this.timer.timeKeeper[stepId.toString()].started = true;
-      if (!this.timer.currentTrackingStep.includes(stepId)) {
-        this.timer.currentTrackingStep.push(stepId);
-      }
-      this.toastService.info('Timer synced with running timer');
-    } else {
-      const timeKeeperId = remoteTimer.id;
-      this.timeKeeperService.startTimer(timeKeeperId).subscribe({
-        next: (response) => {
-          this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
-          const utcDate = new Date(response.timeKeeper.startTime).getTime();
-          this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
-          this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
-          this.timer.timeKeeper[stepId.toString()].started = true;
-          if (!this.timer.currentTrackingStep.includes(stepId)) {
-            this.timer.currentTrackingStep.push(stepId);
+          const dur = created.currentDuration ?? step.stepDuration ?? 0;
+          this.timer.timeKeeper[stepId.toString()].current = dur;
+          this.timer.timeKeeper[stepId.toString()].previousStop = dur;
+          if (created.started) {
+            this.timeKeeperService.resetTimer(created.id).subscribe({
+              next: (res) => {
+                this.timer.remoteTimeKeeper[stepId.toString()] = res.timeKeeper;
+                const resetDur = res.timeKeeper.currentDuration ?? step.stepDuration ?? 0;
+                this.timer.timeKeeper[stepId.toString()].current = resetDur;
+                this.timer.timeKeeper[stepId.toString()].previousStop = resetDur;
+                doStart(created.id);
+              },
+              error: () => this.toastService.error('Failed to reset timer')
+            });
+          } else {
+            doStart(created.id);
           }
         },
-        error: (err) => {
+        error: () => {
           this.toastService.error('Failed to start timer');
         }
       });
+    } else if (remoteTimer.started) {
+      this.timeKeeperService.resetTimer(remoteTimer.id).subscribe({
+        next: (response) => {
+          this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
+          const dur = response.timeKeeper.currentDuration ?? step.stepDuration ?? 0;
+          this.timer.timeKeeper[stepId.toString()].current = dur;
+          this.timer.timeKeeper[stepId.toString()].previousStop = dur;
+          doStart(remoteTimer.id);
+        },
+        error: () => {
+          this.toastService.error('Failed to reset timer');
+        }
+      });
+    } else {
+      doStart(remoteTimer.id);
     }
   }
 
