@@ -152,14 +152,12 @@ export class ProtocolList implements OnInit {
   toggleEnabled(protocol: ProtocolModel, event: Event): void {
     event.stopPropagation();
 
-    this.protocolService.updateProtocol(protocol.id, {
-      enabled: !protocol.enabled
-    }).subscribe({
-      next: (updated) => {
-        protocol.enabled = updated.enabled;
-        this.toastService.success(`Protocol ${protocol.enabled ? 'enabled' : 'disabled'}`);
+    this.protocolService.toggleEnabled(protocol.id).subscribe({
+      next: (response) => {
+        protocol.enabled = response.enabled;
+        this.toastService.success(response.message);
       },
-      error: (err) => {
+      error: () => {
         this.toastService.error('Failed to update protocol');
       }
     });
