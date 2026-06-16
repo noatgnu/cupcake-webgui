@@ -1940,6 +1940,5 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     this.destroy$.next();
     this.destroy$.complete();
     this.notificationWs.disconnect();
-    this.timer.ngOnDestroy();
   }
 }

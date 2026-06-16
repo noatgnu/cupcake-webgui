@@ -435,6 +435,5 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.wsSubscriptions.forEach(sub => sub.unsubscribe());
     this.timeKeeperWsService.disconnect();
-    this.timer.ngOnDestroy();
   }
 }
