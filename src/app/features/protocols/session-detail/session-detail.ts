@@ -1028,20 +1028,30 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       this.timeKeeperService.createTimeKeeper({
         session: currentSession.id,
         step: stepId,
-        started: true,
-        currentDuration: step.stepDuration || 0
+        started: false,
+        currentDuration: step.stepDuration || 0,
+        originalDuration: step.stepDuration || 0
       }).subscribe({
-        next: (data) => {
-          this.timer.remoteTimeKeeper[stepId.toString()] = data;
-          const utcDate = new Date(data.startTime).getTime();
-          this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
-          this.timer.timeKeeper[stepId.toString()].started = true;
-          if (!this.timer.currentTrackingStep.includes(stepId)) {
-            this.timer.currentTrackingStep.push(stepId);
-          }
+        next: (created) => {
+          this.timer.remoteTimeKeeper[stepId.toString()] = created;
+          this.timeKeeperService.startTimer(created.id).subscribe({
+            next: (response) => {
+              this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
+              const utcDate = new Date(response.timeKeeper.startTime).getTime();
+              this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
+              this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
+              this.timer.timeKeeper[stepId.toString()].started = true;
+              if (!this.timer.currentTrackingStep.includes(stepId)) {
+                this.timer.currentTrackingStep.push(stepId);
+              }
+            },
+            error: () => {
+              this.toastService.error('Failed to start timer');
+            }
+          });
         },
-        error: (err) => {
-          this.toastService.error('Failed to start timer');
+        error: () => {
+          this.toastService.error('Failed to create timer');
         }
       });
     } else if (remoteTimer.started) {
@@ -1058,6 +1068,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         next: (response) => {
           this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
           const utcDate = new Date(response.timeKeeper.startTime).getTime();
+          this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
           this.timer.timeKeeper[stepId.toString()].startTime = utcDate;
           this.timer.timeKeeper[stepId.toString()].started = true;
           if (!this.timer.currentTrackingStep.includes(stepId)) {
