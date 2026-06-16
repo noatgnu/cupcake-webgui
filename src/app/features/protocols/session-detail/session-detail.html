@@ -207,7 +207,7 @@
                         </span>
                         @if (timer.timeKeeper[currentStep()!.id.toString()] && timer.tick() >= 0) {
                           <div class="d-flex align-items-center gap-2">
-                            <span class="fs-6 fw-semibold">
+                            <span class="fs-6 fw-semibold font-monospace">
                               <i class="bi bi-clock me-1"></i>
                               {{ timer.convertTime(timer.timeKeeper[currentStep()!.id.toString()].current) }}
                             </span>
