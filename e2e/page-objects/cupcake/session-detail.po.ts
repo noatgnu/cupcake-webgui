@@ -52,6 +52,7 @@ export class SessionDetailPage {
   }
 
   async getStepTimerDisplay(): Promise<string> {
-    return this.page.locator(".timer-compact .fw-bold, .timer-display .fw-bold").first().innerText();
+    const text = await this.page.locator("span.font-monospace").first().innerText();
+    return text.trim();
   }
 }

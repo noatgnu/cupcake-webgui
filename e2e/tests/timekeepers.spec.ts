@@ -87,7 +87,7 @@ test.describe("timekeepers", () => {
     await page.resetSelectedTimer();
     await expect(adminPage.getByTitle("Start")).toBeVisible({ timeout: 5000 });
     const timeAfterReset = await page.getDisplayedTime();
-    expect(timeAfterReset).toMatch(/^0?1:00$/);
+    expect(timeAfterReset).toContain('01:00');
   });
 
   test("start timer after reset starts from full duration", async ({ adminPage }) => {

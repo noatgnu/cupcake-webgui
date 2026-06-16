@@ -116,7 +116,7 @@ test.describe("sessions", () => {
       await session.resetStepTimer();
       await expect(adminPage.getByTitle("Start Timer")).toBeVisible({ timeout: 5000 });
       const resetDisplay = await session.getStepTimerDisplay();
-      expect(resetDisplay).toMatch(/^10:0[01]$|^9:5\d$/);
+      expect(resetDisplay).toMatch(/00:00:0[89]|00:00:10/);
     });
 
     test("start after reset begins countdown from full duration", async ({ adminPage }) => {
