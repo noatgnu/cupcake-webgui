@@ -59,7 +59,7 @@ export class TimerService {
     let hours = Math.floor(minutes / 60);
     minutes = minutes - hours * 60;
     let secondsString = seconds.toFixed(2).toString();
-    if (secondsString.length === 1) {
+    if (seconds < 10) {
       secondsString = `0${secondsString}`;
     }
     let minutesString = minutes.toString();

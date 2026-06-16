@@ -175,10 +175,6 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
     this.timeKeeperService.stopTimer(tk.id).subscribe({
       next: (response) => {
         this.timer.remoteTimeKeeper[id.toString()] = response.timeKeeper;
-        if (response.timeKeeper.currentDuration !== undefined && response.timeKeeper.currentDuration !== null) {
-          this.timer.timeKeeper[id.toString()].current = response.timeKeeper.currentDuration;
-          this.timer.timeKeeper[id.toString()].previousStop = response.timeKeeper.currentDuration;
-        }
         this.timekeepers.update(tks =>
           tks.map(t => t.id === id ? response.timeKeeper : t)
         );

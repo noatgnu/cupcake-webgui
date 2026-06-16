@@ -1108,10 +1108,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       this.timeKeeperService.stopTimer(timeKeeperId).subscribe({
         next: (response) => {
           this.timer.remoteTimeKeeper[stepId.toString()] = response.timeKeeper;
-          if (response.timeKeeper.currentDuration !== undefined && response.timeKeeper.currentDuration !== null) {
-            this.timer.timeKeeper[stepId.toString()].current = response.timeKeeper.currentDuration;
-            this.timer.timeKeeper[stepId.toString()].previousStop = response.timeKeeper.currentDuration;
-          }
         },
         error: () => {
           this.toastService.error('Failed to pause timer');

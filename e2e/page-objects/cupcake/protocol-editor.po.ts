@@ -37,7 +37,7 @@ export class ProtocolEditorPage {
     await editor.click();
     await editor.fill(stepDescription);
     if (durationMinutes > 0) {
-      const minutesInput = this.page.locator(".duration-input input").nth(2);
+      const minutesInput = this.page.locator(".modal-dialog .duration-input input").nth(2);
       await minutesInput.fill(String(durationMinutes));
     }
     await this.page.locator(".modal-footer .btn-primary").click();
