@@ -175,6 +175,10 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
     this.timeKeeperService.stopTimer(tk.id).subscribe({
       next: (response) => {
         this.timer.remoteTimeKeeper[id.toString()] = response.timeKeeper;
+        if (response.timeKeeper.currentDuration !== undefined && response.timeKeeper.currentDuration !== null) {
+          this.timer.timeKeeper[id.toString()].current = response.timeKeeper.currentDuration;
+          this.timer.timeKeeper[id.toString()].previousStop = response.timeKeeper.currentDuration;
+        }
         this.timekeepers.update(tks =>
           tks.map(t => t.id === id ? response.timeKeeper : t)
         );
@@ -370,10 +374,11 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
             const tk = this.timekeepers().find(t => t.id === timekeeperId);
             if (tk && this.timer.timeKeeper[timekeeperId.toString()]) {
               this.timer.timeKeeper[timekeeperId.toString()].started = false;
-              this.timer.timeKeeper[timekeeperId.toString()].previousStop = this.timer.timeKeeper[timekeeperId.toString()].current;
               if (event.duration !== undefined) {
                 this.timer.timeKeeper[timekeeperId.toString()].current = event.duration;
                 this.timer.timeKeeper[timekeeperId.toString()].previousStop = event.duration;
+              } else {
+                this.timer.timeKeeper[timekeeperId.toString()].previousStop = this.timer.timeKeeper[timekeeperId.toString()].current;
               }
               this.timekeepers.update(tks =>
                 tks.map(t => t.id === timekeeperId ? {

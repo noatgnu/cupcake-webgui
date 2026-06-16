@@ -38,6 +38,13 @@ export class TimekeepersPage {
   async pauseSelectedTimer(): Promise<void> {
     await this.page.getByTitle("Pause").click();
     await expect(this.page.getByTitle("Start")).toBeVisible({ timeout: 5000 });
+    let prev = '';
+    for (let i = 0; i < 20; i++) {
+      await this.page.waitForTimeout(100);
+      const curr = await this.page.locator(".timer-time-display-large").innerText();
+      if (curr === prev) break;
+      prev = curr;
+    }
   }
 
   async resetSelectedTimer(): Promise<void> {
