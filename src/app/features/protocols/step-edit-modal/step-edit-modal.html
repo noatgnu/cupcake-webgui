@@ -61,10 +61,10 @@
             </quill-editor>
 
             <div #dropdownMenu class="dropdown-menu show shadow" style="display: none; z-index: 1050; max-height: 250px; overflow-y: auto;">
-              @if (filteredReagents.length === 0) {
+              @if (filteredReagents().length === 0) {
                 <div class="dropdown-item-text text-muted">No reagents found</div>
               }
-              @for (reagent of filteredReagents; track reagent.id) {
+              @for (reagent of filteredReagents(); track reagent.id) {
                 <h6 class="dropdown-header">{{reagent.reagentName}} (ID: {{reagent.id}})</h6>
                 <button type="button" class="dropdown-item" (click)="insertReagentTemplate(reagent.id, 'name')">
                   %{{reagent.id}}.name%
@@ -96,7 +96,7 @@
         @if (showPreview) {
           <div class="col-md-6">
             <div class="border rounded p-3" style="min-height: 200px;">
-              <div [innerHTML]="stepForm.get('stepDescription')?.value | stepTemplate:reagents"></div>
+              <div [innerHTML]="stepForm.get('stepDescription')?.value | stepTemplate:reagents()"></div>
             </div>
           </div>
         }
@@ -111,12 +111,12 @@
       </div>
     </div>
 
-    @if (reagents.length > 0) {
+    @if (reagents().length > 0) {
       <div class="card">
         <div class="card-header py-2">
           <h6 class="mb-0">
             <i class="bi bi-flask me-2"></i>
-            Step Reagents ({{ reagents.length }})
+            Step Reagents ({{ reagents().length }})
           </h6>
         </div>
         <div class="card-body p-0">
@@ -132,7 +132,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (reagent of reagents; track reagent.id) {
+                @for (reagent of reagents(); track reagent.id) {
                   <tr>
                     <td>
                       <span class="badge text-bg-primary">{{ reagent.id }}</span>

@@ -35,8 +35,8 @@ export class StepEditModal implements OnInit {
   saving = signal(false);
   showTemplateHelp = false;
   showPreview = false;
-  reagents: StepReagent[] = [];
-  filteredReagents: StepReagent[] = [];
+  reagents = signal<StepReagent[]>([]);
+  filteredReagents = signal<StepReagent[]>([]);
   currentCursorIndex = 0;
   dropdownVisible = false;
 
@@ -72,8 +72,8 @@ export class StepEditModal implements OnInit {
   loadStepReagents(): void {
     this.stepReagentService.getReagentsByStep(this.step.id).subscribe({
       next: (response) => {
-        this.reagents = response.results;
-        this.filteredReagents = [...this.reagents];
+        this.reagents.set(response.results);
+        this.filteredReagents.set([...response.results]);
       },
       error: () => {
       }
@@ -124,15 +124,15 @@ export class StepEditModal implements OnInit {
 
   filterReagents(searchTerm: string): void {
     if (!searchTerm) {
-      this.filteredReagents = [...this.reagents];
+      this.filteredReagents.set([...this.reagents()]);
       return;
     }
 
-    this.filteredReagents = this.reagents.filter(r => {
+    this.filteredReagents.set(this.reagents().filter(r => {
       const idMatch = r.id.toString().includes(searchTerm);
       const nameMatch = r.reagentName?.toLowerCase().includes(searchTerm);
       return idMatch || nameMatch;
-    });
+    }));
   }
 
   hideDropdown(): void {
@@ -164,7 +164,7 @@ export class StepEditModal implements OnInit {
   }
 
   hasScalableReagents(): boolean {
-    return this.reagents.some(r => r.scalable === true);
+    return this.reagents().some(r => r.scalable === true);
   }
 
   updateStep(): void {
