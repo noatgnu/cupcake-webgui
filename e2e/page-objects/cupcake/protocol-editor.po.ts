@@ -55,4 +55,43 @@ export class ProtocolEditorPage {
     }
     await expect(item).not.toBeVisible({ timeout: 10000 });
   }
+
+  stepListItem(stepDescription: string) {
+    return this.page.locator(".list-group-item").filter({ hasText: stepDescription });
+  }
+
+  async addStepReagent(stepDescription: string, reagentName: string, unit: string, quantity: number): Promise<number> {
+    await this.stepListItem(stepDescription).getByTitle("Add Reagent").click();
+    await this.page.locator("#reagentName").fill(reagentName);
+    await this.page.locator("#reagentUnit").selectOption(unit);
+    await this.page.locator("#quantity").fill(String(quantity));
+    const [response] = await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/step-reagents/") && resp.request().method() === "POST"),
+      this.page.locator(".modal-footer .btn-primary").click(),
+    ]);
+    await expect(this.page.getByText(reagentName).first()).toBeVisible({ timeout: 10000 });
+    const body = await response.json();
+    return body.id;
+  }
+
+  async insertReagentTemplateIntoStep(
+    stepDescription: string,
+    property: "name" | "quantity" | "unit" | "scaled_quantity" = "quantity"
+  ): Promise<void> {
+    const iconMap: Record<string, string> = {
+      quantity: "bi-123",
+      unit: "bi-rulers",
+      name: "bi-tag",
+      scaled_quantity: "bi-calculator",
+    };
+    await this.stepListItem(stepDescription).getByTitle("Edit Step").click();
+    await expect(this.page.locator(".modal-title")).toContainText("Edit Step");
+    await this.page.locator("table tbody tr").first().locator(`button:has(i.${iconMap[property]})`).click();
+    await this.page.locator(".modal-footer .btn-primary", { hasText: /save changes/i }).click();
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async getStepTemplateValue(stepDescription: string): Promise<string> {
+    return this.stepListItem(stepDescription).locator(".template-value").first().innerText();
+  }
 }

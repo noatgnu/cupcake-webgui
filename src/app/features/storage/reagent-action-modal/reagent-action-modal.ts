@@ -48,7 +48,7 @@ export class ReagentActionModal {
     this.saving.set(true);
 
     const payload: any = {
-      reagent: this.storedReagent.reagent,
+      reagent: this.storedReagent.id,
       actionType: this.actionType,
       quantity: this.quantity
     };
