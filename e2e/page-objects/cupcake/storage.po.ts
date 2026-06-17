@@ -11,9 +11,12 @@ export class StoragePage {
   }
 
   async create(name: string): Promise<void> {
-    await this.page.getByRole("button", { name: /new|create|add storage|add freezer/i }).click();
-    await this.page.getByLabel(/name/i).fill(name);
-    await this.page.getByRole("button", { name: /save|create|confirm/i }).click();
+    await this.page.getByRole("button", { name: "Add Storage" }).click();
+    await this.page.locator("#name").fill(name);
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "POST", { timeout: 30000 }),
+      this.page.locator(".modal-footer .btn-primary").click(),
+    ]);
     await expect(this.page.getByText(name)).toBeVisible({ timeout: 10000 });
   }
 
@@ -22,12 +25,14 @@ export class StoragePage {
   }
 
   async addReagent(name: string, qty: number, unit: string): Promise<void> {
-    await this.page.getByRole("button", { name: /add reagent|new reagent/i }).click();
-    await this.page.getByLabel(/name/i).fill(name);
-    await this.page.getByLabel(/quantity/i).fill(String(qty));
-    const unitSelect = this.page.locator("select#reagentUnit");
-    if (await unitSelect.isVisible()) await unitSelect.selectOption(unit);
-    await this.page.getByRole("button", { name: /save|add|confirm/i }).click();
+    await this.page.getByTitle("Add Reagent").click();
+    await this.page.locator("#reagentName").fill(name);
+    await this.page.locator("#quantity").fill(String(qty));
+    await this.page.locator("#reagentUnit").selectOption(unit);
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/stored-reagents/") && resp.request().method() === "POST", { timeout: 30000 }),
+      this.page.locator(".modal-footer .btn-primary").click(),
+    ]);
     await expect(this.page.getByText(name)).toBeVisible({ timeout: 10000 });
   }
 
@@ -37,8 +42,11 @@ export class StoragePage {
 
   async createChildStorage(name: string): Promise<void> {
     await this.page.getByTitle("Add child storage").click();
-    await this.page.getByLabel(/name/i).fill(name);
-    await this.page.getByRole("button", { name: /save|create|confirm/i }).click();
+    await this.page.locator("#name").fill(name);
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "POST", { timeout: 30000 }),
+      this.page.locator(".modal-footer .btn-primary").click(),
+    ]);
     await expect(this.page.locator(".storage-panel-left").getByText(name)).toBeVisible({ timeout: 10000 });
   }
 
@@ -52,7 +60,10 @@ export class StoragePage {
     if (notes) {
       await this.page.locator("#notes").fill(notes);
     }
-    await this.page.locator(".modal-footer .btn-primary").click();
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/stored-reagents/") && resp.request().method() === "GET", { timeout: 30000 }),
+      this.page.locator(".modal-footer .btn-primary").click(),
+    ]);
     await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
   }
 
@@ -62,7 +73,10 @@ export class StoragePage {
     if (notes) {
       await this.page.locator("#notes").fill(notes);
     }
-    await this.page.locator(".modal-footer .btn-danger").click();
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/stored-reagents/") && resp.request().method() === "GET", { timeout: 30000 }),
+      this.page.locator(".modal-footer .btn-danger").click(),
+    ]);
     await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
   }
 

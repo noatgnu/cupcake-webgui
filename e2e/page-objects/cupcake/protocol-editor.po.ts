@@ -84,9 +84,13 @@ export class ProtocolEditorPage {
       name: "bi-tag",
       scaled_quantity: "bi-calculator",
     };
-    await this.stepListItem(stepDescription).getByTitle("Edit Step").click();
+    const [editStepResponse] = await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes("/step-reagents/") && resp.request().method() === "GET", { timeout: 30000 }),
+      this.stepListItem(stepDescription).getByTitle("Edit Step").click(),
+    ]);
+    await editStepResponse.finished();
     await expect(this.page.locator(".modal-title")).toContainText("Edit Step");
-    await this.page.locator("table tbody tr").first().locator(`button:has(i.${iconMap[property]})`).click();
+    await this.page.locator("table tbody tr").first().locator(`button:has(i.${iconMap[property]})`).click({ timeout: 15000 });
     await this.page.locator(".modal-footer .btn-primary", { hasText: /save changes/i }).click();
     await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
   }
