@@ -55,4 +55,31 @@ export class SessionDetailPage {
     const text = await this.page.locator("span.font-monospace").first().innerText();
     return text.trim();
   }
+
+  stepReagentRow(stepReagentName: string) {
+    return this.page.locator(".step-reagents .list-group-item").filter({ hasText: stepReagentName });
+  }
+
+  async bookReagent(stepReagentName: string, storageLocationName: string, quantity: number, notes?: string): Promise<void> {
+    await this.stepReagentRow(stepReagentName).getByTitle("Book this reagent").click();
+    await expect(this.page.locator(".modal-title")).toContainText("Book Reagent");
+
+    const row = this.page.locator(".list-group-item-action").filter({ hasText: storageLocationName });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await row.click();
+
+    await this.page.locator("#quantity").fill(String(quantity));
+    if (notes) {
+      await this.page.locator("#notes").fill(notes);
+    }
+
+    const postWait = this.page.waitForResponse(resp => resp.url().includes("/reagent-actions/") && resp.request().method() === "POST", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary", { hasText: "Book Reagent" }).click();
+    await postWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async getStepReagentBookedText(stepReagentName: string): Promise<string> {
+    return this.stepReagentRow(stepReagentName).innerText();
+  }
 }
