@@ -149,8 +149,10 @@ export class StoragePage {
   }
 
   async shareStorageWithLabGroup(labGroupName: string): Promise<void> {
+    const labGroupsWait = this.page.waitForResponse(resp => resp.url().includes("/lab-groups/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator(".storage-panel-right .card-header").getByTitle("Manage Access").click();
     await expect(this.page.locator(".modal-title")).toContainText("Manage Access Permissions");
+    await labGroupsWait;
     await this.checkLabGroupInAccessModal(labGroupName);
     const putWait = this.page.waitForResponse(resp => /\/storage-objects\/\d+\/$/.test(resp.url()) && resp.request().method() === "PUT", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
@@ -159,12 +161,14 @@ export class StoragePage {
   }
 
   async shareReagentWithLabGroup(reagentName: string, labGroupName: string): Promise<void> {
+    const labGroupsWait = this.page.waitForResponse(resp => resp.url().includes("/lab-groups/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.reagentRow(reagentName).getByTitle("Manage Access").click();
     await expect(this.page.locator(".modal-title")).toContainText("Manage Reagent Access");
     if (!(await this.page.locator("#shareableSwitch").isChecked())) {
       await this.page.locator("#shareableSwitch").check();
     }
     await this.page.getByRole("button", { name: "Lab Groups" }).click();
+    await labGroupsWait;
     await this.checkLabGroupInAccessModal(labGroupName);
     const putWait = this.page.waitForResponse(resp => /\/stored-reagents\/\d+\/$/.test(resp.url()) && resp.request().method() === "PUT", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
