@@ -86,6 +86,10 @@ export const routes: Routes = [
         ]
       },
       {
+        path: 'lab-groups/invitations/:id/accept',
+        loadComponent: () => import('./features/lab-groups/lab-group-invitation-accept/lab-group-invitation-accept').then(m => m.LabGroupInvitationAccept)
+      },
+      {
         path: 'instruments',
         loadComponent: () => import('./features/instruments/instruments/instruments').then(m => m.Instruments)
       },

@@ -90,4 +90,85 @@ export class StoragePage {
   async searchReagents(term: string): Promise<void> {
     await this.page.getByPlaceholder("Search reagents...").fill(term);
   }
+
+  async openEditReagentModal(reagentName: string): Promise<void> {
+    await this.reagentRow(reagentName).getByTitle("Edit").click();
+    await expect(this.page.locator(".modal-title")).toContainText("Edit Stored Reagent");
+  }
+
+  async setLowStockNotification(reagentName: string, opts: { threshold?: number; notify: boolean }): Promise<void> {
+    await this.openEditReagentModal(reagentName);
+    if (opts.threshold !== undefined) {
+      await this.page.locator("#lowStockThreshold").fill(String(opts.threshold));
+    }
+    await this.page.locator("#notifyOnLowStock").setChecked(opts.notify);
+    const putWait = this.page.waitForResponse(resp => /\/stored-reagents\/\d+\/$/.test(resp.url()) && resp.request().method() === "PUT", { timeout: 30000 });
+    const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/stored-reagents/") && resp.request().method() === "GET", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary").click();
+    await putWait;
+    await refreshWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async isNotifyOnLowStockChecked(reagentName: string): Promise<boolean> {
+    await this.openEditReagentModal(reagentName);
+    const checked = await this.page.locator("#notifyOnLowStock").isChecked();
+    await this.page.getByRole("button", { name: "Cancel" }).click();
+    return checked;
+  }
+
+  async sendTestNotification(reagentName: string, alertType: "low_stock" | "expired" | "expiring_soon"): Promise<void> {
+    await this.openEditReagentModal(reagentName);
+    await this.page.locator("#notificationType").selectOption(alertType);
+    const postWait = this.page.waitForResponse(resp => resp.url().includes("/send_test_notification/") && resp.request().method() === "POST", { timeout: 30000 });
+    await this.page.getByRole("button", { name: "Send Test" }).click();
+    await postWait;
+  }
+
+  toast(message: string) {
+    return this.page.locator(".toast-container").getByText(message);
+  }
+
+  /**
+   * Checks the checkbox for a lab group inside an access modal's paginated
+   * list, paging forward if the lab group isn't on the current page.
+   */
+  private async checkLabGroupInAccessModal(labGroupName: string): Promise<void> {
+    const maxPages = 20;
+    for (let i = 0; i < maxPages; i++) {
+      const row = this.page.locator(".list-group-item").filter({ hasText: labGroupName });
+      if (await row.isVisible({ timeout: i === 0 ? 10000 : 2000 }).catch(() => false)) {
+        await row.locator('input[type="checkbox"]').check();
+        return;
+      }
+      const nextButton = this.page.getByRole("button", { name: "Next" });
+      if (await nextButton.isDisabled().catch(() => true)) break;
+      await nextButton.click();
+    }
+    throw new Error(`Lab group "${labGroupName}" not found in access modal list`);
+  }
+
+  async shareStorageWithLabGroup(labGroupName: string): Promise<void> {
+    await this.page.locator(".storage-panel-right .card-header").getByTitle("Manage Access").click();
+    await expect(this.page.locator(".modal-title")).toContainText("Manage Access Permissions");
+    await this.checkLabGroupInAccessModal(labGroupName);
+    const putWait = this.page.waitForResponse(resp => /\/storage-objects\/\d+\/$/.test(resp.url()) && resp.request().method() === "PUT", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary").click();
+    await putWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async shareReagentWithLabGroup(reagentName: string, labGroupName: string): Promise<void> {
+    await this.reagentRow(reagentName).getByTitle("Manage Access").click();
+    await expect(this.page.locator(".modal-title")).toContainText("Manage Reagent Access");
+    if (!(await this.page.locator("#shareableSwitch").isChecked())) {
+      await this.page.locator("#shareableSwitch").check();
+    }
+    await this.page.getByRole("button", { name: "Lab Groups" }).click();
+    await this.checkLabGroupInAccessModal(labGroupName);
+    const putWait = this.page.waitForResponse(resp => /\/stored-reagents\/\d+\/$/.test(resp.url()) && resp.request().method() === "PUT", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary").click();
+    await putWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
 }

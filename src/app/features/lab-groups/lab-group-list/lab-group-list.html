@@ -44,6 +44,21 @@
       </div>
     }
 
+    @if (pendingInvitations().length > 0) {
+      <div class="alert alert-info">
+        <i class="bi bi-envelope-paper me-2"></i>
+        <strong>You have {{ pendingInvitations().length }} pending lab group invitation(s):</strong>
+        <ul class="mb-0 mt-2">
+          @for (invitation of pendingInvitations(); track invitation.id) {
+            <li>
+              {{ invitation.labGroupName }} (from {{ invitation.inviterName }})
+              <a [routerLink]="['/lab-groups/invitations', invitation.id, 'accept']" class="ms-2">Review invitation</a>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
     <div class="lab-group-layout d-flex gap-3 h-100">
       <!-- Left Panel - Lab Groups Hierarchy -->
       <div class="lab-group-panel-left">

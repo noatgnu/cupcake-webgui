@@ -18,9 +18,10 @@ describe('LabGroupList', () => {
   beforeEach(async () => {
     currentUserSignal = signal<any>(null);
 
-    mockLabGroupService = jasmine.createSpyObj('LabGroupService', ['getLabGroups', 'getLabGroupMembers']);
+    mockLabGroupService = jasmine.createSpyObj('LabGroupService', ['getLabGroups', 'getLabGroupMembers', 'getMyPendingInvitations']);
     mockLabGroupService.getLabGroups.and.returnValue(of({ count: 0, results: [] }));
     mockLabGroupService.getLabGroupMembers.and.returnValue(of({ count: 0, next: null, previous: null, results: [] }));
+    mockLabGroupService.getMyPendingInvitations.and.returnValue(of([]));
 
     mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error', 'info', 'show']);
 
@@ -61,5 +62,10 @@ describe('LabGroupList', () => {
 
   it('isStaff() returns false when user is null', () => {
     expect(component.isStaff()).toBeFalse();
+  });
+
+  it('loadPendingInvitations() populates pendingInvitations() on init', () => {
+    expect(mockLabGroupService.getMyPendingInvitations).toHaveBeenCalled();
+    expect(component.pendingInvitations()).toEqual([]);
   });
 });

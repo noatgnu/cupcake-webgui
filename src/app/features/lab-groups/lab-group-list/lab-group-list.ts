@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { LabGroup, LabGroupService, ToastService, AuthService, LabGroupMember, LabGroupPathItem } from '@noatgnu/cupcake-core';
+import { LabGroup, LabGroupService, ToastService, AuthService, LabGroupMember, LabGroupPathItem, LabGroupInvitation } from '@noatgnu/cupcake-core';
 import { LabGroupPermissionsModal } from '../lab-group-permissions-modal/lab-group-permissions-modal';
 import { LabGroupEditModal } from '../lab-group-edit-modal/lab-group-edit-modal';
 import { LabGroupInviteModal } from '../lab-group-invite-modal/lab-group-invite-modal';
@@ -10,7 +11,7 @@ import { LabGroupCreateModal } from '../lab-group-create-modal/lab-group-create-
 
 @Component({
   selector: 'app-lab-group-list',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './lab-group-list.html',
   styleUrl: './lab-group-list.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -33,6 +34,7 @@ export class LabGroupList implements OnInit {
   childLabGroups = signal<LabGroup[]>([]);
   members = signal<LabGroupMember[]>([]);
   breadcrumbs = signal<LabGroupPathItem[]>([]);
+  pendingInvitations = signal<LabGroupInvitation[]>([]);
 
   loadingChildren = signal(false);
   loadingMembers = signal(false);
@@ -55,6 +57,18 @@ export class LabGroupList implements OnInit {
 
   ngOnInit(): void {
     this.loadChildLabGroups();
+    this.loadPendingInvitations();
+  }
+
+  loadPendingInvitations(): void {
+    this.labGroupService.getMyPendingInvitations().subscribe({
+      next: (invitations) => {
+        this.pendingInvitations.set(invitations);
+      },
+      error: () => {
+        this.pendingInvitations.set([]);
+      }
+    });
   }
 
   loadChildLabGroups(): void {

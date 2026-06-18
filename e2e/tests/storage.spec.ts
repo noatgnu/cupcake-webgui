@@ -145,4 +145,52 @@ test.describe("storage", () => {
       await expect(adminPage.getByText(OTHER_REAGENT_NAME)).not.toBeVisible({ timeout: 5000 });
     });
   });
+
+  test.describe("reagent notifications", () => {
+    const NOTIF_FREEZER_NAME = `E2E Notif Freezer ${Date.now()}`;
+    const NOTIF_REAGENT_NAME = `E2E Notif Reagent ${Date.now()}`;
+
+    test.beforeAll(async ({ browser }) => {
+      const ctx = await browser.newContext({ storageState: adminAuthState });
+      const page = await ctx.newPage();
+      const storage = new StoragePage(page);
+      await storage.goto();
+      await storage.create(NOTIF_FREEZER_NAME);
+      await storage.open(NOTIF_FREEZER_NAME);
+      await storage.addReagent(NOTIF_REAGENT_NAME, 100, "mg");
+      await page.context().close();
+    });
+
+    test("enabling notify on low stock persists after reload", async ({ adminPage }) => {
+      const storage = new StoragePage(adminPage);
+      await storage.goto();
+      await storage.open(NOTIF_FREEZER_NAME);
+
+      await storage.setLowStockNotification(NOTIF_REAGENT_NAME, { threshold: 10, notify: true });
+
+      await storage.goto();
+      await storage.open(NOTIF_FREEZER_NAME);
+      expect(await storage.isNotifyOnLowStockChecked(NOTIF_REAGENT_NAME)).toBe(true);
+    });
+
+    test("sending a test low stock notification shows confirmation toast", async ({ adminPage }) => {
+      const storage = new StoragePage(adminPage);
+      await storage.goto();
+      await storage.open(NOTIF_FREEZER_NAME);
+
+      await storage.sendTestNotification(NOTIF_REAGENT_NAME, "low_stock");
+
+      await expect(storage.toast("Test notification sent to admin")).toBeVisible({ timeout: 5000 });
+    });
+
+    test("sending a test expiring-soon notification shows confirmation toast", async ({ adminPage }) => {
+      const storage = new StoragePage(adminPage);
+      await storage.goto();
+      await storage.open(NOTIF_FREEZER_NAME);
+
+      await storage.sendTestNotification(NOTIF_REAGENT_NAME, "expiring_soon");
+
+      await expect(storage.toast("Test notification sent to admin")).toBeVisible({ timeout: 5000 });
+    });
+  });
 });

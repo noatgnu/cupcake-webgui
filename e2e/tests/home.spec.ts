@@ -1,4 +1,5 @@
 import { test, expect } from "../fixtures/auth";
+import { LabGroupsPage } from "../page-objects/cupcake/lab-groups.po";
 
 test.describe("home dashboard", () => {
   test("/home loads for admin", async ({ adminPage }) => {
@@ -22,10 +23,8 @@ test.describe("home dashboard", () => {
 
   test("create lab group from home and it appears in list", async ({ adminPage }) => {
     const name = `E2E Home Lab ${Date.now()}`;
-    await adminPage.goto("/#/home/lab-groups");
-    await adminPage.getByRole("button", { name: /new|create|add/i }).click();
-    await adminPage.getByLabel(/name/i).fill(name);
-    await adminPage.getByRole("button", { name: /save|create|confirm/i }).click();
-    await expect(adminPage.getByText(name)).toBeVisible({ timeout: 10000 });
+    const labGroups = new LabGroupsPage(adminPage);
+    await labGroups.goto();
+    await labGroups.create(name);
   });
 });
