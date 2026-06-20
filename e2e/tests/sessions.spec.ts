@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { request as playwrightRequest } from "@playwright/test";
 import { test, expect } from "../fixtures/auth";
 import { ProtocolEditorPage } from "../page-objects/cupcake/protocol-editor.po";
 import { SessionDetailPage } from "../page-objects/cupcake/session-detail.po";
@@ -333,6 +334,37 @@ test.describe("sessions", () => {
       await instruments.goto();
       await instruments.create(BOOKING_ANNOTATION_INSTRUMENT);
       await page.context().close();
+
+      const storageState = JSON.parse(fs.readFileSync(adminAuthState, "utf-8"));
+      const token = storageState.origins?.[0]?.localStorage?.find(
+        (item: { name: string; value: string }) => item.name === "ccvAccessToken"
+      )?.value;
+      if (token) {
+        const apiBase = process.env["API_URL"] || "http://localhost:8000";
+        const apiContext = await playwrightRequest.newContext({
+          baseURL: apiBase,
+          extraHTTPHeaders: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        const usersRes = await apiContext.get("/api/v1/users/?search=admin&limit=5");
+        const instRes = await apiContext.get(
+          `/api/v1/instruments/?search=${encodeURIComponent(BOOKING_ANNOTATION_INSTRUMENT)}&limit=5`
+        );
+        if (usersRes.ok() && instRes.ok()) {
+          const usersData = await usersRes.json();
+          const instData = await instRes.json();
+          const adminUser = usersData.results?.find((u: { username: string }) => u.username === "admin");
+          const instrument = instData.results?.find(
+            (i: { instrument_name: string }) => i.instrument_name === BOOKING_ANNOTATION_INSTRUMENT
+          );
+          if (adminUser && instrument) {
+            await apiContext.post("/api/v1/instrument-permissions/", {
+              headers: { "Content-Type": "application/json" },
+              data: { instrument: instrument.id, user: adminUser.id, can_view: true, can_book: true, can_manage: true },
+            });
+          }
+        }
+        await apiContext.dispose();
+      }
     });
 
     test("booking an instrument from the annotation modal links it to the step", async ({ adminPage }) => {
