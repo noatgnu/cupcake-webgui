@@ -99,7 +99,9 @@ export class SessionDetailPage {
   }
 
   async toggleHideScratched(): Promise<void> {
+    const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/step-annotations/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator("#hideScratched").click();
+    await refreshWait;
   }
 
   async goToNextAnnotation(): Promise<void> {
