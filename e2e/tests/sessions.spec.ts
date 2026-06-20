@@ -4,6 +4,7 @@ import { test, expect } from "../fixtures/auth";
 import { ProtocolEditorPage } from "../page-objects/cupcake/protocol-editor.po";
 import { SessionDetailPage } from "../page-objects/cupcake/session-detail.po";
 import { StoragePage } from "../page-objects/cupcake/storage.po";
+import { InstrumentsPage } from "../page-objects/cupcake/instruments.po";
 
 const adminAuthState = path.join(__dirname, "../auth-states/admin.json");
 const PROTOCOL_TITLE = `E2E Session Protocol ${Date.now()}`;
@@ -222,8 +223,9 @@ test.describe("sessions", () => {
     });
   });
 
-  test.describe("audio transcription", () => {
+  test.describe("audio and video transcription", () => {
     const voiceSamplePath = process.env["E2E_VOICE_SAMPLE_PATH"];
+    const voiceVideoPath = process.env["E2E_VOICE_VIDEO_PATH"];
 
     test("uploading an audio annotation transcribes it via whisper.cpp", async ({ adminPage }) => {
       test.skip(!voiceSamplePath || !fs.existsSync(voiceSamplePath), "No voice sample fixture configured (set E2E_VOICE_SAMPLE_PATH; CI generates one via espeak-ng)");
@@ -234,11 +236,194 @@ test.describe("sessions", () => {
       await session.createFromProtocol(PROTOCOL_TITLE);
       await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
 
-      await session.uploadAudioAnnotation(voiceSamplePath as string);
+      await session.uploadFileAnnotation(voiceSamplePath as string);
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("Audio");
       await session.waitForTranscriptionCompleted();
 
       const cueText = await session.getTranscriptionCueText();
       expect(cueText.trim().length).toBeGreaterThan(0);
+    });
+
+    test("uploading a video annotation with the same speech produces a transcription too", async ({ adminPage }) => {
+      test.skip(!voiceVideoPath || !fs.existsSync(voiceVideoPath), "No voice video fixture configured (set E2E_VOICE_VIDEO_PATH; CI generates one via ffmpeg)");
+      test.setTimeout(180000);
+
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.uploadFileAnnotation(voiceVideoPath as string);
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("Video");
+      await session.expectVideoAnnotationVisible();
+      await session.waitForTranscriptionCompleted();
+
+      const cueText = await session.getTranscriptionCueText();
+      expect(cueText.trim().length).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe("image and document annotation upload", () => {
+    const imagePath = process.env["E2E_IMAGE_PATH"];
+    const documentPath = process.env["E2E_DOCUMENT_PATH"];
+
+    test("uploading an image annotation displays it inline", async ({ adminPage }) => {
+      test.skip(!imagePath || !fs.existsSync(imagePath), "No image fixture configured (set E2E_IMAGE_PATH)");
+      test.setTimeout(60000);
+
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.uploadFileAnnotation(imagePath as string);
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("Image");
+      await session.expectImageAnnotationVisible();
+    });
+
+    test("uploading a generic document annotation with descriptive text", async ({ adminPage }) => {
+      test.skip(!documentPath || !fs.existsSync(documentPath), "No document fixture configured (set E2E_DOCUMENT_PATH)");
+      test.setTimeout(60000);
+
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      const description = `E2E document description ${Date.now()}`;
+      await session.uploadFileAnnotation(documentPath as string, description);
+
+      await expect(adminPage.locator(".annotation-item")).toContainText(description, { timeout: 10000 });
+    });
+  });
+
+  test.describe("calculator annotations", () => {
+    test("calculator mode saves a history entry as an annotation", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addCalculatorAnnotation();
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("calculator");
+      await expect(adminPage.locator(".annotation-item")).toContainText("10", { timeout: 10000 });
+    });
+
+    test("molarity dilution mode saves a history entry as an annotation", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addMolarityDilutionAnnotation();
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("mcalculator");
+    });
+  });
+
+  test.describe("instrument booking annotation", () => {
+    const BOOKING_ANNOTATION_INSTRUMENT = `E2E Annotation Instrument ${Date.now()}`;
+
+    test.beforeAll(async ({ browser }) => {
+      test.setTimeout(60000);
+      const ctx = await browser.newContext({ storageState: adminAuthState });
+      const page = await ctx.newPage();
+      const instruments = new InstrumentsPage(page);
+      await instruments.goto();
+      await instruments.create(BOOKING_ANNOTATION_INSTRUMENT);
+      await page.context().close();
+    });
+
+    test("booking an instrument from the annotation modal links it to the step", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addInstrumentBookingAnnotation(BOOKING_ANNOTATION_INSTRUMENT);
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("booking");
+    });
+  });
+
+  test.describe("recorded audio annotation", () => {
+    test("recording audio via the fake media device saves an audio annotation", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.recordAudioAnnotation();
+      expect(await session.getCurrentAnnotationTypeLabel()).toBe("Audio");
+    });
+  });
+
+  test.describe("sketch annotation", () => {
+    test("drawing a sketch saves it and renders on a canvas", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addSketchAnnotation();
+      await session.expectSketchAnnotationVisible();
+    });
+  });
+
+  test.describe("annotation management", () => {
+    test("scratching, unscratching and hiding scratched annotations", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addTextAnnotation(`E2E scratch annotation ${Date.now()}`);
+      expect(await session.isCurrentAnnotationScratched()).toBe(false);
+
+      await session.toggleScratchCurrentAnnotation();
+      expect(await session.isCurrentAnnotationScratched()).toBe(true);
+
+      await session.toggleHideScratched();
+      await expect(adminPage.locator(".annotation-item")).not.toBeVisible({ timeout: 10000 });
+
+      await session.toggleHideScratched();
+      await expect(adminPage.locator(".annotation-item")).toBeVisible({ timeout: 10000 });
+    });
+
+    test("previous/next navigation moves between multiple annotations", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.addTextAnnotation(`E2E nav annotation 1 ${Date.now()}`);
+      await session.addTextAnnotation(`E2E nav annotation 2 ${Date.now()}`);
+
+      expect(await session.getAnnotationPositionText()).toContain("1 of");
+      await session.goToNextAnnotation();
+      expect(await session.getAnnotationPositionText()).toContain("2 of");
+      await session.goToPreviousAnnotation();
+      expect(await session.getAnnotationPositionText()).toContain("1 of");
+    });
+
+    test("deleting an annotation removes it", async ({ adminPage }) => {
+      test.setTimeout(60000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      const annotationText = `E2E delete annotation ${Date.now()}`;
+      await session.addTextAnnotation(annotationText);
+      await expect(adminPage.locator(".annotation-item")).toContainText(annotationText, { timeout: 10000 });
+
+      await session.deleteCurrentAnnotation();
+      await expect(adminPage.getByText(annotationText)).not.toBeVisible({ timeout: 10000 });
     });
   });
 });

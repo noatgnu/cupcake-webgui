@@ -62,12 +62,28 @@ jobs:
           WHISPERCPP_PATH: /tmp/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL: /tmp/whisper.cpp/models/ggml-tiny.en.bin
 
-      - name: Generate test voice sample
+      - name: Generate test fixtures
         run: |
           mkdir -p /tmp/e2e-fixtures
           espeak-ng "the quick brown fox jumps over the lazy dog" \
             -s 150 -w /tmp/e2e-fixtures/voice-sample.wav
           ls -lh /tmp/e2e-fixtures/voice-sample.wav
+
+          # Same speech muxed with a plain color video track, so video
+          # annotation transcription can be exercised against known content.
+          ffmpeg -y -f lavfi -i color=c=blue:s=320x240:d=3 \
+            -i /tmp/e2e-fixtures/voice-sample.wav \
+            -c:v libx264 -c:a aac -shortest \
+            /tmp/e2e-fixtures/voice-sample.mp4
+          ls -lh /tmp/e2e-fixtures/voice-sample.mp4
+
+          ffmpeg -y -f lavfi -i color=c=red:s=64x64 -frames:v 1 \
+            /tmp/e2e-fixtures/test-image.png
+          ls -lh /tmp/e2e-fixtures/test-image.png
+
+          echo "This is a test document for e2e annotation upload." \
+            > /tmp/e2e-fixtures/test-document.txt
+          ls -lh /tmp/e2e-fixtures/test-document.txt
 
       - name: Migrate and seed
         env:
@@ -275,6 +291,9 @@ jobs:
           CUPCAKE_URL: http://localhost:4201
           E2E_SKIP_BACKEND_CHECK: "1"
           E2E_VOICE_SAMPLE_PATH: /tmp/e2e-fixtures/voice-sample.wav
+          E2E_VOICE_VIDEO_PATH: /tmp/e2e-fixtures/voice-sample.mp4
+          E2E_IMAGE_PATH: /tmp/e2e-fixtures/test-image.png
+          E2E_DOCUMENT_PATH: /tmp/e2e-fixtures/test-document.txt
 
       - name: Upload Playwright report
         if: always()
