@@ -1412,8 +1412,14 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
         scratched: newScratchedState
       }
     }).subscribe({
-      next: () => {
-        annotation.scratched = newScratchedState;
+      next: (updatedAnnotation) => {
+        const annotations = this.stepAnnotations();
+        const index = annotations.findIndex(a => a.id === annotation.id);
+        if (index !== -1) {
+          const updated = [...annotations];
+          updated[index] = updatedAnnotation;
+          this.stepAnnotations.set(updated);
+        }
         const action = newScratchedState ? 'scratched' : 'unscratched';
         this.toastService.success(`Annotation ${action}`);
       },

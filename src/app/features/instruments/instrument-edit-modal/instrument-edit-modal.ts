@@ -27,7 +27,7 @@ export class InstrumentEditModal implements OnInit {
   instrumentName = '';
   instrumentDescription = '';
   enabled = true;
-  acceptsBookings = false;
+  acceptsBookings = true;
   allowOverlappingBookings = false;
   maxDaysAheadPreApproval: number | null = null;
   maxDaysWithinUsagePreApproval: number | null = null;
