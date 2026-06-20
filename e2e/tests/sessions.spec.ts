@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import { test, expect } from "../fixtures/auth";
 import { ProtocolEditorPage } from "../page-objects/cupcake/protocol-editor.po";
@@ -181,6 +182,63 @@ test.describe("sessions", () => {
       const bookedText = await session.getStepReagentBookedText(BOOKING_REAGENT_NAME);
       expect(bookedText).toContain("Booked:");
       expect(bookedText).toContain("10");
+    });
+  });
+
+  test.describe("step annotations", () => {
+    test("adding a text annotation shows it as the current annotation", async ({ adminPage }) => {
+      test.setTimeout(120000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      const annotationText = `E2E annotation ${Date.now()}`;
+      await session.addTextAnnotation(annotationText);
+
+      const displayedText = await session.getCurrentAnnotationText();
+      expect(displayedText).toBe(annotationText);
+    });
+  });
+
+  test.describe("session export", () => {
+    test("exporting a session as HTML downloads a file containing the step and its annotation", async ({ adminPage }) => {
+      test.setTimeout(120000);
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      const annotationText = `E2E export annotation ${Date.now()}`;
+      await session.addTextAnnotation(annotationText);
+
+      const download = await session.exportSessionHtml();
+      const downloadPath = await download.path();
+      expect(downloadPath).toBeTruthy();
+
+      const content = fs.readFileSync(downloadPath as string, "utf-8");
+      expect(content).toContain("Step 1");
+      expect(content).toContain(annotationText);
+    });
+  });
+
+  test.describe("audio transcription", () => {
+    const voiceSamplePath = process.env["E2E_VOICE_SAMPLE_PATH"];
+
+    test("uploading an audio annotation transcribes it via whisper.cpp", async ({ adminPage }) => {
+      test.skip(!voiceSamplePath || !fs.existsSync(voiceSamplePath), "No voice sample fixture configured (set E2E_VOICE_SAMPLE_PATH; CI generates one via espeak-ng)");
+      test.setTimeout(180000);
+
+      const session = new SessionDetailPage(adminPage);
+      await session.gotoList();
+      await session.createFromProtocol(PROTOCOL_TITLE);
+      await expect(adminPage).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 15000 });
+
+      await session.uploadAudioAnnotation(voiceSamplePath as string);
+      await session.waitForTranscriptionCompleted();
+
+      const cueText = await session.getTranscriptionCueText();
+      expect(cueText.trim().length).toBeGreaterThan(0);
     });
   });
 });

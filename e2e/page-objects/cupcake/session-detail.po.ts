@@ -1,7 +1,7 @@
 /**
  * Page object for session detail (/protocols/sessions/:id).
  */
-import { Page, expect } from "@playwright/test";
+import { Page, expect, Download } from "@playwright/test";
 
 export class SessionDetailPage {
   constructor(private readonly page: Page) {}
@@ -23,17 +23,41 @@ export class SessionDetailPage {
     await expect(this.page).toHaveURL(/\/protocols\/sessions\/\d+/, { timeout: 10000 });
   }
 
-  async addTextAnnotation(stepText: string, content: string): Promise<void> {
-    const step = this.page.locator("[class*='step']").filter({ hasText: stepText }).first();
-    await step.getByRole("button", { name: /annotate|add annotation|add note/i }).click();
-    await this.page.getByRole("textbox").fill(content);
-    await this.page.getByRole("button", { name: /save|add|confirm/i }).click();
-    await expect(this.page.getByText(content)).toBeVisible({ timeout: 10000 });
+  async addTextAnnotation(content: string): Promise<void> {
+    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
+    await this.page.locator("#textAnnotation").fill(content);
+
+    const postWait = this.page.waitForResponse(resp => resp.url().includes("/step-annotations/") && resp.request().method() === "POST", { timeout: 30000 });
+    const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/step-annotations/") && resp.request().method() === "GET", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary", { hasText: "Save" }).click();
+    await postWait;
+    await refreshWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
   }
 
-  async markStepComplete(stepText: string): Promise<void> {
-    const step = this.page.locator("[class*='step']").filter({ hasText: stepText }).first();
-    await step.getByRole("checkbox", { name: /complete|done/i }).check();
+  async getCurrentAnnotationText(): Promise<string> {
+    return this.page.locator(".annotation-text p").first().innerText();
+  }
+
+  async uploadAudioAnnotation(filePath: string): Promise<void> {
+    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
+    await this.page.locator('label[for="modeUpload"]').click();
+    await this.page.locator("#annotationFile").setInputFiles(filePath);
+
+    const postWait = this.page.waitForResponse(resp => resp.url().includes("/upload/step-annotation-chunks/") && resp.request().method() === "POST", { timeout: 30000 });
+    await this.page.locator(".modal-footer .btn-primary", { hasText: "Save" }).click();
+    await postWait;
+    await expect(this.page.locator(".modal-title")).not.toBeVisible({ timeout: 10000 });
+  }
+
+  async waitForTranscriptionCompleted(timeoutMs = 120000): Promise<void> {
+    await expect(this.page.locator(".toast-container").getByText(/Transcription completed/i)).toBeVisible({ timeout: timeoutMs });
+  }
+
+  async getTranscriptionCueText(): Promise<string> {
+    return this.page.locator(".transcription .cue-text").first().innerText();
   }
 
   async startStepTimer(): Promise<void> {
@@ -81,5 +105,13 @@ export class SessionDetailPage {
 
   async getStepReagentBookedText(stepReagentName: string): Promise<string> {
     return this.stepReagentRow(stepReagentName).innerText();
+  }
+
+  async exportSessionHtml(): Promise<Download> {
+    const [download] = await Promise.all([
+      this.page.waitForEvent("download", { timeout: 30000 }),
+      this.page.getByTitle("Export session with all protocols and annotations as HTML").click(),
+    ]);
+    return download;
   }
 }

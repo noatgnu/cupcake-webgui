@@ -1158,6 +1158,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
             this.saveCalculatorAnnotation(result.calculatorData);
           } else if (result.molarityData) {
             this.saveMolarityAnnotation(result.molarityData);
+          } else if (result.annotationType === AnnotationType.Text) {
+            this.saveTextAnnotation(result.text);
           } else {
             this.uploadAnnotation(result.file, result.annotationType, result.annotationText, result.autoTranscribe);
           }
@@ -1276,6 +1278,37 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       error: (err) => {
         this.toastService.error('Failed to save molarity annotation');
+        this.uploading.set(false);
+      }
+    });
+  }
+
+  saveTextAnnotation(text: string): void {
+    const step = this.currentStep();
+    const currentSession = this.session();
+
+    if (!step || !currentSession) {
+      this.toastService.error('Missing required information');
+      return;
+    }
+
+    this.uploading.set(true);
+
+    this.stepAnnotationService.createStepAnnotation({
+      session: currentSession.id,
+      step: step.id,
+      annotationData: {
+        annotation: text,
+        annotationType: AnnotationType.Text
+      }
+    }).subscribe({
+      next: () => {
+        this.toastService.success('Annotation added successfully');
+        this.uploading.set(false);
+        this.loadStepAnnotations();
+      },
+      error: (err) => {
+        this.toastService.error('Failed to add annotation');
         this.uploading.set(false);
       }
     });
