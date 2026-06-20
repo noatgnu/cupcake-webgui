@@ -89,6 +89,7 @@ jobs:
           ENABLE_CUPCAKE_RED_VELVET: 'True'
           ALLOWED_HOSTS: localhost
           MEDIA_ROOT: /tmp/backend/media
+          WHISPERCPP_DEFAULT_MODEL: /tmp/whisper.cpp/models/ggml-tiny.en.bin
         run: |
           mkdir -p /tmp/backend/media /tmp/backend/staticfiles
           cd /tmp/backend
@@ -105,6 +106,11 @@ jobs:
           from django.contrib.auth import get_user_model
           User = get_user_model()
           User.objects.create_user('testuser','testuser@cupcake.local','testuser123')
+
+          from ccc.models import SiteConfig
+          site_config, _ = SiteConfig.objects.get_or_create(pk=1)
+          site_config.whisper_cpp_model = os.environ['WHISPERCPP_DEFAULT_MODEL']
+          site_config.save(update_fields=['whisper_cpp_model'])
           "
           $MANAGE load_species
           $MANAGE load_tissue

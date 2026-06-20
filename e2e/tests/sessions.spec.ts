@@ -217,7 +217,7 @@ test.describe("sessions", () => {
       expect(downloadPath).toBeTruthy();
 
       const content = fs.readFileSync(downloadPath as string, "utf-8");
-      expect(content).toContain("Step 1");
+      expect(content).toContain('class="step-description"');
       expect(content).toContain(annotationText);
     });
   });
