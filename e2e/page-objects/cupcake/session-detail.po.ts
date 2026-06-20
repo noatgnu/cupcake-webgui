@@ -53,7 +53,9 @@ export class SessionDetailPage {
   }
 
   async waitForTranscriptionCompleted(timeoutMs = 120000): Promise<void> {
-    await expect(this.page.locator(".toast-container").getByText(/Transcription completed/i)).toBeVisible({ timeout: timeoutMs });
+    // queue_annotation_transcription() always requests translate=True, so the
+    // toast reads "Transcription and translation completed", not the plain form.
+    await expect(this.page.locator(".toast-container").getByText(/Transcription.*completed/i)).toBeVisible({ timeout: timeoutMs });
   }
 
   async getTranscriptionCueText(): Promise<string> {
