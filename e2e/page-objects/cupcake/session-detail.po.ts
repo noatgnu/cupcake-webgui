@@ -24,7 +24,7 @@ export class SessionDetailPage {
   }
 
   async addTextAnnotation(content: string): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator("#textAnnotation").fill(content);
 
@@ -41,7 +41,7 @@ export class SessionDetailPage {
   }
 
   async uploadFileAnnotation(filePath: string, annotationText?: string): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeUpload"]').click();
     await this.page.locator("#annotationFile").setInputFiles(filePath);
@@ -172,7 +172,7 @@ export class SessionDetailPage {
   }
 
   async addCalculatorAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeCalculator"]').click();
 
@@ -188,7 +188,7 @@ export class SessionDetailPage {
   }
 
   async addMolarityDilutionAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeMolarity"]').click();
 
@@ -207,7 +207,7 @@ export class SessionDetailPage {
   }
 
   async addInstrumentBookingAnnotation(instrumentName: string): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeBook"]').click();
 
@@ -227,7 +227,7 @@ export class SessionDetailPage {
   }
 
   async recordAudioAnnotation(durationMs = 1500): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeRecord"]').click();
 
@@ -244,7 +244,7 @@ export class SessionDetailPage {
   }
 
   async addSketchAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Add Annotation" }).click();
+    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeSketch"]').click();
 
