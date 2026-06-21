@@ -2,6 +2,7 @@
  * Page object for the standalone timekeepers page (/protocols/timers).
  */
 import { Page, expect, Locator } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class TimekeepersPage {
   constructor(private readonly page: Page) {}
@@ -13,7 +14,8 @@ export class TimekeepersPage {
 
   async createTimer(name: string, durationSeconds: number): Promise<void> {
     await this.page.locator("button.btn-primary.btn-sm", { hasText: /new timer/i }).click();
-    await this.page.locator("#timerName").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#timerName"), name);
     await this.page.locator("#timerDuration").fill(String(durationSeconds));
     await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page.getByText(name)).toBeVisible({ timeout: 10000 });

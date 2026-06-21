@@ -2,6 +2,7 @@
  * Page object for lab groups (/home/lab-groups).
  */
 import { Page, expect } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class LabGroupsPage {
   constructor(private readonly page: Page) {}
@@ -12,7 +13,8 @@ export class LabGroupsPage {
 
   async create(name: string): Promise<void> {
     await this.page.getByRole("button", { name: "Create Lab Group" }).click();
-    await this.page.locator("#name").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#name"), name);
     const postWait = this.page.waitForResponse(resp => resp.url().includes("/lab-groups/") && resp.request().method() === "POST", { timeout: 30000 });
     const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/lab-groups/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
@@ -33,7 +35,8 @@ export class LabGroupsPage {
    */
   async inviteUser(username: string): Promise<number> {
     await this.page.getByRole("button", { name: /add member|invite/i }).click();
-    await this.page.locator("#search").fill(username);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#search"), username);
     const row = this.page.locator(".list-group-item").filter({ hasText: username });
     await expect(row).toBeVisible({ timeout: 10000 });
     await row.locator('input[type="radio"]').check();

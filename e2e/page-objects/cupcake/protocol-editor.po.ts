@@ -2,6 +2,7 @@
  * Page object for the protocol list and editor (/protocols, /protocols/:id/edit).
  */
 import { Page, expect } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class ProtocolEditorPage {
   constructor(private readonly page: Page) {}
@@ -12,7 +13,8 @@ export class ProtocolEditorPage {
 
   async createProtocol(title: string): Promise<void> {
     await this.page.getByRole("button", { name: /new|create|add protocol/i }).click();
-    await this.page.locator("#protocolTitle").fill(title);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#protocolTitle"), title);
     await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page).toHaveURL(/\/protocols\/\d+\/edit/, { timeout: 15000 });
   }
@@ -33,6 +35,7 @@ export class ProtocolEditorPage {
   async addStep(sectionText: string, stepDescription: string, durationMinutes: number): Promise<void> {
     await this.page.locator(".list-group-item-action").filter({ hasText: sectionText }).click();
     await this.page.locator("button.btn-sm.btn-primary", { hasText: /add step/i }).click();
+    await this.page.locator(".modal-title").waitFor();
     const editor = this.page.locator(".ql-editor[contenteditable='true']");
     await editor.click();
     await editor.fill(stepDescription);
@@ -62,7 +65,8 @@ export class ProtocolEditorPage {
 
   async addStepReagent(stepDescription: string, reagentName: string, unit: string, quantity: number): Promise<number> {
     await this.stepListItem(stepDescription).getByTitle("Add Reagent").click();
-    await this.page.locator("#reagentName").fill(reagentName);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#reagentName"), reagentName);
     await this.page.locator("#reagentUnit").selectOption(unit);
     await this.page.locator("#quantity").fill(String(quantity));
     const [response] = await Promise.all([

@@ -2,6 +2,7 @@
  * Page object for instruments (/instruments).
  */
 import { Page, expect } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class InstrumentsPage {
   constructor(private readonly page: Page) {}
@@ -12,7 +13,8 @@ export class InstrumentsPage {
 
   async create(name: string): Promise<void> {
     await this.page.getByRole("button", { name: "New Instrument" }).click();
-    await this.page.locator("#instrumentName").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#instrumentName"), name);
     const postWait = this.page.waitForResponse(resp => resp.url().includes("/instruments/") && resp.request().method() === "POST", { timeout: 30000 });
     const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/instruments/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
@@ -29,8 +31,9 @@ export class InstrumentsPage {
   async addMaintenanceLog(description: string): Promise<void> {
     await this.page.getByRole("tab", { name: /maintenance/i }).click();
     await this.page.locator("button.btn-sm.btn-primary", { hasText: /add log/i }).click();
+    await this.page.locator(".modal-title").waitFor();
     const today = new Date().toISOString().split("T")[0];
-    await this.page.locator("#maintenanceDate").fill(today);
+    await fillReliably(this.page.locator("#maintenanceDate"), today);
     await this.page.locator("#maintenanceDescription").fill(description);
     await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page.locator(".modal-footer .btn-primary")).not.toBeVisible({ timeout: 10000 });

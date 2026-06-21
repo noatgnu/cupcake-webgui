@@ -2,6 +2,7 @@
  * Page object for storage management (/storage).
  */
 import { Page, expect } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class StoragePage {
   constructor(private readonly page: Page) {}
@@ -12,7 +13,8 @@ export class StoragePage {
 
   async create(name: string): Promise<void> {
     await this.page.getByRole("button", { name: "Add Storage" }).click();
-    await this.page.locator("#name").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#name"), name);
     const postWait = this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "POST", { timeout: 30000 });
     const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
@@ -27,7 +29,8 @@ export class StoragePage {
 
   async addReagent(name: string, qty: number, unit: string): Promise<void> {
     await this.page.getByTitle("Add Reagent").click();
-    await this.page.locator("#reagentName").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#reagentName"), name);
     await this.page.locator("#quantity").fill(String(qty));
     await this.page.locator("#reagentUnit").selectOption(unit);
     const postWait = this.page.waitForResponse(resp => resp.url().includes("/stored-reagents/") && resp.request().method() === "POST", { timeout: 30000 });
@@ -44,7 +47,8 @@ export class StoragePage {
 
   async createChildStorage(name: string): Promise<void> {
     await this.page.getByTitle("Add child storage").click();
-    await this.page.locator("#name").fill(name);
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#name"), name);
     const postWait = this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "POST", { timeout: 30000 });
     const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/storage-objects/") && resp.request().method() === "GET", { timeout: 30000 });
     await this.page.locator(".modal-footer .btn-primary").click();
@@ -59,7 +63,8 @@ export class StoragePage {
 
   async addQuantity(reagentName: string, qty: number, notes?: string): Promise<void> {
     await this.reagentRow(reagentName).getByTitle("Add Quantity").click();
-    await this.page.locator("#quantity").fill(String(qty));
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#quantity"), String(qty));
     if (notes) {
       await this.page.locator("#notes").fill(notes);
     }
@@ -72,7 +77,8 @@ export class StoragePage {
 
   async reserveQuantity(reagentName: string, qty: number, notes?: string): Promise<void> {
     await this.reagentRow(reagentName).getByTitle("Reserve Quantity").click();
-    await this.page.locator("#quantity").fill(String(qty));
+    await this.page.locator(".modal-title").waitFor();
+    await fillReliably(this.page.locator("#quantity"), String(qty));
     if (notes) {
       await this.page.locator("#notes").fill(notes);
     }

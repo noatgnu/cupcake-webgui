@@ -2,6 +2,7 @@
  * Page object for session detail (/protocols/sessions/:id).
  */
 import { Page, expect, Download } from "@playwright/test";
+import { fillReliably } from "./utils";
 
 export class SessionDetailPage {
   constructor(private readonly page: Page) {}
@@ -14,8 +15,9 @@ export class SessionDetailPage {
     await this.page.goto("/#/protocols");
     await this.page.locator(".protocol-list-item").filter({ hasText: protocolTitle }).click();
     await this.page.getByRole("button", { name: /start session/i }).click();
+    await expect(this.page.locator(".modal-title")).toContainText("Create New Session");
     const sessionName = `E2E Session ${Date.now()}`;
-    await this.page.locator("#sessionName").fill(sessionName);
+    await fillReliably(this.page.locator("#sessionName"), sessionName);
     await this.page.locator(".modal-footer .btn-primary").click();
     await expect(this.page).toHaveURL(/\/protocols\/sessions/, { timeout: 15000 });
     await this.page.locator(".list-group-item-action").filter({ hasText: sessionName }).first().click();
@@ -24,7 +26,7 @@ export class SessionDetailPage {
   }
 
   async addTextAnnotation(content: string): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator("#textAnnotation").fill(content);
 
@@ -41,7 +43,7 @@ export class SessionDetailPage {
   }
 
   async uploadFileAnnotation(filePath: string, annotationText?: string): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeUpload"]').click();
     await this.page.locator("#annotationFile").setInputFiles(filePath);
@@ -104,16 +106,24 @@ export class SessionDetailPage {
     await refreshWait;
   }
 
+  async switchToSingleAnnotationView(): Promise<void> {
+    await this.page.getByTitle("Single view").click();
+  }
+
   async goToNextAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Next" }).click();
+    const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/step-annotations/") && resp.request().method() === "GET", { timeout: 30000 });
+    await this.page.locator(".step-annotations button:not([title])", { hasText: "Next" }).click();
+    await refreshWait;
   }
 
   async goToPreviousAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: "Previous" }).click();
+    const refreshWait = this.page.waitForResponse(resp => resp.url().includes("/step-annotations/") && resp.request().method() === "GET", { timeout: 30000 });
+    await this.page.locator(".step-annotations button:not([title])", { hasText: "Previous" }).click();
+    await refreshWait;
   }
 
   async getAnnotationPositionText(): Promise<string> {
-    return this.page.getByRole("button", { name: "Previous" }).locator("xpath=../..").locator(".text-muted.small").innerText();
+    return this.page.locator(".step-annotations button:not([title])", { hasText: "Previous" }).locator("xpath=../..").locator(".text-muted.small").innerText();
   }
 
   async startStepTimer(): Promise<void> {
@@ -164,15 +174,15 @@ export class SessionDetailPage {
   }
 
   async exportSessionHtml(): Promise<Download> {
-    const [download] = await Promise.all([
-      this.page.waitForEvent("download", { timeout: 30000 }),
+    const [popup] = await Promise.all([
+      this.page.waitForEvent("popup", { timeout: 15000 }),
       this.page.getByTitle("Export session with all protocols and annotations as HTML").click(),
     ]);
-    return download;
+    return popup.waitForEvent("download", { timeout: 30000 });
   }
 
   async addCalculatorAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeCalculator"]').click();
 
@@ -188,7 +198,7 @@ export class SessionDetailPage {
   }
 
   async addMolarityDilutionAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeMolarity"]').click();
 
@@ -207,7 +217,7 @@ export class SessionDetailPage {
   }
 
   async addInstrumentBookingAnnotation(instrumentName: string): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeBook"]').click();
 
@@ -227,7 +237,7 @@ export class SessionDetailPage {
   }
 
   async recordAudioAnnotation(durationMs = 1500): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeRecord"]').click();
 
@@ -244,7 +254,7 @@ export class SessionDetailPage {
   }
 
   async addSketchAnnotation(): Promise<void> {
-    await this.page.getByRole("button", { name: /^Add( Annotation)?$/ }).click();
+    await this.page.locator("button.btn-sm:has(i.bi-plus-circle)").click();
     await expect(this.page.locator(".modal-title")).toContainText("Add Annotation");
     await this.page.locator('label[for="modeSketch"]').click();
 

@@ -436,6 +436,7 @@ test.describe("sessions", () => {
       await session.addTextAnnotation(`E2E nav annotation 1 ${Date.now()}`);
       await session.addTextAnnotation(`E2E nav annotation 2 ${Date.now()}`);
 
+      await session.switchToSingleAnnotationView();
       expect(await session.getAnnotationPositionText()).toContain("1 of");
       await session.goToNextAnnotation();
       expect(await session.getAnnotationPositionText()).toContain("2 of");
