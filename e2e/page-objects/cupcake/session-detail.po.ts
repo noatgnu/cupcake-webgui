@@ -174,11 +174,16 @@ export class SessionDetailPage {
   }
 
   async exportSessionHtml(): Promise<Download> {
-    const [popup] = await Promise.all([
-      this.page.waitForEvent("popup", { timeout: 15000 }),
-      this.page.getByTitle("Export session with all protocols and annotations as HTML").click(),
+    const downloadPromise: Promise<Download> = new Promise((resolve) => {
+      this.page.context().once("page", (popup) => {
+        popup.once("download", resolve);
+      });
+    });
+    await this.page.getByTitle("Export session with all protocols and annotations as HTML").click();
+    return Promise.race([
+      downloadPromise,
+      new Promise<Download>((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for export download")), 30000)),
     ]);
-    return popup.waitForEvent("download", { timeout: 30000 });
   }
 
   async addCalculatorAnnotation(): Promise<void> {
