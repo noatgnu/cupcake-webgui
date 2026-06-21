@@ -1,0 +1,891 @@
+---
+- name: Deploy Cupcake Appliance
+  hosts: cupcake
+  become: true
+
+  tasks:
+
+    # ── Base ──────────────────────────────────────────────────────────────────
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [base]
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - cmake
+          - ffmpeg
+          - curl
+          - wget
+          - git
+          - libpq-dev
+          - "python{{ python_version }}"
+          - "python{{ python_version }}-venv"
+          - "python{{ python_version }}-dev"
+          - nginx
+          - avahi-daemon
+          - avahi-utils
+          - jq
+          - unzip
+          - ca-certificates
+          - ufw
+          - nfs-common
+          - cifs-utils
+          - exfatprogs
+          - python3-zeroconf
+          - iw
+          - wpasupplicant
+          - wireless-regdb
+          - openssl
+        state: present
+      tags: [base]
+
+    - name: Create cupcake-svc system user
+      ansible.builtin.user:
+        name: cupcake-svc
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+        home: /opt/cupcake
+        groups: [www-data]
+        append: true
+      tags: [base]
+
+    - name: Create cupcake user
+      ansible.builtin.user:
+        name: cupcake
+        shell: /bin/bash
+        create_home: true
+        groups: [sudo, www-data]
+        append: true
+        password: "{{ 'cupcake' | password_hash('sha512') }}"
+      tags: [base]
+
+    - name: Add cupcake to cupcake-svc group
+      ansible.builtin.user:
+        name: cupcake
+        groups: [cupcake-svc]
+        append: true
+      tags: [base]
+
+    - name: Create cupcake directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        mode: '0755'
+      loop:
+        - /opt/cupcake/backend
+        - /opt/cupcake/webgui
+        - /opt/cupcake/vanilla
+        - /opt/cupcake/static
+        - /opt/cupcake/media
+        - /opt/cupcake/backups
+        - /opt/cupcake/venv
+      tags: [base]
+
+    - name: Create wifi-certs directory
+      ansible.builtin.file:
+        path: /opt/cupcake/wifi-certs
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        mode: '0700'
+      tags: [base]
+
+    - name: Create log directory
+      ansible.builtin.file:
+        path: /var/log/cupcake
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        mode: '0775'
+      tags: [base]
+
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: cupcake
+      tags: [base]
+
+    - name: Configure /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        block: |
+          127.0.1.1 cupcake.local cupcake
+          127.0.1.1 vanilla.local vanilla
+        marker: "# {mark} ANSIBLE MANAGED — cupcake"
+      tags: [base]
+
+    - name: Configure UFW rules
+      ansible.builtin.shell:
+        cmd: |
+          ufw allow 22/tcp
+          ufw allow 80/tcp
+          ufw allow 443/tcp
+          ufw allow 8080/tcp
+          ufw allow 8443/tcp
+          ufw allow 5353/udp
+          ufw --force enable
+      changed_when: false
+      tags: [base]
+
+    # ── PostgreSQL ────────────────────────────────────────────────────────────
+
+    - name: Install PostgreSQL
+      ansible.builtin.apt:
+        name:
+          - "postgresql-{{ pg_version }}"
+          - "postgresql-client-{{ pg_version }}"
+        state: present
+      tags: [postgresql]
+
+    - name: Enable and start PostgreSQL
+      ansible.builtin.systemd:
+        name: postgresql
+        enabled: true
+        state: started
+      tags: [postgresql]
+
+    - name: Configure pg_hba for md5 auth
+      ansible.builtin.shell:
+        cmd: |
+          PG_HBA=$(su - postgres -c "psql -t -c 'SHOW hba_file;'" | tr -d ' ')
+          sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' "$PG_HBA"
+          sed -i 's/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             127.0.0.1\/32            md5/' "$PG_HBA"
+          systemctl restart postgresql
+      changed_when: false
+      tags: [postgresql]
+
+    - name: Create PostgreSQL user
+      ansible.builtin.shell:
+        cmd: |
+          su - postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='cupcake_vanilla'\"" | grep -q 1 || \
+          su - postgres -c "psql -c \"CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';\""
+          su - postgres -c "psql -c \"ALTER USER cupcake_vanilla CREATEDB;\""
+      changed_when: false
+      tags: [postgresql]
+
+    - name: Create PostgreSQL database
+      ansible.builtin.shell:
+        cmd: |
+          su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='cupcake_vanilla_db'\"" | grep -q 1 || \
+          su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\""
+      changed_when: false
+      tags: [postgresql]
+
+    # ── Redis ─────────────────────────────────────────────────────────────────
+
+    - name: Install Redis
+      ansible.builtin.apt:
+        name: redis-server
+        state: present
+      tags: [redis]
+
+    - name: Bind Redis to localhost only
+      ansible.builtin.lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^bind '
+        line: 'bind 127.0.0.1'
+      notify: Restart redis
+      tags: [redis]
+
+    - name: Enable Redis
+      ansible.builtin.systemd:
+        name: redis-server
+        enabled: true
+        state: started
+      tags: [redis]
+
+    # ── Backend ───────────────────────────────────────────────────────────────
+
+    - name: Clone backend repository
+      ansible.builtin.git:
+        repo: https://github.com/noatgnu/cupcake_vanilla.git
+        dest: /opt/cupcake/backend
+        version: "{{ backend_ref }}"
+        depth: 1
+        force: true
+      tags: [backend]
+
+    - name: Create Python virtualenv
+      ansible.builtin.command:
+        cmd: "python{{ python_version }} -m venv /opt/cupcake/venv"
+        creates: /opt/cupcake/venv/bin/activate
+      tags: [backend]
+
+    - name: Install Python dependencies
+      ansible.builtin.shell:
+        cmd: |
+          /opt/cupcake/venv/bin/pip install --upgrade pip
+          /opt/cupcake/venv/bin/pip install -r /opt/cupcake/backend/requirements.txt
+          /opt/cupcake/venv/bin/pip install gunicorn "uvicorn[standard]" psycopg2-binary
+      tags: [backend]
+
+    - name: Check if .env file exists
+      ansible.builtin.stat:
+        path: /opt/cupcake/.env
+      register: env_file_stat
+      tags: [backend]
+
+    - name: Generate SECRET_KEY
+      ansible.builtin.shell:
+        cmd: openssl rand -base64 48 | tr -d '\n'
+      register: secret_key_result
+      changed_when: false
+      no_log: true
+      when: not env_file_stat.stat.exists
+      tags: [backend]
+
+    - name: Generate COTURN_SECRET
+      ansible.builtin.shell:
+        cmd: openssl rand -hex 20
+      register: coturn_secret_result
+      changed_when: false
+      no_log: true
+      when: not env_file_stat.stat.exists
+      tags: [backend]
+
+    - name: Set secret key fact
+      ansible.builtin.set_fact:
+        secret_key: "{{ secret_key_result.stdout }}"
+        coturn_secret: "{{ coturn_secret_result.stdout }}"
+      no_log: true
+      when: not env_file_stat.stat.exists
+      tags: [backend]
+
+    - name: Write .env file
+      ansible.builtin.template:
+        src: templates/env.j2
+        dest: /opt/cupcake/.env
+        owner: root
+        group: cupcake-svc
+        mode: '0640'
+      when: not env_file_stat.stat.exists
+      tags: [backend]
+
+    - name: Run database migrations
+      ansible.builtin.shell:
+        cmd: |
+          set -a; source /opt/cupcake/.env; set +a
+          /opt/cupcake/venv/bin/python manage.py migrate --noinput
+        chdir: /opt/cupcake/backend
+      tags: [backend]
+
+    - name: Collect static files
+      ansible.builtin.shell:
+        cmd: |
+          set -a; source /opt/cupcake/.env; set +a
+          /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
+        chdir: /opt/cupcake/backend
+      tags: [backend]
+
+    - name: Create Django superuser
+      ansible.builtin.shell:
+        cmd: |
+          set -a; source /opt/cupcake/.env; set +a
+          DJANGO_SUPERUSER_USERNAME=admin \
+          DJANGO_SUPERUSER_EMAIL=admin@cupcake.local \
+          DJANGO_SUPERUSER_PASSWORD=cupcake \
+          /opt/cupcake/venv/bin/python manage.py createsuperuser --noinput || true
+        chdir: /opt/cupcake/backend
+      changed_when: false
+      tags: [backend]
+
+    - name: Set backend ownership
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        recurse: true
+      loop:
+        - /opt/cupcake/backend
+        - /opt/cupcake/venv
+      tags: [backend]
+
+    # ── Whisper.cpp (optional) ────────────────────────────────────────────────
+
+    - name: Clone whisper.cpp
+      ansible.builtin.git:
+        repo: https://github.com/ggerganov/whisper.cpp.git
+        dest: /opt/cupcake/whisper.cpp
+        depth: 1
+      when: install_whisper | bool
+      tags: [whisper]
+
+    - name: Build whisper.cpp
+      ansible.builtin.shell:
+        cmd: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF
+          cmake --build build --config Release -j "$(nproc)"
+        chdir: /opt/cupcake/whisper.cpp
+        creates: /opt/cupcake/whisper.cpp/build/bin/whisper-cli
+      when: install_whisper | bool
+      tags: [whisper]
+
+    - name: Download whisper model
+      ansible.builtin.shell:
+        cmd: "bash /opt/cupcake/whisper.cpp/models/download-ggml-model.sh {{ whisper_model }}"
+        chdir: /opt/cupcake/whisper.cpp/models
+        creates: "/opt/cupcake/whisper.cpp/models/ggml-{{ whisper_model }}.bin"
+      when: install_whisper | bool
+      tags: [whisper]
+
+    - name: Remove whisper.cpp build artifacts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/cupcake/whisper.cpp/build/CMakeFiles
+        - /opt/cupcake/whisper.cpp/build/_deps
+        - /opt/cupcake/whisper.cpp/src
+        - /opt/cupcake/whisper.cpp/ggml
+      when: install_whisper | bool
+      tags: [whisper]
+
+    - name: Set whisper.cpp ownership
+      ansible.builtin.file:
+        path: /opt/cupcake/whisper.cpp
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        recurse: true
+      when: install_whisper | bool
+      tags: [whisper]
+
+    - name: Seed SiteConfig whisper model path
+      ansible.builtin.shell:
+        cmd: |
+          set -a; source /opt/cupcake/.env; set +a
+          /opt/cupcake/venv/bin/python -c "
+          import django, os
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cupcake_vanilla.settings')
+          django.setup()
+          from ccc.models import SiteConfig
+          site_config, _ = SiteConfig.objects.get_or_create(pk=1)
+          site_config.whisper_cpp_model = os.environ['WHISPERCPP_DEFAULT_MODEL']
+          site_config.save(update_fields=['whisper_cpp_model'])
+          "
+        chdir: /opt/cupcake/backend
+      changed_when: false
+      when: install_whisper | bool
+      tags: [whisper]
+
+    # ── Frontend ──────────────────────────────────────────────────────────────
+
+    - name: Add Node.js 22 repository
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        creates: /etc/apt/sources.list.d/nodesource.list
+      tags: [frontend]
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+      tags: [frontend]
+
+    - name: Build and deploy cupcake-webgui
+      ansible.builtin.shell:
+        cmd: |
+          rm -rf /tmp/cupcake-webgui
+          git clone --depth 1 --branch "{{ webgui_ref }}" \
+            https://github.com/noatgnu/cupcake-webgui.git /tmp/cupcake-webgui
+          cd /tmp/cupcake-webgui
+          npm ci
+          npx ng build --configuration=appliance --base-href /
+          mkdir -p /opt/cupcake/webgui
+          cp -r dist/cupcake/browser/* /opt/cupcake/webgui/
+          rm -rf /tmp/cupcake-webgui
+      tags: [frontend]
+
+    - name: Build and deploy cupcake-vanilla-ng
+      ansible.builtin.shell:
+        cmd: |
+          rm -rf /tmp/cupcake-vanilla-ng
+          git clone --depth 1 --branch "{{ vanilla_ng_ref }}" \
+            https://github.com/noatgnu/cupcake-vanilla-ng.git /tmp/cupcake-vanilla-ng
+          cd /tmp/cupcake-vanilla-ng
+          npm ci
+          npx ng build @noatgnu/cupcake-core
+          npx ng build @noatgnu/cupcake-vanilla
+          npx ng build @noatgnu/cupcake-macaron
+          npx ng build @noatgnu/cupcake-mint-chocolate
+          npx ng build @noatgnu/cupcake-red-velvet
+          npx ng build @noatgnu/cupcake-salted-caramel
+          npx ng build --configuration=appliance --base-href /
+          mkdir -p /opt/cupcake/vanilla
+          cp -r dist/cupcake-vanilla-ng/browser/* /opt/cupcake/vanilla/
+          rm -rf /tmp/cupcake-vanilla-ng
+      tags: [frontend]
+
+    - name: Set frontend ownership
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        recurse: true
+      loop:
+        - /opt/cupcake/webgui
+        - /opt/cupcake/vanilla
+      tags: [frontend]
+
+    # ── nginx ─────────────────────────────────────────────────────────────────
+
+    - name: Create SSL directory
+      ansible.builtin.file:
+        path: /etc/ssl/cupcake
+        state: directory
+        mode: '0755'
+      tags: [nginx]
+
+    - name: Generate self-signed SSL certificate
+      ansible.builtin.shell:
+        cmd: |
+          openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout /etc/ssl/cupcake/cupcake.key \
+            -out /etc/ssl/cupcake/cupcake.crt \
+            -subj "/CN=vanilla.local/O=Cupcake Appliance" \
+            -addext "subjectAltName=DNS:cupcake.local,DNS:cupcake,DNS:vanilla.local,DNS:vanilla,DNS:localhost,IP:127.0.0.1"
+          chmod 640 /etc/ssl/cupcake/cupcake.key
+        creates: /etc/ssl/cupcake/cupcake.crt
+      tags: [nginx]
+
+    - name: Write nginx upstream config
+      ansible.builtin.copy:
+        dest: /etc/nginx/conf.d/cupcake-upstream.conf
+        mode: '0644'
+        content: |
+          upstream django_backend {
+              server 127.0.0.1:8000;
+          }
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Write nginx SSL snippet
+      ansible.builtin.copy:
+        dest: /etc/nginx/snippets/cupcake-ssl.conf
+        mode: '0644'
+        content: |
+          ssl_certificate     /etc/ssl/cupcake/cupcake.crt;
+          ssl_certificate_key /etc/ssl/cupcake/cupcake.key;
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+          ssl_session_cache   shared:SSL:10m;
+          ssl_session_timeout 10m;
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Write vanilla nginx site
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/vanilla.conf
+        mode: '0644'
+        content: |
+          server {
+              listen 80 default_server;
+              listen 443 ssl default_server;
+              server_name vanilla.local vanilla localhost _;
+
+              include /etc/nginx/snippets/cupcake-ssl.conf;
+              client_max_body_size 2G;
+              root /opt/cupcake/vanilla;
+              index index.html;
+
+              gzip on;
+              gzip_types text/css application/javascript application/json image/svg+xml;
+              gzip_vary on;
+
+              location / { try_files $uri $uri/ /index.html; }
+
+              location /api/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_read_timeout 300s;
+              }
+
+              location /ws/ {
+                  proxy_pass http://django_backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_read_timeout 86400s;
+              }
+
+              location /admin/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              location /static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
+              }
+
+              location /admin/static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
+              }
+
+              location /internal/media/ {
+                  internal;
+                  alias /opt/cupcake/backend/media/;
+              }
+          }
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Write cupcake nginx site
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/cupcake.conf
+        mode: '0644'
+        content: |
+          server {
+              listen 80;
+              listen 443 ssl;
+              listen 8080 default_server;
+              listen 8443 ssl default_server;
+              server_name cupcake.local cupcake;
+
+              include /etc/nginx/snippets/cupcake-ssl.conf;
+              client_max_body_size 2G;
+              root /opt/cupcake/webgui;
+              index index.html;
+
+              gzip on;
+              gzip_types text/css application/javascript application/json image/svg+xml;
+              gzip_vary on;
+
+              location / { try_files $uri $uri/ /index.html; }
+
+              location /api/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_read_timeout 300s;
+              }
+
+              location /ws/ {
+                  proxy_pass http://django_backend;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_read_timeout 86400s;
+              }
+
+              location /admin/ {
+                  proxy_pass http://django_backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              location /static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
+              }
+
+              location /admin/static/ {
+                  alias /opt/cupcake/backend/staticfiles/;
+                  expires 7d;
+              }
+
+              location /internal/media/ {
+                  internal;
+                  alias /opt/cupcake/backend/media/;
+              }
+          }
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Enable nginx sites
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ item }}"
+        dest: "/etc/nginx/sites-enabled/{{ item }}"
+        state: link
+      loop:
+        - vanilla.conf
+        - cupcake.conf
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Remove default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+      tags: [nginx]
+
+    - name: Enable and start nginx
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+      tags: [nginx]
+
+    # ── mDNS ──────────────────────────────────────────────────────────────────
+
+    - name: Write avahi cupcake service
+      ansible.builtin.copy:
+        dest: /etc/avahi/services/cupcake.service
+        mode: '0644'
+        content: |
+          <?xml version="1.0" standalone='no'?>
+          <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+          <service-group>
+            <name>Cupcake Appliance</name>
+            <service>
+              <type>_http._tcp</type>
+              <port>80</port>
+              <txt-record>path=/</txt-record>
+            </service>
+          </service-group>
+      notify: Restart avahi
+      tags: [mdns]
+
+    - name: Configure systemd-resolved for mDNS
+      ansible.builtin.copy:
+        dest: /etc/systemd/resolved.conf.d/mdns.conf
+        mode: '0644'
+        content: |
+          [Resolve]
+          MulticastDNS=yes
+      notify: Restart systemd-resolved
+      tags: [mdns]
+      become: true
+
+    - name: Create resolved.conf.d directory
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d
+        state: directory
+        mode: '0755'
+      tags: [mdns]
+
+    - name: Configure nsswitch for mDNS
+      ansible.builtin.lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: '^hosts:'
+        line: 'hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname'
+      tags: [mdns]
+
+    - name: Install cupcake-vanilla-mdns script
+      ansible.builtin.copy:
+        src: ../scripts/cupcake-vanilla-mdns.py
+        dest: /usr/local/bin/cupcake-vanilla-mdns
+        mode: '0755'
+      tags: [mdns]
+
+    - name: Write cupcake-vanilla-mdns systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cupcake-vanilla-mdns.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Publish vanilla.local mDNS A record
+          After=network-online.target avahi-daemon.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/cupcake-vanilla-mdns
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+      tags: [mdns]
+
+    - name: Enable avahi-daemon
+      ansible.builtin.systemd:
+        name: avahi-daemon
+        enabled: true
+        state: started
+      tags: [mdns]
+
+    # ── Systemd services ──────────────────────────────────────────────────────
+
+    - name: Write cupcake-backend systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cupcake-backend.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Cupcake Django Backend (Gunicorn)
+          After=network.target postgresql.service redis-server.service
+          Requires=postgresql.service redis-server.service
+
+          [Service]
+          Type=simple
+          User=cupcake-svc
+          Group=cupcake-svc
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStart=/opt/cupcake/venv/bin/gunicorn cupcake_vanilla.asgi:application \
+              --bind 127.0.0.1:8000 \
+              --workers 4 \
+              --timeout 300 \
+              -k uvicorn.workers.UvicornWorker \
+              --log-level info \
+              --access-logfile /var/log/cupcake/gunicorn-access.log \
+              --error-logfile /var/log/cupcake/gunicorn-error.log
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+      tags: [services]
+
+    - name: Write cupcake-rqworker systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cupcake-rqworker.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Cupcake RQ Worker (default high low)
+          After=cupcake-backend.service
+          Requires=cupcake-backend.service
+
+          [Service]
+          Type=simple
+          User=cupcake-svc
+          Group=cupcake-svc
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker default high low
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+      tags: [services]
+
+    - name: Write cupcake-transcribe-worker systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cupcake-transcribe-worker.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Cupcake Transcribe Worker
+          After=cupcake-backend.service
+          Requires=cupcake-backend.service
+
+          [Service]
+          Type=simple
+          User=cupcake-svc
+          Group=cupcake-svc
+          WorkingDirectory=/opt/cupcake/backend
+          EnvironmentFile=/opt/cupcake/.env
+          ExecStartPre=/opt/cupcake/venv/bin/python manage.py cleanup_dead_workers
+          ExecStart=/opt/cupcake/venv/bin/python manage.py rqworker transcribe
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+      tags: [services]
+
+    - name: Write cupcake-vanilla-mdns systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cupcake-vanilla-mdns.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Publish vanilla.local mDNS A record
+          After=network-online.target avahi-daemon.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/cupcake-vanilla-mdns
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+      tags: [services, mdns]
+
+    - name: Enable and start cupcake services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop:
+        - cupcake-backend
+        - cupcake-rqworker
+        - cupcake-transcribe-worker
+        - cupcake-vanilla-mdns
+      tags: [services]
+
+    # ── Install update script ─────────────────────────────────────────────────
+
+    - name: Install update script
+      ansible.builtin.copy:
+        src: ../scripts/update.sh
+        dest: /opt/cupcake/update.sh
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [services]
+
+    # ── Cleanup ───────────────────────────────────────────────────────────────
+
+    - name: Clean apt cache
+      ansible.builtin.apt:
+        autoclean: true
+        autoremove: true
+      tags: [cleanup]
+
+  # ── Handlers ─────────────────────────────────────────────────────────────────
+
+  handlers:
+    - name: Restart redis
+      ansible.builtin.systemd:
+        name: redis-server
+        state: restarted
+
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Restart avahi
+      ansible.builtin.systemd:
+        name: avahi-daemon
+        state: restarted
+
+    - name: Restart systemd-resolved
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        state: restarted
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true

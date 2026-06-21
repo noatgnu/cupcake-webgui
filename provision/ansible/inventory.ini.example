@@ -1,0 +1,5 @@
+[cupcake]
+192.168.1.100 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+# Debian trixie example (override python and pg versions):
+# 192.168.1.101 ansible_user=debian python_version=3.13 pg_version=17

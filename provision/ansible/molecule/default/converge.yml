@@ -1,0 +1,33 @@
+---
+- name: Pre-create placeholder frontends
+  hosts: all
+  become: true
+  tasks:
+    - name: Create cupcake-svc group early
+      ansible.builtin.group:
+        name: cupcake-svc
+        system: true
+
+    - name: Create frontend placeholder directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/cupcake/webgui
+        - /opt/cupcake/vanilla
+
+    - name: Create webgui placeholder
+      ansible.builtin.copy:
+        content: "<html><head><title>Cupcake</title></head><body>test</body></html>"
+        dest: /opt/cupcake/webgui/index.html
+        mode: '0644'
+
+    - name: Create vanilla placeholder
+      ansible.builtin.copy:
+        content: "<html><head><title>Cupcake Vanilla</title></head><body>test</body></html>"
+        dest: /opt/cupcake/vanilla/index.html
+        mode: '0644'
+
+- name: Converge
+  ansible.builtin.import_playbook: ../../site.yml

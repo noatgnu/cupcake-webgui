@@ -1111,6 +1111,19 @@ jobs:
               echo "Admin user verified OK"
           fi
 
+          echo "=== CUPCAKE: seeding SiteConfig whisper model path ==="
+          cd /opt/cupcake/backend
+          set -a; source /opt/cupcake/.env; set +a
+          /opt/cupcake/venv/bin/python -c "
+          import django, os
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cupcake_vanilla.settings')
+          django.setup()
+          from ccc.models import SiteConfig
+          site_config, _ = SiteConfig.objects.get_or_create(pk=1)
+          site_config.whisper_cpp_model = os.environ['WHISPERCPP_DEFAULT_MODEL']
+          site_config.save(update_fields=['whisper_cpp_model'])
+          "
+
           BACKEND_COMMIT=$(git -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
           WEBGUI_COMMIT=$(grep "^WEBGUI_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
           VANILLA_NG_COMMIT=$(grep "^VANILLA_NG_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
@@ -1626,7 +1639,6 @@ jobs:
           name: Cupcake ${{ github.event.release.name || github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
           files: release-assets/*.img.xz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

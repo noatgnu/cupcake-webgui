@@ -1,0 +1,12 @@
+---
+python_version: "3.12"
+pg_version: "16"
+
+backend_ref: "master"
+webgui_ref: "master"
+vanilla_ng_ref: "master"
+
+install_whisper: true
+whisper_model: "medium"
+
+coturn_realm: "cupcake.local"
