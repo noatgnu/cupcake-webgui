@@ -154,9 +154,10 @@
     - name: Configure pg_hba for md5 auth
       ansible.builtin.shell:
         cmd: |
+          set -o pipefail
           PG_HBA=$(su - postgres -c "psql -t -c 'SHOW hba_file;'" | tr -d ' ')
-          sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' "$PG_HBA"
-          sed -i 's/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             127.0.0.1\/32            md5/' "$PG_HBA"
+          sed -i -E 's/^(local\s+all\s+all\s+)peer/\1md5/' "$PG_HBA"
+          sed -i -E 's/^(host\s+all\s+all\s+127\.0\.0\.1\/32\s+)scram-sha-256/\1md5/' "$PG_HBA"
           systemctl restart postgresql
       changed_when: false
       tags: [postgresql]
@@ -164,6 +165,7 @@
     - name: Create PostgreSQL user
       ansible.builtin.shell:
         cmd: |
+          set -o pipefail
           su - postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='cupcake_vanilla'\"" | grep -q 1 || \
           su - postgres -c "psql -c \"CREATE USER cupcake_vanilla WITH PASSWORD 'cupcake_vanilla_pass';\""
           su - postgres -c "psql -c \"ALTER USER cupcake_vanilla CREATEDB;\""
@@ -173,6 +175,7 @@
     - name: Create PostgreSQL database
       ansible.builtin.shell:
         cmd: |
+          set -o pipefail
           su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='cupcake_vanilla_db'\"" | grep -q 1 || \
           su - postgres -c "psql -c \"CREATE DATABASE cupcake_vanilla_db OWNER cupcake_vanilla;\""
       changed_when: false

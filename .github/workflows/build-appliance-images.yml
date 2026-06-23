@@ -170,6 +170,39 @@ jobs:
           $MANAGE sync_schemas
           $MANAGE load_column_templates
 
+      - name: Export mobile snapshot (ontology tables, SDRF schemas, column templates)
+        env:
+          POSTGRES_DB: cupcake_vanilla_db
+          POSTGRES_USER: cupcake_vanilla
+          POSTGRES_PASSWORD: cupcake_vanilla_pass
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: '5432'
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          DJANGO_SETTINGS_MODULE: cupcake_vanilla.settings
+          SECRET_KEY: build-time-only-not-used-in-production
+          DEBUG: 'False'
+          ENABLE_CUPCAKE_MACARON: 'True'
+          ENABLE_CUPCAKE_MINT_CHOCOLATE: 'True'
+          ENABLE_CUPCAKE_SALTED_CARAMEL: 'True'
+          ENABLE_CUPCAKE_RED_VELVET: 'True'
+          ALLOWED_HOSTS: localhost
+        run: |
+          cd /tmp/backend
+          /tmp/venv/bin/python manage.py export_mobile_snapshot \
+            --dataset all --output-dir "$GITHUB_WORKSPACE/mobile-snapshot"
+          RELEASE_TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          mv "$GITHUB_WORKSPACE/mobile-snapshot/manifest.json" \
+             "$GITHUB_WORKSPACE/mobile-snapshot/manifest-${RELEASE_TAG}.json"
+          du -sh "$GITHUB_WORKSPACE/mobile-snapshot"/*
+
+      - name: Upload mobile snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-mobile-snapshot
+          path: mobile-snapshot/
+          retention-days: 1
+
       - name: Dump database
         run: |
           PGPASSWORD=cupcake_vanilla_pass pg_dump \
@@ -1620,7 +1653,7 @@ jobs:
 
   publish-release:
     name: Publish RPi image to release
-    needs: [build-rpi]
+    needs: [build-rpi, build-db]
     if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
@@ -1632,6 +1665,12 @@ jobs:
           name: cupcake-pi-arm64
           path: release-assets/
 
+      - name: Download mobile snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-mobile-snapshot
+          path: release-assets/
+
       - name: Publish to GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -1639,7 +1678,10 @@ jobs:
           name: Cupcake ${{ github.event.release.name || github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          files: release-assets/*.img.xz
+          files: |
+            release-assets/*.img.xz
+            release-assets/*.sqlite.gz
+            release-assets/manifest-*.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
