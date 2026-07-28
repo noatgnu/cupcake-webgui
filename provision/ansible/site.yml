@@ -947,6 +947,7 @@
       ansible.builtin.systemd:
         name: systemd-resolved
         state: restarted
+      when: ansible_virtualization_type != "docker"
 
     - name: Reload systemd
       ansible.builtin.systemd:

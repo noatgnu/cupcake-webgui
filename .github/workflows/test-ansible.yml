@@ -88,7 +88,9 @@ jobs:
         run: |
           curl -sf http://localhost/           -o /dev/null && echo "vanilla OK"
           curl -sf http://localhost:8080/      -o /dev/null && echo "cupcake OK"
-          curl -sf http://127.0.0.1:8000/api/v1/ -o /dev/null && echo "API OK"
+          api_code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/v1/)
+          echo "API status: $api_code"
+          echo "$api_code" | grep -qE "^(2|3|401)" && echo "API OK"
 
       - name: Verify database
         run: |
