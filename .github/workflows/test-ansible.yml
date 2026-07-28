@@ -45,7 +45,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Ansible
-        run: pip install ansible
+        run: pip install ansible passlib
 
       - name: Create placeholder frontends
         run: |
@@ -114,7 +114,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Molecule
-        run: pip install ansible molecule molecule-docker docker
+        run: pip install ansible molecule molecule-docker docker passlib
 
       - name: Run Molecule test
         working-directory: provision/ansible
@@ -134,7 +134,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Molecule
-        run: pip install ansible molecule molecule-docker docker
+        run: pip install ansible molecule molecule-docker docker passlib
 
       - name: Run Molecule test
         working-directory: provision/ansible
