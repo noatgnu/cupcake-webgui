@@ -37,14 +37,28 @@ describe('AppComponent', () => {
     expect(component.showSuperuserModal()).toBeFalse();
   });
 
-  it('should log backend status changes', () => {
+  it('should log backend status changes', async () => {
     const status = { service: 'django', status: 'ready', message: 'Started' };
-    (mockWailsService as any).backendStatus = signal(status);
+    const statusMockWailsService = jasmine.createSpyObj('WailsService', ['logToFile'], {
+      backendStatus: signal(status),
+      showSuperuserCreation: signal(false),
+      isWails: false
+    });
+
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        { provide: WailsService, useValue: statusMockWailsService },
+        provideRouter([])
+      ]
+    }).compileComponents();
 
     fixture = TestBed.createComponent(AppComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    expect(mockWailsService.logToFile).toHaveBeenCalled();
+    expect(statusMockWailsService.logToFile).toHaveBeenCalled();
   });
 });

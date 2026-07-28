@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
 
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { Project } from '@noatgnu/cupcake-red-velvet';
@@ -7,6 +7,7 @@ import { Project } from '@noatgnu/cupcake-red-velvet';
   selector: 'app-step-one-job-project',
   imports: [],
   templateUrl: './step-one-job-project.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './step-one-job-project.scss'
 })
 export class StepOneJobProjectComponent {

@@ -109,7 +109,7 @@ describe('ProtocolCreateModal', () => {
     component.createProtocol();
 
     expect(mockToastService.error).toHaveBeenCalledWith('Failed to create protocol');
-    expect(component.saving).toBeFalse();
+    expect(component.saving()).toBeFalse();
     expect(mockActiveModal.close).not.toHaveBeenCalled();
   });
 
@@ -134,8 +134,8 @@ describe('ProtocolCreateModal', () => {
       protocolTitle: 'Test Protocol'
     });
 
-    expect(component.saving).toBeFalse();
+    expect(component.saving()).toBeFalse();
     component.createProtocol();
-    expect(component.saving).toBeTrue();
+    expect(component.saving()).toBeTrue();
   });
 });

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, computed, signal, effect, untracked, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, signal, effect, untracked, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WailsService, BackendStatus, LogMessage } from '../../core/services/wails.service';
 
@@ -14,6 +14,7 @@ interface ServiceStatus {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './splash.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './splash.component.scss'
 })
 export class SplashComponent implements OnInit, OnDestroy {

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NgbCollapse } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarControl } from '../../../core/services/sidebar-control';
@@ -8,6 +8,7 @@ import { environment } from '../../../../environments/environment';
   selector: 'app-admin-navbar',
   imports: [RouterModule, NgbCollapse],
   templateUrl: './admin-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './admin-navbar.scss',
 })
 export class AdminNavbar {

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, computed, inject, ViewChild, ElementRef, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, inject, ViewChild, ElementRef, effect, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WailsService, SyncSchemasOptions, LoadColumnTemplatesOptions, LoadOntologiesOptions, BackupInfo } from '../../core/services/wails.service';
@@ -29,6 +29,7 @@ interface CommandStatus {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './management.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './management.component.scss'
 })
 export class ManagementComponent implements OnInit, OnDestroy {

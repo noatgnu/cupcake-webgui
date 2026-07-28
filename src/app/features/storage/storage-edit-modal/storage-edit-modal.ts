@@ -1,4 +1,4 @@
-import { Component, inject, Input } from '@angular/core';
+import { Component, inject, Input, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { StorageObject } from '@noatgnu/cupcake-macaron';
@@ -8,6 +8,7 @@ import { ImageUpload } from '../../../shared/components/image-upload/image-uploa
   selector: 'app-storage-edit-modal',
   imports: [ReactiveFormsModule, ImageUpload],
   templateUrl: './storage-edit-modal.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './storage-edit-modal.scss'
 })
 export class StorageEditModal {

@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, inject } from '@angular/core';
+import { Component, signal, computed, effect, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WailsService, DownloadProgress } from '../../core/services/wails.service';
 
@@ -15,6 +15,7 @@ interface PhaseInfo {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './backend-setup.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './backend-setup.component.scss'
 })
 export class BackendSetupComponent {

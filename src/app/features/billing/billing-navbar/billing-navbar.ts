@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { RouterModule } from '@angular/router';
 import { NgbCollapse, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -9,6 +9,7 @@ import { QuoteRequestModal } from '../quote-request-modal/quote-request-modal';
   selector: 'app-billing-navbar',
   imports: [RouterModule, NgbCollapse],
   templateUrl: './billing-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './billing-navbar.scss',
 })
 export class BillingNavbar {

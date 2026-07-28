@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { RouterModule } from '@angular/router';
 import { SidebarControl } from '../../../core/services/sidebar-control';
@@ -7,6 +7,7 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
   selector: 'app-instruments-navbar',
   imports: [RouterModule],
   templateUrl: './instruments-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './instruments-navbar.scss'
 })
 export class InstrumentsNavbar {

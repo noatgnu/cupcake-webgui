@@ -33,7 +33,8 @@ describe('SplashComponent', () => {
   });
 
   it('should have default version', () => {
-    expect(component.version).toBe('0.0.1');
+    const freshFixture = TestBed.createComponent(SplashComponent);
+    expect(freshFixture.componentInstance.version).toBe('0.0.1');
   });
 
   it('should initialize with all services in pending state', () => {
@@ -88,9 +89,10 @@ describe('SplashComponent', () => {
   });
 
   describe('service status display', () => {
-    it('should display pending icon for pending status', () => {
+    it('should display pending icon for pending status', async () => {
+      await fixture.whenStable();
       const compiled = fixture.nativeElement as HTMLElement;
-      const pendingIcons = compiled.querySelectorAll('.service-item.pending .service-icon');
+      const pendingIcons = compiled.querySelectorAll('.service-row.pending .status-icon');
       expect(pendingIcons.length).toBeGreaterThan(0);
     });
   });

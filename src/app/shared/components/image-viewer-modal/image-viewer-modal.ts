@@ -1,4 +1,4 @@
-import { Component, Input, inject } from '@angular/core';
+import { Component, Input, inject, ChangeDetectionStrategy } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 
 
@@ -6,6 +6,7 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
   selector: 'app-image-viewer-modal',
   imports: [],
   templateUrl: './image-viewer-modal.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './image-viewer-modal.scss'
 })
 export class ImageViewerModal {

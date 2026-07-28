@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 
 import { JobAnnotations } from '../../job-annotations/job-annotations';
 
@@ -6,6 +6,7 @@ import { JobAnnotations } from '../../job-annotations/job-annotations';
   selector: 'app-job-annotations-section',
   imports: [JobAnnotations],
   templateUrl: './job-annotations-section.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './job-annotations-section.scss',
 })
 export class JobAnnotationsSection {

@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WailsService } from '../../core/services/wails.service';
@@ -8,6 +8,7 @@ import { WailsService } from '../../core/services/wails.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './superuser.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './superuser.component.scss'
 })
 export class SuperuserComponent {

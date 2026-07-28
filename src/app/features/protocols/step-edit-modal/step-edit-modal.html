@@ -96,7 +96,7 @@
         @if (showPreview) {
           <div class="col-md-6">
             <div class="border rounded p-3" style="min-height: 200px;">
-              <div [innerHTML]="stepForm.get('stepDescription')?.value | stepTemplate:reagents()"></div>
+              <div [innerHTML]="$safeNavigationMigration(stepForm.get('stepDescription')?.value) | stepTemplate:reagents()"></div>
             </div>
           </div>
         }

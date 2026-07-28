@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NgbCollapse } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarControl } from '../../../core/services/sidebar-control';
@@ -7,6 +7,7 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
   selector: 'app-protocols-navbar',
   imports: [RouterModule, NgbCollapse],
   templateUrl: './protocols-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './protocols-navbar.scss'
 })
 export class ProtocolsNavbar {

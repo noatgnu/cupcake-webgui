@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, effect, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { WailsService } from './core/services/wails.service';
@@ -9,6 +9,7 @@ import { SuperuserComponent } from './panels/superuser/superuser.component';
   standalone: true,
   imports: [CommonModule, RouterOutlet, SuperuserComponent],
   templateUrl: './app.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.component.scss'
 })
 export class AppComponent {

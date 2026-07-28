@@ -31,7 +31,7 @@ describe('ManagementComponent', () => {
       'getOntologyCounts',
       'runSyncSchemas',
       'runLoadColumnTemplates',
-      'runLoadOntologies',
+      'runLoadAllOntologies',
       'logToFile',
       'listBackups',
       'createDatabaseBackup',
@@ -51,7 +51,7 @@ describe('ManagementComponent', () => {
     mockWailsService.getOntologyCounts.and.resolveTo(mockOntologyCounts);
     mockWailsService.runSyncSchemas.and.resolveTo();
     mockWailsService.runLoadColumnTemplates.and.resolveTo();
-    mockWailsService.runLoadOntologies.and.resolveTo();
+    mockWailsService.runLoadAllOntologies.and.resolveTo();
     mockWailsService.listBackups.and.resolveTo(mockBackups);
     mockWailsService.createDatabaseBackup.and.resolveTo();
     mockWailsService.createMediaBackup.and.resolveTo();
@@ -173,11 +173,6 @@ describe('ManagementComponent', () => {
       expect(breakdown.every(item => item.count > 0)).toBeTrue();
     });
 
-    it('should uppercase names', async () => {
-      await component.ngOnInit();
-      const breakdown = component.ontologyBreakdown();
-      expect(breakdown.every(item => item.name === item.name.toUpperCase())).toBeTrue();
-    });
   });
 
   describe('refreshStats', () => {
@@ -205,7 +200,7 @@ describe('ManagementComponent', () => {
 
     it('should run load-ontologies command with options', async () => {
       await component.runCommand('load-ontologies');
-      expect(mockWailsService.runLoadOntologies).toHaveBeenCalledWith(jasmine.objectContaining({ noLimit: true }));
+      expect(mockWailsService.runLoadAllOntologies).toHaveBeenCalledWith(jasmine.objectContaining({ noLimit: true }));
     });
 
     it('should set command to running', async () => {

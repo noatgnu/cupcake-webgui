@@ -72,7 +72,7 @@ describe('TimerService', () => {
   });
 
   it('convertTime() formats zero correctly', () => {
-    expect(service.convertTime(0)).toBe('00:00:0.00');
+    expect(service.convertTime(0)).toBe('00:00:00.00');
   });
 
   it('convertTime() formats 90 seconds as 1 minute 30 seconds', () => {
@@ -80,6 +80,6 @@ describe('TimerService', () => {
   });
 
   it('convertTime() handles null', () => {
-    expect(service.convertTime(null)).toBe('00:00:0.00');
+    expect(service.convertTime(null)).toBe('00:00:00.00');
   });
 });

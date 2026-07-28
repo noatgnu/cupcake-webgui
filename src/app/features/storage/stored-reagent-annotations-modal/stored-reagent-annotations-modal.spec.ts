@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { CUPCAKE_CORE_CONFIG, ToastService, ApiService, SiteConfigService } from '@noatgnu/cupcake-core';
 import { ReagentService } from '@noatgnu/cupcake-macaron';
@@ -31,7 +31,7 @@ describe('StoredReagentAnnotationsModal', () => {
       imports: [StoredReagentAnnotationsModal],
       providers: [
         { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: NgbActiveModal, useValue: mockActiveModal },
         { provide: ReagentService, useValue: mockReagentService },

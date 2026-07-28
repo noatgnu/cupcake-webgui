@@ -1,4 +1,4 @@
-import { Component, inject, Input } from '@angular/core';
+import { Component, inject, Input, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { StorageObject, StorageObjectType } from '@noatgnu/cupcake-macaron';
@@ -7,6 +7,7 @@ import { StorageObject, StorageObjectType } from '@noatgnu/cupcake-macaron';
   selector: 'app-storage-create-modal',
   imports: [ReactiveFormsModule],
   templateUrl: './storage-create-modal.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './storage-create-modal.scss'
 })
 export class StorageCreateModal {

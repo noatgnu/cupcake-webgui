@@ -88,7 +88,7 @@ describe('StepCreateModal', () => {
     component.createStep();
 
     expect(mockToastService.error).toHaveBeenCalledWith('Failed to create step');
-    expect(component.saving).toBeFalse();
+    expect(component.saving()).toBeFalse();
   });
 
   it('should dismiss modal on cancel', () => {

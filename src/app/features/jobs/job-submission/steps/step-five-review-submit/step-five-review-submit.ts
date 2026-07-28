@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
 
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { MetadataTableEditor } from '../../../../../features/metadata/metadata-table-editor/metadata-table-editor';
@@ -7,6 +7,7 @@ import { MetadataTableEditor } from '../../../../../features/metadata/metadata-t
   selector: 'app-step-five-review-submit',
   imports: [MetadataTableEditor],
   templateUrl: './step-five-review-submit.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './step-five-review-submit.scss'
 })
 export class StepFiveReviewSubmitComponent {

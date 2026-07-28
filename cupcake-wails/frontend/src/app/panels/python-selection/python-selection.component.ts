@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WailsService, PythonCandidate, ValidationResult } from '../../core/services/wails.service';
@@ -8,6 +8,7 @@ import { WailsService, PythonCandidate, ValidationResult } from '../../core/serv
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './python-selection.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './python-selection.component.scss'
 })
 export class PythonSelectionComponent implements OnInit {

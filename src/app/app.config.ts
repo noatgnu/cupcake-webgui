@@ -1,6 +1,6 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
@@ -12,7 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes, withHashLocation()),
     { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: environment.apiUrl } },
-    provideHttpClient(
+    provideHttpClient(withXhr(), 
       withInterceptors([authInterceptor])
     )
   ]

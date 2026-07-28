@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { RouterModule } from '@angular/router';
 import { NgbCollapse, NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
@@ -8,6 +8,7 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
   selector: 'app-storage-navbar',
   imports: [RouterModule, NgbDropdownModule, NgbCollapse],
   templateUrl: './storage-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './storage-navbar.scss'
 })
 export class StorageNavbar {

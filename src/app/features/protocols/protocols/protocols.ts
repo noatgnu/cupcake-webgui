@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ProtocolsNavbar } from '../protocols-navbar/protocols-navbar';
 
@@ -6,6 +6,7 @@ import { ProtocolsNavbar } from '../protocols-navbar/protocols-navbar';
   selector: 'app-protocols',
   imports: [ProtocolsNavbar, RouterOutlet],
   templateUrl: './protocols.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './protocols.scss'
 })
 export class Protocols {

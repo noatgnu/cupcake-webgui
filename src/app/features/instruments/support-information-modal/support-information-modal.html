@@ -49,7 +49,7 @@
       </label>
       <app-storage-location-typeahead
         [selectedLocationName]="selectedLocationName"
-        [selectedLocationId]="supportInformation?.location"
+        [selectedLocationId]="$safeNavigationMigration(supportInformation?.location)"
         (locationSelected)="onLocationSelected($event)"
         placeholder="Search for storage location...">
       </app-storage-location-typeahead>

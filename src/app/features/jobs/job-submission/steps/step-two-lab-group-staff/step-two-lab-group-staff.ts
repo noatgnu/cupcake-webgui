@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
 
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 import { LabGroup } from '@noatgnu/cupcake-core';
@@ -7,6 +7,7 @@ import { LabGroup } from '@noatgnu/cupcake-core';
   selector: 'app-step-two-lab-group-staff',
   imports: [],
   templateUrl: './step-two-lab-group-staff.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './step-two-lab-group-staff.scss'
 })
 export class StepTwoLabGroupStaffComponent {

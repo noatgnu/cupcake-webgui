@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { DownloaderComponent } from './downloader.component';
 import { WailsService, ReleaseInfo, PythonCandidate, DownloadProgress, DownloadComplete } from '../../core/services/wails.service';
 import { signal, WritableSignal } from '@angular/core';
@@ -9,6 +10,7 @@ describe('DownloaderComponent', () => {
   let mockWailsService: jasmine.SpyObj<WailsService>;
   let downloadProgressSignal: WritableSignal<DownloadProgress | null>;
   let downloadCompleteSignal: WritableSignal<DownloadComplete | null>;
+  let mockRoute: { snapshot: { queryParams: Record<string, string>; data: Record<string, string>; paramMap: ReturnType<typeof convertToParamMap> } };
 
   const mockReleases: ReleaseInfo[] = [
     { tag: 'master', name: 'Latest (master branch)', publishedAt: '' },
@@ -41,10 +43,13 @@ describe('DownloaderComponent', () => {
     mockWailsService.setupNativeBackend.and.resolveTo();
     mockWailsService.downloadValkey.and.resolveTo();
 
+    mockRoute = { snapshot: { queryParams: {}, data: {}, paramMap: convertToParamMap({}) } };
+
     await TestBed.configureTestingModule({
       imports: [DownloaderComponent],
       providers: [
-        { provide: WailsService, useValue: mockWailsService }
+        { provide: WailsService, useValue: mockWailsService },
+        { provide: ActivatedRoute, useValue: mockRoute },
       ]
     }).compileComponents();
 
@@ -93,14 +98,14 @@ describe('DownloaderComponent', () => {
     it('should show correct title for portable mode', async () => {
       await component.ngOnInit();
       component.setDistributionMode('portable');
-      expect(component.title()).toBe('Setup Backend');
-      expect(component.description()).toContain('portable');
+      expect(component.title()).toBe('Backend Source');
+      expect(component.description()).toContain('pre-configured Python environment');
     });
 
     it('should show correct title for native mode', async () => {
       await component.ngOnInit();
       component.setDistributionMode('native');
-      expect(component.description()).toContain('system Python');
+      expect(component.description()).toContain('system-level Python');
     });
 
     it('should enable download when version selected in portable mode', async () => {
@@ -140,12 +145,12 @@ describe('DownloaderComponent', () => {
 
   describe('valkey download', () => {
     beforeEach(() => {
-      component.downloadType = 'valkey';
+      mockRoute.snapshot.data = { downloadType: 'valkey' };
       fixture.detectChanges();
     });
 
     it('should show correct title', () => {
-      expect(component.title()).toBe('Download Redis/Valkey');
+      expect(component.title()).toBe('Service Setup');
     });
 
     it('should enable download without version selection', () => {
@@ -203,12 +208,12 @@ describe('DownloaderComponent', () => {
 
     it('should format size correctly', () => {
       expect(component.formatSize(0)).toBe('0 B');
-      expect(component.formatSize(1024)).toBe('1 KB');
-      expect(component.formatSize(1048576)).toBe('1 MB');
+      expect(component.formatSize(1024)).toBe('1.0 KB');
+      expect(component.formatSize(1048576)).toBe('1.0 MB');
     });
 
     it('should format speed correctly', () => {
-      expect(component.formatSpeed(1024)).toBe('1 KB/s');
+      expect(component.formatSpeed(1024)).toBe('1.0 KB/s');
     });
   });
 });

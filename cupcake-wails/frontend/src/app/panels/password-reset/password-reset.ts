@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WailsService } from '../../core/services/wails.service';
@@ -8,6 +8,7 @@ import { WailsService } from '../../core/services/wails.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './password-reset.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './password-reset.scss'
 })
 export class PasswordResetComponent implements OnInit {

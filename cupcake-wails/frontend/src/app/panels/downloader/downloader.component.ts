@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, effect, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, effect, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -11,6 +11,7 @@ type DistributionMode = 'portable' | 'native';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './downloader.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './downloader.component.scss'
 })
 export class DownloaderComponent implements OnInit {

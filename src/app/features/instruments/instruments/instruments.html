@@ -322,7 +322,7 @@
                           }
                           <div class="col-12 mb-2">
                             <small class="text-muted">Created</small>
-                            <div>{{ selectedInstrument()?.createdAt | date: 'medium' }}</div>
+                            <div>{{ $safeNavigationMigration(selectedInstrument()?.createdAt) | date: 'medium' }}</div>
                           </div>
                         </div>
                       </div>
@@ -514,13 +514,13 @@
                                 <small class="text-muted">Warranty Period</small>
                                 <div>
                                   @if (selectedSupportInfo()?.warrantyStartDate) {
-                                    <span>{{ selectedSupportInfo()?.warrantyStartDate | date: 'mediumDate' }}</span>
+                                    <span>{{ $safeNavigationMigration(selectedSupportInfo()?.warrantyStartDate) | date: 'mediumDate' }}</span>
                                   }
                                   @if (selectedSupportInfo()?.warrantyStartDate && selectedSupportInfo()?.warrantyEndDate) {
                                     <span> - </span>
                                   }
                                   @if (selectedSupportInfo()?.warrantyEndDate) {
-                                    <span>{{ selectedSupportInfo()?.warrantyEndDate | date: 'mediumDate' }}</span>
+                                    <span>{{ $safeNavigationMigration(selectedSupportInfo()?.warrantyEndDate) | date: 'mediumDate' }}</span>
                                   }
                                 </div>
                               </div>

@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Subject, of } from 'rxjs';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CUPCAKE_CORE_CONFIG, ToastService, AuthService, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
@@ -63,7 +63,7 @@ describe('SessionDetail', () => {
       providers: [
         { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
         provideRouter([]),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: NgbModal, useValue: mockModalService },
         { provide: SessionService, useValue: mockSessionService },

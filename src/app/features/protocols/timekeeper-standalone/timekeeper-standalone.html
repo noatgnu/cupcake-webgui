@@ -257,15 +257,15 @@
                         </div>
                         <div class="col-6 mb-2">
                           <small class="text-muted">Created</small>
-                          <div>{{ selectedTimer()?.startTime | date: 'short' }}</div>
+                          <div>{{ $safeNavigationMigration(selectedTimer()?.startTime) | date: 'short' }}</div>
                         </div>
-                        @if (selectedTimer()?.currentDuration !== undefined && selectedTimer()?.currentDuration !== null) {
+                        @if ($safeNavigationMigration(selectedTimer()?.currentDuration) !== undefined && $safeNavigationMigration(selectedTimer()?.currentDuration) !== null) {
                           <div class="col-6 mb-2">
                             <small class="text-muted">Current Duration</small>
                             <div>{{ formatDuration(selectedTimer()!.currentDuration) }}</div>
                           </div>
                         }
-                        @if (selectedTimer()?.originalDuration !== undefined && selectedTimer()?.originalDuration !== null) {
+                        @if ($safeNavigationMigration(selectedTimer()?.originalDuration) !== undefined && $safeNavigationMigration(selectedTimer()?.originalDuration) !== null) {
                           <div class="col-6 mb-2">
                             <small class="text-muted">Original Duration</small>
                             <div>{{ formatDuration(selectedTimer()!.originalDuration) }}</div>
@@ -386,13 +386,13 @@
                         @if (selectedTimerSession()?.startedAt) {
                           <div class="col-6 mb-2">
                             <small class="text-muted">Started At</small>
-                            <div>{{ selectedTimerSession()?.startedAt | date: 'short' }}</div>
+                            <div>{{ $safeNavigationMigration(selectedTimerSession()?.startedAt) | date: 'short' }}</div>
                           </div>
                         }
                         @if (selectedTimerSession()?.endedAt) {
                           <div class="col-6 mb-2">
                             <small class="text-muted">Ended At</small>
-                            <div>{{ selectedTimerSession()?.endedAt | date: 'short' }}</div>
+                            <div>{{ $safeNavigationMigration(selectedTimerSession()?.endedAt) | date: 'short' }}</div>
                           </div>
                         }
                         @if (selectedTimerSession()?.protocolCount) {

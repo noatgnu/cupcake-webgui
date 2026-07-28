@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, signal, computed, effect, inject, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WailsService, LogMessage } from '../../core/services/wails.service';
@@ -8,6 +8,7 @@ import { WailsService, LogMessage } from '../../core/services/wails.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './debug.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './debug.component.scss'
 })
 export class DebugComponent {

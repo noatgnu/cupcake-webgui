@@ -159,7 +159,7 @@
                 <div class="row">
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showMetadataTables" [checked]="formData().uiFeatures?.show_metadata_tables" (change)="updateUIFeature('show_metadata_tables', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showMetadataTables" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_metadata_tables)" (change)="updateUIFeature('show_metadata_tables', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showMetadataTables">
                         Show Metadata Tables
                       </label>
@@ -168,7 +168,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showInstruments" [checked]="formData().uiFeatures?.show_instruments" (change)="updateUIFeature('show_instruments', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showInstruments" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_instruments)" (change)="updateUIFeature('show_instruments', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showInstruments">
                         Show Instruments
                       </label>
@@ -177,7 +177,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showSessions" [checked]="formData().uiFeatures?.show_sessions" (change)="updateUIFeature('show_sessions', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showSessions" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_sessions)" (change)="updateUIFeature('show_sessions', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showSessions">
                         Show Sessions
                       </label>
@@ -186,7 +186,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showProtocols" [checked]="formData().uiFeatures?.show_protocols" (change)="updateUIFeature('show_protocols', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showProtocols" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_protocols)" (change)="updateUIFeature('show_protocols', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showProtocols">
                         Show Protocols
                       </label>
@@ -195,7 +195,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showMessages" [checked]="formData().uiFeatures?.show_messages" (change)="updateUIFeature('show_messages', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showMessages" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_messages)" (change)="updateUIFeature('show_messages', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showMessages">
                         Show Messages
                       </label>
@@ -204,7 +204,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showNotifications" [checked]="formData().uiFeatures?.show_notifications" (change)="updateUIFeature('show_notifications', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showNotifications" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_notifications)" (change)="updateUIFeature('show_notifications', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showNotifications">
                         Show Notifications
                       </label>
@@ -213,7 +213,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showStorage" [checked]="formData().uiFeatures?.show_storage" (change)="updateUIFeature('show_storage', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showStorage" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_storage)" (change)="updateUIFeature('show_storage', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showStorage">
                         Show Storage
                       </label>
@@ -222,7 +222,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showWebrtc" [checked]="formData().uiFeatures?.show_webrtc" (change)="updateUIFeature('show_webrtc', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showWebrtc" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_webrtc)" (change)="updateUIFeature('show_webrtc', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showWebrtc">
                         Show WebRTC
                       </label>
@@ -231,7 +231,7 @@
 
                   <div class="col-md-6 mb-3">
                     <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="showBilling" [checked]="formData().uiFeatures?.show_billing" (change)="updateUIFeature('show_billing', $any($event.target).checked)" [disabled]="!canEdit()">
+                      <input class="form-check-input" type="checkbox" id="showBilling" [checked]="$safeNavigationMigration(formData().uiFeatures?.show_billing)" (change)="updateUIFeature('show_billing', $any($event.target).checked)" [disabled]="!canEdit()">
                       <label class="form-check-label" for="showBilling">
                         Show Billing
                       </label>
@@ -291,7 +291,7 @@
                   <hr>
                   <div class="small text-muted">
                     <div>Last Updated:</div>
-                    <div>{{ config()?.updatedAt | date: 'medium' }}</div>
+                    <div>{{ $safeNavigationMigration(config()?.updatedAt) | date: 'medium' }}</div>
                   </div>
                 }
               </div>

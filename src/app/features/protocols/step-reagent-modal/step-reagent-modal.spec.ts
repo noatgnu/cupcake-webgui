@@ -164,7 +164,7 @@ describe('StepReagentModal', () => {
     component.save();
 
     expect(mockToastService.error).toHaveBeenCalledWith('Failed to create step reagent');
-    expect(component.saving).toBe(false);
+    expect(component.saving()).toBe(false);
   });
 
   it('should handle update error', () => {
@@ -183,7 +183,7 @@ describe('StepReagentModal', () => {
     component.save();
 
     expect(mockToastService.error).toHaveBeenCalledWith('Failed to update step reagent');
-    expect(component.saving).toBe(false);
+    expect(component.saving()).toBe(false);
   });
 
   it('should set scalableFactor to 1 when scalable is unchecked', () => {

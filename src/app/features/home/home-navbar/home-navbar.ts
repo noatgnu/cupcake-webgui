@@ -1,4 +1,4 @@
-import { Component, inject, signal, Input, Output, EventEmitter } from '@angular/core';
+import { Component, inject, signal, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { NgbCollapse } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarControl } from '../../../core/services/sidebar-control';
 
@@ -6,6 +6,7 @@ import { SidebarControl } from '../../../core/services/sidebar-control';
   selector: 'app-home-navbar',
   imports: [NgbCollapse],
   templateUrl: './home-navbar.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './home-navbar.scss'
 })
 export class HomeNavbar {

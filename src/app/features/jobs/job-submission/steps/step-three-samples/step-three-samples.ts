@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
 
 import { JobSubmissionStateService } from '../../services/job-submission-state';
 
@@ -6,6 +6,7 @@ import { JobSubmissionStateService } from '../../services/job-submission-state';
   selector: 'app-step-three-samples',
   imports: [],
   templateUrl: './step-three-samples.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './step-three-samples.scss'
 })
 export class StepThreeSamplesComponent {
