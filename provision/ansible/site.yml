@@ -23,9 +23,6 @@
           - wget
           - git
           - libpq-dev
-          - "python{{ python_version }}"
-          - "python{{ python_version }}-venv"
-          - "python{{ python_version }}-dev"
           - nginx
           - avahi-daemon
           - avahi-utils
@@ -226,9 +223,36 @@
         force: true
       tags: [backend]
 
+    - name: Download uv installer script
+      ansible.builtin.get_url:
+        url: https://astral.sh/uv/install.sh
+        dest: /tmp/uv-install.sh
+        mode: '0755'
+      tags: [backend]
+
+    - name: Install uv
+      ansible.builtin.command:
+        cmd: bash /tmp/uv-install.sh
+        creates: /root/.local/bin/uv
+      tags: [backend]
+
+    - name: Install Python via uv
+      ansible.builtin.command:
+        cmd: /root/.local/bin/uv python install "{{ python_version }}"
+      register: uv_python_install
+      changed_when: "'Installed' in uv_python_install.stdout"
+      tags: [backend]
+
+    - name: Find uv-managed Python interpreter path
+      ansible.builtin.command:
+        cmd: /root/.local/bin/uv python find "{{ python_version }}"
+      register: uv_python_path
+      changed_when: false
+      tags: [backend]
+
     - name: Create Python virtualenv
       ansible.builtin.command:
-        cmd: "python{{ python_version }} -m venv /opt/cupcake/venv"
+        cmd: "{{ uv_python_path.stdout }} -m venv /opt/cupcake/venv"
         creates: /opt/cupcake/venv/bin/activate
       tags: [backend]
 

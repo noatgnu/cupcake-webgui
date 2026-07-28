@@ -16,7 +16,7 @@ provisioner:
   name: ansible
   ansible_args:
     - --extra-vars
-    - install_whisper=false python_version=3.11 pg_version=15
+    - install_whisper=false python_version=3.12 pg_version=15
   playbooks:
     converge: ../default/converge.yml
     verify: ../default/verify.yml
