@@ -708,6 +708,13 @@
       notify: Restart avahi
       tags: [mdns]
 
+    - name: Create resolved.conf.d directory
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d
+        state: directory
+        mode: '0755'
+      tags: [mdns]
+
     - name: Configure systemd-resolved for mDNS
       ansible.builtin.copy:
         dest: /etc/systemd/resolved.conf.d/mdns.conf
@@ -718,13 +725,6 @@
       notify: Restart systemd-resolved
       tags: [mdns]
       become: true
-
-    - name: Create resolved.conf.d directory
-      ansible.builtin.file:
-        path: /etc/systemd/resolved.conf.d
-        state: directory
-        mode: '0755'
-      tags: [mdns]
 
     - name: Configure nsswitch for mDNS
       ansible.builtin.lineinfile:
