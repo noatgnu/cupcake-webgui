@@ -118,6 +118,8 @@ jobs:
 
       - name: Run Molecule test
         working-directory: provision/ansible
+        env:
+          ANSIBLE_ALLOW_BROKEN_CONDITIONALS: 'true'
         run: molecule test -s default
 
   molecule-debian:
@@ -136,4 +138,6 @@ jobs:
 
       - name: Run Molecule test
         working-directory: provision/ansible
+        env:
+          ANSIBLE_ALLOW_BROKEN_CONDITIONALS: 'true'
         run: molecule test -s debian

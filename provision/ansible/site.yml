@@ -1,6 +1,6 @@
 ---
 - name: Deploy Cupcake Appliance
-  hosts: cupcake
+  hosts: all
   become: true
 
   tasks:

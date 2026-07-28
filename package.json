@@ -41,7 +41,7 @@
     "@angular/router": "^22.0.8",
     "@ericblade/quagga2": "^1.8.4",
     "@ng-bootstrap/ng-bootstrap": "^21.0.0",
-    "@noatgnu/cupcake-core": "^1.4.0",
+    "@noatgnu/cupcake-core": "^1.4.1",
     "@noatgnu/cupcake-macaron": "^1.4.0",
     "@noatgnu/cupcake-mint-chocolate": "^1.3.0",
     "@noatgnu/cupcake-red-velvet": "^1.4.0",
