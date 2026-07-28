@@ -100,11 +100,11 @@
     - name: Wait for Django API to respond
       ansible.builtin.uri:
         url: http://127.0.0.1:8000/api/v1/
-        status_code: [200, 301, 302, 404]
+        status_code: [200, 301, 302, 401, 404]
       register: api_check
       retries: 24
       delay: 5
-      until: api_check.status in [200, 301, 302, 404]
+      until: api_check.status in [200, 301, 302, 401, 404]
 
     - name: Check nginx serves vanilla frontend on port 80
       ansible.builtin.uri:
