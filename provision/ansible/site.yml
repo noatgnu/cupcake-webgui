@@ -252,7 +252,7 @@
 
     - name: Create Python virtualenv
       ansible.builtin.command:
-        cmd: "{{ uv_python_path.stdout }} -m venv /opt/cupcake/venv"
+        cmd: "{{ uv_python_path.stdout }} -m venv --copies /opt/cupcake/venv"
         creates: /opt/cupcake/venv/bin/activate
       tags: [backend]
 
