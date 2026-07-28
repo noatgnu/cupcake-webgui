@@ -99,8 +99,11 @@ jobs:
         if: failure()
         run: |
           journalctl -u cupcake-backend --no-pager -n 50 || true
+          journalctl -u cupcake-rqworker --no-pager -n 50 || true
+          journalctl -u cupcake-transcribe-worker --no-pager -n 50 || true
           journalctl -u nginx --no-pager -n 20 || true
           journalctl -u postgresql --no-pager -n 20 || true
+          journalctl -u redis-server --no-pager -n 20 || true
 
   molecule-ubuntu:
     name: Molecule (Ubuntu 24.04)
