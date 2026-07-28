@@ -230,29 +230,44 @@
         mode: '0755'
       tags: [backend]
 
-    - name: Install uv
+    - name: Install uv into a world-readable location
       ansible.builtin.command:
         cmd: bash /tmp/uv-install.sh
-        creates: /root/.local/bin/uv
+        creates: /opt/uv-bin/uv
+      environment:
+        UV_INSTALL_DIR: /opt/uv-bin
+        UV_PYTHON_INSTALL_DIR: /opt/uv-python
       tags: [backend]
 
     - name: Install Python via uv
       ansible.builtin.command:
-        cmd: /root/.local/bin/uv python install "{{ python_version }}"
+        cmd: /opt/uv-bin/uv python install "{{ python_version }}"
+      environment:
+        UV_PYTHON_INSTALL_DIR: /opt/uv-python
       register: uv_python_install
       changed_when: "'Installed' in uv_python_install.stdout"
       tags: [backend]
 
     - name: Find uv-managed Python interpreter path
       ansible.builtin.command:
-        cmd: /root/.local/bin/uv python find "{{ python_version }}"
+        cmd: /opt/uv-bin/uv python find "{{ python_version }}"
+      environment:
+        UV_PYTHON_INSTALL_DIR: /opt/uv-python
       register: uv_python_path
       changed_when: false
       tags: [backend]
 
+    - name: Make uv Python install tree world-readable
+      ansible.builtin.file:
+        path: /opt/uv-python
+        state: directory
+        mode: '0755'
+        recurse: true
+      tags: [backend]
+
     - name: Create Python virtualenv
       ansible.builtin.command:
-        cmd: "{{ uv_python_path.stdout }} -m venv --copies /opt/cupcake/venv"
+        cmd: "{{ uv_python_path.stdout }} -m venv /opt/cupcake/venv"
         creates: /opt/cupcake/venv/bin/activate
       tags: [backend]
 
