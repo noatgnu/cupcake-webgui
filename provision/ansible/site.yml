@@ -221,12 +221,26 @@
         creates: /opt/cupcake/venv/bin/activate
       tags: [backend]
 
-    - name: Install Python dependencies
-      ansible.builtin.shell:
-        cmd: |
-          /opt/cupcake/venv/bin/pip install --upgrade pip
-          /opt/cupcake/venv/bin/pip install -r /opt/cupcake/backend/requirements.txt
-          /opt/cupcake/venv/bin/pip install gunicorn "uvicorn[standard]" psycopg2-binary
+    - name: Upgrade pip in virtualenv  # noqa: package-latest
+      ansible.builtin.pip:
+        name: pip
+        state: latest
+        virtualenv: /opt/cupcake/venv
+      tags: [backend]
+
+    - name: Install backend Python requirements
+      ansible.builtin.pip:
+        requirements: /opt/cupcake/backend/requirements.txt
+        virtualenv: /opt/cupcake/venv
+      tags: [backend]
+
+    - name: Install additional Python packages
+      ansible.builtin.pip:
+        name:
+          - gunicorn
+          - "uvicorn[standard]"
+          - psycopg2-binary
+        virtualenv: /opt/cupcake/venv
       tags: [backend]
 
     - name: Check if .env file exists
@@ -236,8 +250,8 @@
       tags: [backend]
 
     - name: Generate SECRET_KEY
-      ansible.builtin.shell:
-        cmd: openssl rand -base64 48 | tr -d '\n'
+      ansible.builtin.command:
+        cmd: openssl rand -base64 48
       register: secret_key_result
       changed_when: false
       no_log: true
@@ -245,7 +259,7 @@
       tags: [backend]
 
     - name: Generate COTURN_SECRET
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: openssl rand -hex 20
       register: coturn_secret_result
       changed_when: false
@@ -277,6 +291,7 @@
           set -a; source /opt/cupcake/.env; set +a
           /opt/cupcake/venv/bin/python manage.py migrate --noinput
         chdir: /opt/cupcake/backend
+      changed_when: false
       tags: [backend]
 
     - name: Collect static files
@@ -285,6 +300,7 @@
           set -a; source /opt/cupcake/.env; set +a
           /opt/cupcake/venv/bin/python manage.py collectstatic --noinput
         chdir: /opt/cupcake/backend
+      changed_when: false
       tags: [backend]
 
     - name: Create Django superuser
@@ -317,6 +333,7 @@
       ansible.builtin.git:
         repo: https://github.com/ggerganov/whisper.cpp.git
         dest: /opt/cupcake/whisper.cpp
+        version: master
         depth: 1
       when: install_whisper | bool
       tags: [whisper]
@@ -332,7 +349,7 @@
       tags: [whisper]
 
     - name: Download whisper model
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "bash /opt/cupcake/whisper.cpp/models/download-ggml-model.sh {{ whisper_model }}"
         chdir: /opt/cupcake/whisper.cpp/models
         creates: "/opt/cupcake/whisper.cpp/models/ggml-{{ whisper_model }}.bin"
@@ -381,9 +398,16 @@
 
     # ── Frontend ──────────────────────────────────────────────────────────────
 
+    - name: Download Node.js 22 setup script
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/setup_22.x
+        dest: /tmp/nodesource_setup.sh
+        mode: '0755'
+      tags: [frontend]
+
     - name: Add Node.js 22 repository
-      ansible.builtin.shell:
-        cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      ansible.builtin.command:
+        cmd: bash /tmp/nodesource_setup.sh
         creates: /etc/apt/sources.list.d/nodesource.list
       tags: [frontend]
 
@@ -406,6 +430,7 @@
           mkdir -p /opt/cupcake/webgui
           cp -r dist/cupcake/browser/* /opt/cupcake/webgui/
           rm -rf /tmp/cupcake-webgui
+      changed_when: true
       tags: [frontend]
 
     - name: Build and deploy cupcake-vanilla-ng
@@ -426,6 +451,7 @@
           mkdir -p /opt/cupcake/vanilla
           cp -r dist/cupcake-vanilla-ng/browser/* /opt/cupcake/vanilla/
           rm -rf /tmp/cupcake-vanilla-ng
+      changed_when: true
       tags: [frontend]
 
     - name: Set frontend ownership
@@ -718,7 +744,7 @@
           [Install]
           WantedBy=multi-user.target
       notify: Reload systemd
-      tags: [mdns]
+      tags: [mdns, services]
 
     - name: Enable avahi-daemon
       ansible.builtin.systemd:
@@ -812,27 +838,6 @@
           WantedBy=multi-user.target
       notify: Reload systemd
       tags: [services]
-
-    - name: Write cupcake-vanilla-mdns systemd unit
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/cupcake-vanilla-mdns.service
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Publish vanilla.local mDNS A record
-          After=network-online.target avahi-daemon.service
-          Wants=network-online.target
-
-          [Service]
-          Type=simple
-          ExecStart=/usr/local/bin/cupcake-vanilla-mdns
-          Restart=always
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-      notify: Reload systemd
-      tags: [services, mdns]
 
     - name: Enable and start cupcake services
       ansible.builtin.systemd:
