@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
+import { provideRouter } from '@angular/router';
 import { CUPCAKE_CORE_CONFIG, AuthService, ToastService, UserManagementService } from '@noatgnu/cupcake-core';
 import { UserProfile } from './user-profile';
 
@@ -40,6 +41,7 @@ describe('UserProfile', () => {
     await TestBed.configureTestingModule({
       imports: [UserProfile],
       providers: [
+        provideRouter([]),
         { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
         { provide: AuthService, useValue: mockAuthService },
         { provide: UserManagementService, useValue: mockUserManagementService },

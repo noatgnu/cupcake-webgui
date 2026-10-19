@@ -1,0 +1,21 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <h4 class="navbar-brand m-0 fw-bold">
+        <i class="bi bi-cloud-download me-2"></i>Import from protocols.io
+      </h4>
+    </div>
+  </nav>
+
+  <div class="flex-grow-1 p-3 overflow-auto">
+    <div class="row">
+      <div class="col-lg-8 mx-auto">
+        <app-protocols-io-browser
+          actionLabel="Import"
+          [busyUri]="importingUri()"
+          (protocolChosen)="importProtocol($event)">
+        </app-protocols-io-browser>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,88 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <h4 class="navbar-brand m-0 fw-bold">
+        <i class="bi bi-plug me-2"></i>protocols.io Account
+      </h4>
+    </div>
+  </nav>
+
+  <div class="flex-grow-1 p-4 overflow-auto">
+    <div class="row">
+      <div class="col-lg-8 mx-auto">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-cloud me-2"></i>Connected account
+            </h6>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb breadcrumb-sm mb-0">
+                <li class="breadcrumb-item">
+                  <a routerLink="/home/profile"><i class="bi bi-person-circle"></i></a>
+                </li>
+                <li class="breadcrumb-item active"><span>protocols.io</span></li>
+              </ol>
+            </nav>
+          </div>
+          <div class="card-body">
+            @if (loading()) {
+              <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            } @else {
+              @if (status()?.connected) {
+                <dl class="row mb-3">
+                  <dt class="col-sm-3">Account</dt>
+                  <dd class="col-sm-9 account-name">{{ status()?.name || status()?.username }} ({{ status()?.username }})</dd>
+                  <dt class="col-sm-3">Connected</dt>
+                  <dd class="col-sm-9">{{ status()?.connectedAt | date: 'medium' }}</dd>
+                  <dt class="col-sm-3">Last used</dt>
+                  <dd class="col-sm-9">{{ status()?.lastUsedAt ? (status()?.lastUsedAt | date: 'medium') : 'Not used yet' }}</dd>
+                </dl>
+                @if (confirmingDisconnect()) {
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="small">Remove the saved token from Cupcake?</span>
+                    <button type="button" class="btn btn-sm btn-danger confirm-disconnect" (click)="disconnect()" [disabled]="saving()">Disconnect</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="confirmingDisconnect.set(false)" [disabled]="saving()">Cancel</button>
+                  </div>
+                } @else {
+                  <button type="button" class="btn btn-sm btn-outline-danger mb-3 start-disconnect" (click)="confirmingDisconnect.set(true)">
+                    <i class="bi bi-x-circle me-1"></i>Disconnect
+                  </button>
+                }
+                <h6 class="border-top pt-3">Replace token</h6>
+              } @else {
+                <p class="text-muted">
+                  Connect your protocols.io account to browse your workspaces, import protocols and export Cupcake protocols.
+                  Get an access token from the <a [href]="developerPageUrl" target="_blank" rel="noopener">protocols.io developer page</a>.
+                </p>
+              }
+              <form (ngSubmit)="connect()">
+                <div class="mb-3">
+                  <label for="protocolsIoToken" class="form-label">Access token</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="protocolsIoToken"
+                    name="token"
+                    autocomplete="off"
+                    [ngModel]="token()"
+                    (ngModelChange)="token.set($event)"
+                    [disabled]="saving()">
+                </div>
+                <button type="submit" class="btn btn-primary" [disabled]="saving() || !token().trim()">
+                  @if (saving()) {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                  }
+                  {{ status()?.connected ? 'Replace Token' : 'Connect' }}
+                </button>
+              </form>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

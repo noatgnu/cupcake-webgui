@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import { ToastService } from '@noatgnu/cupcake-core';
@@ -21,6 +22,7 @@ describe('ProtocolCreateModal', () => {
     await TestBed.configureTestingModule({
       imports: [ProtocolCreateModal, ReactiveFormsModule],
       providers: [
+        provideRouter([]),
         { provide: ProtocolService, useValue: mockProtocolService },
         { provide: ToastService, useValue: mockToastService },
         { provide: NgbActiveModal, useValue: mockActiveModal }
@@ -34,6 +36,16 @@ describe('ProtocolCreateModal', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should close and open the protocols.io browser', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    component.toggleMode();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.browse-protocols-io') as HTMLButtonElement).click();
+    expect(mockActiveModal.dismiss).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/protocols/protocols-io']);
   });
 
   it('should initialize with empty form', () => {

@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AuthService, ToastService, User, UserManagementService, ThemeService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-user-profile',
-  imports: [FormsModule, NgClass],
+  imports: [FormsModule, NgClass, RouterLink],
   templateUrl: './user-profile.html',
   styleUrl: './user-profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

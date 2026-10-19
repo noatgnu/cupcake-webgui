@@ -37,6 +37,10 @@ export const routes: Routes = [
             loadComponent: () => import('./features/home/user-profile/user-profile').then(m => m.UserProfile)
           },
           {
+            path: 'integrations/protocols-io',
+            loadComponent: () => import('./features/home/protocols-io-account/protocols-io-account').then(m => m.ProtocolsIoAccount)
+          },
+          {
             path: 'devices',
             loadComponent: () => import('./features/home/devices-view/devices-view').then(m => m.DevicesView)
           },
@@ -74,6 +78,10 @@ export const routes: Routes = [
           {
             path: 'sessions/:id',
             loadComponent: () => import('./features/protocols/session-detail/session-detail').then(m => m.SessionDetail)
+          },
+          {
+            path: 'protocols-io',
+            loadComponent: () => import('./features/protocols/protocols-io-import/protocols-io-import').then(m => m.ProtocolsIoImport)
           },
           {
             path: 'timers',

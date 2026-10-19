@@ -278,7 +278,10 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       currentValue: currentValue,
       context: 'table',
       tableId: table.id,
-      enableMultiSampleEdit: false
+      enableMultiSampleEdit: false,
+      allowNotApplicable: column.notApplicable,
+      allowNotAvailable: column.notAvailable,
+      possibleDefaultValues: column.possibleDefaultValues
     };
 
     const modalRef = this.modalService.open(MetadataValueEditModal, {
@@ -328,7 +331,10 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       currentValue: column.value || '',
       context: 'table',
       tableId: table.id,
-      enableMultiSampleEdit: true
+      enableMultiSampleEdit: true,
+      allowNotApplicable: column.notApplicable,
+      allowNotAvailable: column.notAvailable,
+      possibleDefaultValues: column.possibleDefaultValues
     };
 
     const modalRef = this.modalService.open(MetadataValueEditModal, {
@@ -991,7 +997,10 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       currentValue: poolColumn.value || '',
       context: 'pool',
       tableId: table.id,
-      poolId: pool.id
+      poolId: pool.id,
+      allowNotApplicable: poolColumn.notApplicable,
+      allowNotAvailable: poolColumn.notAvailable,
+      possibleDefaultValues: poolColumn.possibleDefaultValues
     };
 
     const modalRef = this.modalService.open(MetadataValueEditModal, {

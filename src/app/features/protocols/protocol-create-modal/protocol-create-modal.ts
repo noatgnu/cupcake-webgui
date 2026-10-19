@@ -2,6 +2,7 @@ import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/cor
 
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Router } from '@angular/router';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import { ToastService } from '@noatgnu/cupcake-core';
 
@@ -17,6 +18,7 @@ export class ProtocolCreateModal {
   private protocolService = inject(ProtocolService);
   private toastService = inject(ToastService);
   activeModal = inject(NgbActiveModal);
+  private router = inject(Router);
 
   protocolForm: FormGroup = this.fb.group({
     protocolTitle: ['', Validators.required],
@@ -81,6 +83,11 @@ export class ProtocolCreateModal {
         this.saving.set(false);
       }
     });
+  }
+
+  browseProtocolsIO(): void {
+    this.activeModal.dismiss();
+    this.router.navigate(['/protocols/protocols-io']);
   }
 
   cancel(): void {
