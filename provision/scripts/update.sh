@@ -15,6 +15,18 @@ set -a
 source "$ENV_FILE"
 set +a
 
+install_requirements() {
+    local requirements="$1"
+    local filtered
+    filtered=$(mktemp)
+    if ls -d "$BACKEND_DIR"/packages/*/ >/dev/null 2>&1; then
+        "$VENV/bin/pip" install --quiet "$BACKEND_DIR"/packages/*/
+    fi
+    grep -v "packages/" "$requirements" > "$filtered"
+    "$VENV/bin/pip" install --quiet -r "$filtered"
+    rm -f "$filtered"
+}
+
 backup_state() {
     echo "--- Creating backup at $BACKUP_DIR ---"
     mkdir -p "$BACKUP_DIR"
@@ -40,7 +52,7 @@ do_update() {
     fi
 
     "$VENV/bin/pip" install --upgrade pip
-    "$VENV/bin/pip" install -r requirements.txt
+    install_requirements "$BACKEND_DIR/requirements.txt"
     "$VENV/bin/python" manage.py migrate --noinput
     "$VENV/bin/python" manage.py collectstatic --noinput
 }
@@ -78,7 +90,7 @@ revert_state() {
 
     echo "--- Reverting backend code ---"
     git -C "$BACKEND_DIR" checkout "$pre_commit"
-    "$VENV/bin/pip" install --quiet -r "$BACKUP_DIR/requirements.txt"
+    install_requirements "$BACKUP_DIR/requirements.txt"
 
     echo "--- Restoring database ---"
     PGPASSWORD="$POSTGRES_PASSWORD" psql \

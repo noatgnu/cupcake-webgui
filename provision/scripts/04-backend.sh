@@ -15,7 +15,11 @@ fi
 
 # Install Python dependencies
 /opt/cupcake/venv/bin/pip install --upgrade pip
-/opt/cupcake/venv/bin/pip install -r /opt/cupcake/backend/requirements.txt
+if ls -d /opt/cupcake/backend/packages/*/ >/dev/null 2>&1; then
+    /opt/cupcake/venv/bin/pip install /opt/cupcake/backend/packages/*/
+fi
+grep -v "packages/" /opt/cupcake/backend/requirements.txt > /tmp/cupcake-backend-requirements.txt
+/opt/cupcake/venv/bin/pip install -r /tmp/cupcake-backend-requirements.txt
 /opt/cupcake/venv/bin/pip install gunicorn uvicorn[standard] psycopg2-binary
 
 # Create .env file

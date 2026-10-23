@@ -46,7 +46,11 @@ jobs:
           python3 -m venv /tmp/venv
           /tmp/venv/bin/pip install --upgrade pip --quiet
           git clone --depth 1 https://github.com/noatgnu/cupcake_vanilla.git /tmp/backend
-          /tmp/venv/bin/pip install -r /tmp/backend/requirements.txt --quiet
+          if ls -d /tmp/backend/packages/*/ >/dev/null 2>&1; then
+            /tmp/venv/bin/pip install /tmp/backend/packages/*/ --quiet
+          fi
+          grep -v "packages/" /tmp/backend/requirements.txt > /tmp/backend-requirements.txt
+          /tmp/venv/bin/pip install -r /tmp/backend-requirements.txt --quiet
           /tmp/venv/bin/pip install gunicorn "uvicorn[standard]" --quiet
 
       - name: Build whisper.cpp and download tiny.en model
