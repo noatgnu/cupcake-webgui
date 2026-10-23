@@ -104,6 +104,13 @@ export class ProtocolEditor implements OnInit {
     });
   }
 
+  exportToProtocolsIO(): void {
+    const protocolId = this.protocol()?.id;
+    if (protocolId) {
+      this.router.navigate(['/protocols', protocolId, 'export', 'protocols-io']);
+    }
+  }
+
   loadSections(protocolId: number): void {
     this.sectionService.getProtocolSections({ protocol: protocolId, ordering: 'order' }).subscribe({
       next: (response) => {

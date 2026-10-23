@@ -1,9 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
-import { ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolModel, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
 import { ProtocolEditor } from './protocol-editor';
 
 describe('ProtocolEditor', () => {
@@ -40,6 +40,16 @@ describe('ProtocolEditor', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should open the protocols.io export page for the loaded protocol', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    component.exportToProtocolsIO();
+    expect(router.navigate).not.toHaveBeenCalled();
+    component.protocol.set({ id: 7 } as ProtocolModel);
+    component.exportToProtocolsIO();
+    expect(router.navigate).toHaveBeenCalledWith(['/protocols', 7, 'export', 'protocols-io']);
   });
 
   it('protocol signal starts as null', () => {

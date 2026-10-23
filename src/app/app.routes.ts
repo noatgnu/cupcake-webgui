@@ -80,12 +80,20 @@ export const routes: Routes = [
             loadComponent: () => import('./features/protocols/session-detail/session-detail').then(m => m.SessionDetail)
           },
           {
+            path: 'sessions/:id/export/protocols-io',
+            loadComponent: () => import('./features/protocols/protocols-io-session-export/protocols-io-session-export').then(m => m.ProtocolsIoSessionExport)
+          },
+          {
             path: 'protocols-io',
             loadComponent: () => import('./features/protocols/protocols-io-import/protocols-io-import').then(m => m.ProtocolsIoImport)
           },
           {
             path: 'timers',
             loadComponent: () => import('./features/protocols/timekeeper-standalone/timekeeper-standalone').then(m => m.TimekeeperStandalone)
+          },
+          {
+            path: ':id/export/protocols-io',
+            loadComponent: () => import('./features/protocols/protocols-io-export/protocols-io-export').then(m => m.ProtocolsIoExport)
           },
           {
             path: ':id/edit',

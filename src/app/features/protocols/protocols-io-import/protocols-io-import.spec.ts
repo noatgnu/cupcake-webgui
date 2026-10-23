@@ -3,20 +3,20 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ToastService } from '@noatgnu/cupcake-core';
+import { ProtocolModel } from '@noatgnu/cupcake-red-velvet';
 import {
-  ProtocolModel,
   ProtocolsIOAccountService,
   ProtocolsIOBrowseService,
   ProtocolsIOProtocolEntry,
-  ProtocolService
-} from '@noatgnu/cupcake-red-velvet';
+  ProtocolsIOProtocolService
+} from '@noatgnu/cupcake-protocols-io';
 
 import { ProtocolsIoImport } from './protocols-io-import';
 
 describe('ProtocolsIoImport', () => {
   let component: ProtocolsIoImport;
   let fixture: ComponentFixture<ProtocolsIoImport>;
-  let protocolService: jasmine.SpyObj<ProtocolService>;
+  let protocolService: jasmine.SpyObj<ProtocolsIOProtocolService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let router: Router;
 
@@ -26,7 +26,7 @@ describe('ProtocolsIoImport', () => {
   };
 
   beforeEach(async () => {
-    protocolService = jasmine.createSpyObj('ProtocolService', ['importFromProtocolsIOAccount']);
+    protocolService = jasmine.createSpyObj('ProtocolsIOProtocolService', ['importFromAccount']);
     toastService = jasmine.createSpyObj('ToastService', ['success', 'error', 'warning', 'info']);
     const accountService = jasmine.createSpyObj('ProtocolsIOAccountService', ['getStatus']);
     accountService.getStatus.and.returnValue(of({ connected: false }));
@@ -34,7 +34,7 @@ describe('ProtocolsIoImport', () => {
       imports: [ProtocolsIoImport],
       providers: [
         provideRouter([]),
-        { provide: ProtocolService, useValue: protocolService },
+        { provide: ProtocolsIOProtocolService, useValue: protocolService },
         { provide: ToastService, useValue: toastService },
         { provide: ProtocolsIOAccountService, useValue: accountService },
         { provide: ProtocolsIOBrowseService, useValue: jasmine.createSpyObj('ProtocolsIOBrowseService', ['getWorkspaces']) }
@@ -48,16 +48,16 @@ describe('ProtocolsIoImport', () => {
   });
 
   it('should import the chosen protocol and open it in the editor', () => {
-    protocolService.importFromProtocolsIOAccount.and.returnValue(of({ id: 41 } as ProtocolModel));
+    protocolService.importFromAccount.and.returnValue(of({ id: 41 } as ProtocolModel));
     component.importProtocol(entry);
-    expect(protocolService.importFromProtocolsIOAccount).toHaveBeenCalledWith('cupcake-export-test-kqcbcvssp');
+    expect(protocolService.importFromAccount).toHaveBeenCalledWith('cupcake-export-test-kqcbcvssp');
     expect(router.navigate).toHaveBeenCalledWith(['/protocols', 41, 'edit']);
     expect(toastService.success).toHaveBeenCalledWith('Imported Cupcake export test');
     expect(component.importingUri()).toBeNull();
   });
 
   it('should report a failed import', () => {
-    protocolService.importFromProtocolsIOAccount.and.returnValue(throwError(() => new HttpErrorResponse({
+    protocolService.importFromAccount.and.returnValue(throwError(() => new HttpErrorResponse({
       status: 400, error: { error: 'Only protocols can be imported' }
     })));
     component.importProtocol(entry);

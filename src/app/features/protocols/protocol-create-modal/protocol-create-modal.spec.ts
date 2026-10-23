@@ -3,7 +3,8 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolModel, ProtocolService } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolsIOProtocolService } from '@noatgnu/cupcake-protocols-io';
 import { ToastService } from '@noatgnu/cupcake-core';
 import { ProtocolCreateModal } from './protocol-create-modal';
 
@@ -11,11 +12,13 @@ describe('ProtocolCreateModal', () => {
   let component: ProtocolCreateModal;
   let fixture: ComponentFixture<ProtocolCreateModal>;
   let mockProtocolService: jasmine.SpyObj<ProtocolService>;
+  let mockProtocolsIOProtocolService: jasmine.SpyObj<ProtocolsIOProtocolService>;
   let mockToastService: jasmine.SpyObj<ToastService>;
   let mockActiveModal: jasmine.SpyObj<NgbActiveModal>;
 
   beforeEach(async () => {
     mockProtocolService = jasmine.createSpyObj('ProtocolService', ['createProtocol']);
+    mockProtocolsIOProtocolService = jasmine.createSpyObj('ProtocolsIOProtocolService', ['importFromUrl']);
     mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error']);
     mockActiveModal = jasmine.createSpyObj('NgbActiveModal', ['close', 'dismiss']);
 
@@ -24,6 +27,7 @@ describe('ProtocolCreateModal', () => {
       providers: [
         provideRouter([]),
         { provide: ProtocolService, useValue: mockProtocolService },
+        { provide: ProtocolsIOProtocolService, useValue: mockProtocolsIOProtocolService },
         { provide: ToastService, useValue: mockToastService },
         { provide: NgbActiveModal, useValue: mockActiveModal }
       ]
@@ -149,5 +153,17 @@ describe('ProtocolCreateModal', () => {
     expect(component.saving()).toBeFalse();
     component.createProtocol();
     expect(component.saving()).toBeTrue();
+  });
+
+  it('should import a protocol from a protocols.io address and close the modal', () => {
+    const imported = { id: 40, protocolTitle: 'Lysis' } as ProtocolModel;
+    mockProtocolsIOProtocolService.importFromUrl.and.returnValue(of(imported));
+    component.toggleMode();
+    component.importForm.setValue({ protocolsIOUrl: 'https://www.protocols.io/view/lysis-abc' });
+
+    component.importProtocol();
+
+    expect(mockProtocolsIOProtocolService.importFromUrl).toHaveBeenCalledWith('https://www.protocols.io/view/lysis-abc');
+    expect(mockActiveModal.close).toHaveBeenCalledWith(imported);
   });
 });

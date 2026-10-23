@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { Router } from '@angular/router';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolsIOProtocolService } from '@noatgnu/cupcake-protocols-io';
 import { ToastService } from '@noatgnu/cupcake-core';
 
 @Component({
@@ -16,6 +17,7 @@ import { ToastService } from '@noatgnu/cupcake-core';
 export class ProtocolCreateModal {
   private fb = inject(FormBuilder);
   private protocolService = inject(ProtocolService);
+  private protocolsIOProtocolService = inject(ProtocolsIOProtocolService);
   private toastService = inject(ToastService);
   activeModal = inject(NgbActiveModal);
   private router = inject(Router);
@@ -73,7 +75,7 @@ export class ProtocolCreateModal {
     this.saving.set(true);
     const url = this.importForm.value.protocolsIOUrl;
 
-    this.protocolService.importFromProtocolsIO(url).subscribe({
+    this.protocolsIOProtocolService.importFromUrl(url).subscribe({
       next: (protocol) => {
         this.toastService.success('Protocol imported successfully from protocols.io');
         this.activeModal.close(protocol);

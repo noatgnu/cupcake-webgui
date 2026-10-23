@@ -10,7 +10,7 @@ import {
   ProtocolsIOPage,
   ProtocolsIOProtocolEntry,
   ProtocolsIOWorkspace
-} from '@noatgnu/cupcake-red-velvet';
+} from '@noatgnu/cupcake-protocols-io';
 
 import { ProtocolsIoBrowser } from './protocols-io-browser';
 
@@ -36,7 +36,7 @@ describe('ProtocolsIoBrowser', () => {
   };
   const collection: ProtocolsIOProtocolEntry = { ...protocol, id: 5, uri: 'lysis-collection', title: 'Lysis collection', protocolType: 'collection', importable: false };
 
-  async function create(connected = true): Promise<void> {
+  async function create(connected = true, mode: 'protocol' | 'folder' = 'protocol'): Promise<void> {
     accountService.getStatus.and.returnValue(of({ connected }));
     await TestBed.configureTestingModule({
       imports: [ProtocolsIoBrowser],
@@ -49,6 +49,7 @@ describe('ProtocolsIoBrowser', () => {
     }).compileComponents();
     fixture = TestBed.createComponent(ProtocolsIoBrowser);
     component = fixture.componentInstance;
+    fixture.componentRef.setInput('mode', mode);
     fixture.detectChanges();
   }
 
@@ -95,6 +96,19 @@ describe('ProtocolsIoBrowser', () => {
     buttons[0].click();
     component.choose(collection);
     expect(chosen).toEqual([protocol]);
+  });
+
+  it('should offer only folders in folder mode', async () => {
+    browseService.getFolderItems.and.returnValue(of(page<ProtocolsIOFolderEntry | ProtocolsIOProtocolEntry>([folder, protocol])));
+    await create(true, 'folder');
+    expect(fixture.nativeElement.querySelector('input[type="search"]')).toBeNull();
+    const chosen: ProtocolsIOFolderEntry[] = [];
+    component.folderChosen.subscribe(entry => chosen.push(entry));
+    component.openFolder(folder);
+    expect(rows('.protocol-row').length).toBe(0);
+    (rows('.choose-folder')[0] as HTMLButtonElement).click();
+    expect(chosen).toEqual([folder]);
+    expect(component.crumbs().length).toBe(2);
   });
 
   it('should page through folder contents', async () => {

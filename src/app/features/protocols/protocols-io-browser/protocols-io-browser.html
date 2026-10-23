@@ -4,7 +4,7 @@
       <h6 class="mb-0">
         <i class="bi bi-cloud me-2"></i>protocols.io
       </h6>
-      @if (connected()) {
+      @if (connected() && mode() === 'protocol') {
         <form class="d-flex gap-1" (ngSubmit)="search()">
           <input
             type="search"
@@ -61,7 +61,7 @@
         @if (current().level === 'search') {
           <small>No protocols match your search</small>
         } @else {
-          <small>No folders or protocols here</small>
+          <small>{{ mode() === 'folder' ? 'No folders here' : 'No folders or protocols here' }}</small>
         }
       </div>
     } @else {
@@ -74,7 +74,14 @@
         @for (entry of entries(); track $index) {
           @if (entry.kind === 'folder') {
             <div class="list-group-item list-group-item-action folder-row" role="button" (click)="openFolder(entry)">
-              <div class="fw-semibold"><i class="bi bi-folder me-2"></i>{{ entry.title }}</div>
+              <div class="d-flex align-items-center gap-2">
+                <div class="fw-semibold flex-grow-1 min-width-0 text-truncate"><i class="bi bi-folder me-2"></i>{{ entry.title }}</div>
+                @if (mode() === 'folder') {
+                  <button type="button" class="btn btn-sm btn-outline-primary choose-folder" (click)="chooseFolder(entry, $event)">
+                    {{ actionLabel() }}
+                  </button>
+                }
+              </div>
             </div>
           } @else {
             <div class="list-group-item protocol-row">

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { ToastService } from '@noatgnu/cupcake-core';
-import { ProtocolsIOAccountService, ProtocolsIOAccountStatus } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolsIOAccountService, ProtocolsIOAccountStatus } from '@noatgnu/cupcake-protocols-io';
 
 @Component({
   selector: 'app-protocols-io-account',

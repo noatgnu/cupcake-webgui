@@ -13,7 +13,7 @@ import {
   ProtocolsIOPage,
   ProtocolsIOProtocolEntry,
   ProtocolsIOWorkspace
-} from '@noatgnu/cupcake-red-velvet';
+} from '@noatgnu/cupcake-protocols-io';
 
 type BrowseLevel = 'workspaces' | 'workspace' | 'folder' | 'search';
 
@@ -40,7 +40,9 @@ export class ProtocolsIoBrowser implements OnInit {
 
   actionLabel = input('Select');
   busyUri = input<string | null>(null);
+  mode = input<'protocol' | 'folder'>('protocol');
   protocolChosen = output<ProtocolsIOProtocolEntry>();
+  folderChosen = output<ProtocolsIOFolderEntry>();
 
   connected = signal<boolean | null>(null);
   loading = signal(false);
@@ -81,7 +83,7 @@ export class ProtocolsIoBrowser implements OnInit {
       crumb.level === 'folder' ? this.browseService.getFolderItems(crumb.ref, this.page()) :
       this.browseService.search(crumb.ref, this.page());
     this.fetch(request, page => {
-      this.entries.set(page.items);
+      this.entries.set(this.mode() === 'folder' ? page.items.filter(item => item.kind === 'folder') : page.items);
       this.workspaces.set([]);
     });
   }
@@ -119,6 +121,11 @@ export class ProtocolsIoBrowser implements OnInit {
     if (entry.importable) {
       this.protocolChosen.emit(entry);
     }
+  }
+
+  chooseFolder(folder: ProtocolsIOFolderEntry, event: Event): void {
+    event.stopPropagation();
+    this.folderChosen.emit(folder);
   }
 
   modifiedDate(entry: ProtocolsIOProtocolEntry): number | null {

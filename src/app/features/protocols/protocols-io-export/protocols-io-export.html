@@ -1,0 +1,144 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center gap-3">
+        <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/protocols', protocolId(), 'edit']">
+          <i class="bi bi-arrow-left me-1"></i>
+          Back
+        </a>
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-cloud-upload me-2"></i>Export to protocols.io
+        </h4>
+      </div>
+    </div>
+  </nav>
+
+  <div class="flex-grow-1 p-3 overflow-auto">
+    <div class="row">
+      <div class="col-lg-8 mx-auto d-flex flex-column gap-3">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-journal-medical me-2"></i>{{ protocol()?.protocolTitle || 'Protocol' }}
+            </h6>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb breadcrumb-sm mb-0">
+                <li class="breadcrumb-item">
+                  <a routerLink="/protocols"><i class="bi bi-house-door"></i></a>
+                </li>
+                <li class="breadcrumb-item">
+                  <a [routerLink]="['/protocols', protocolId(), 'edit']">{{ protocol()?.protocolTitle || 'Protocol' }}</a>
+                </li>
+                <li class="breadcrumb-item active"><span>Export to protocols.io</span></li>
+              </ol>
+            </nav>
+          </div>
+          <div class="card-body">
+            @if (connected() === null) {
+              <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            } @else if (connected() === false) {
+              <div class="empty-state-small text-center text-muted p-3 not-connected">
+                <i class="bi bi-plug fs-2 mb-2 d-block"></i>
+                <small>Connect your protocols.io account to export protocols.</small>
+                <a routerLink="/home/integrations/protocols-io" class="small mt-1">Connect an account</a>
+              </div>
+            } @else if (taskId()) {
+              @if (task(); as current) {
+                @if (!finished()) {
+                  <div class="mb-1 small">{{ current.progressDescription || 'Queued' }}</div>
+                  <div class="progress" role="progressbar" [attr.aria-valuenow]="progress()" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" [style.width.%]="progress()"></div>
+                  </div>
+                } @else if (result(); as exported) {
+                  <div class="alert alert-success export-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Exported {{ exported.stepsSaved }} step(s) to
+                    <a [href]="exported.protocolUrl" target="_blank" rel="noopener">{{ exported.protocolUri }}</a>.
+                    <div class="small mt-1">
+                      {{ exported.stepsDeleted.length }} step(s) removed, {{ exported.imagesUploaded }} image(s) uploaded.
+                    </div>
+                  </div>
+                  @if (exported.warnings.length > 0) {
+                    <h6>Warnings</h6>
+                    <ul class="list-group list-group-flush small mb-3 export-warnings">
+                      @for (warning of exported.warnings; track $index) {
+                        <li class="list-group-item"><i class="bi bi-exclamation-triangle text-warning me-2"></i>{{ warning }}</li>
+                      }
+                    </ul>
+                  }
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportAgain()">Export again</button>
+                } @else {
+                  <div class="alert alert-danger export-failure">
+                    <i class="bi bi-x-circle me-2"></i>{{ current.errorMessage || 'The export failed' }}
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportAgain()">Try again</button>
+                }
+              } @else {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              }
+            } @else if (target(); as chosen) {
+              <div class="alert alert-warning confirm-target">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                The title, description, materials, steps and step times of
+                <strong>{{ chosen.title }}</strong>
+                @if (chosen.workspace) {
+                  in the workspace <strong>{{ chosen.workspace }}</strong>
+                }
+                will be replaced with this protocol.
+              </div>
+              <div class="mb-3">
+                <label for="scalingFactor" class="form-label">Scaling factor</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="scalingFactor"
+                  name="scalingFactor"
+                  min="0"
+                  step="any"
+                  [ngModel]="scalingFactor()"
+                  (ngModelChange)="scalingFactor.set($event)">
+                <div class="form-text">Multiplies scaled quantities of scalable reagents.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary start-export" (click)="startExport()" [disabled]="queuing()">
+                  @if (queuing()) {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                  }
+                  Export
+                </button>
+                <button type="button" class="btn btn-secondary" (click)="chooseAnother()" [disabled]="queuing()">Choose another</button>
+              </div>
+            } @else {
+              <p class="text-muted">
+                Create an empty protocol on protocols.io in the workspace where it should live, then choose it below
+                or paste its address. Its content will be replaced with this protocol.
+              </p>
+              <form class="d-flex gap-2" (ngSubmit)="usePastedAddress()">
+                <input
+                  type="text"
+                  class="form-control"
+                  name="pastedAddress"
+                  placeholder="protocols.io address"
+                  [ngModel]="pastedAddress()"
+                  (ngModelChange)="pastedAddress.set($event)">
+                <button type="submit" class="btn btn-outline-secondary use-address" [disabled]="!pastedAddress().trim()">Use</button>
+              </form>
+            }
+          </div>
+        </div>
+
+        @if (connected() && !taskId() && !target()) {
+          <app-protocols-io-browser actionLabel="Select" (protocolChosen)="chooseProtocol($event)"></app-protocols-io-browser>
+        }
+      </div>
+    </div>
+  </div>
+</div>

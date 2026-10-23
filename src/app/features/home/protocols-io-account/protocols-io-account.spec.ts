@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ToastService } from '@noatgnu/cupcake-core';
-import { ProtocolsIOAccountService, ProtocolsIOAccountStatus } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolsIOAccountService, ProtocolsIOAccountStatus } from '@noatgnu/cupcake-protocols-io';
 
 import { ProtocolsIoAccount } from './protocols-io-account';
 

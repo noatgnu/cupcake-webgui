@@ -68,6 +68,13 @@
                 <i class="bi bi-file-earmark-arrow-down me-1"></i>
                 Export HTML
               </button>
+              <a
+                class="btn btn-sm btn-outline-primary export-protocols-io"
+                [routerLink]="['/protocols/sessions', session()!.id, 'export', 'protocols-io']"
+                title="Export session annotations to protocols.io runs">
+                <i class="bi bi-cloud-upload me-1"></i>
+                Export to protocols.io
+              </a>
             }
             @if (session() && webrtcFeatureEnabled()) {
               <button

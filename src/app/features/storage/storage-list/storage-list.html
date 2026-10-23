@@ -12,54 +12,48 @@
             Scan Barcode
           </button>
           @if (selectedStorage()) {
-            <div class="d-flex flex-column gap-1">
-              <div class="input-group input-group-sm" style="min-width: 250px;">
-                <span class="input-group-text">
-                  <i class="bi bi-search"></i>
-                </span>
+            <div class="input-group input-group-sm reagent-search">
+              <span class="input-group-text">
+                <i class="bi bi-search"></i>
+              </span>
+              <input
+                type="search"
+                class="form-control"
+                placeholder="Search reagents..."
+                aria-label="Search reagents"
+                [(ngModel)]="reagentSearch"
+                (ngModelChange)="onReagentSearchChange()">
+              <span class="input-group-text" title="Include nested storage">
                 <input
-                  type="search"
-                  class="form-control"
-                  placeholder="Search reagents..."
-                  [(ngModel)]="reagentSearch"
-                  (ngModelChange)="onReagentSearchChange()">
-              </div>
-              <div class="form-check form-check-sm">
-                <input
-                  class="form-check-input"
+                  class="form-check-input mt-0 me-1"
                   type="checkbox"
                   id="includeSubStorageSearch"
                   [(ngModel)]="includeSubStorage"
                   (ngModelChange)="onReagentSearchChange()">
-                <label class="form-check-label small text-muted" for="includeSubStorageSearch">
-                  Include nested storage
-                </label>
-              </div>
+                <label class="small mb-0" for="includeSubStorageSearch">Nested</label>
+              </span>
             </div>
-          }
-          @if (selectedStorage()) {
-            <div class="d-flex flex-column gap-1">
-              <div class="d-flex gap-1">
-                <input
-                  type="number"
-                  class="form-control form-control-sm"
-                  placeholder="Min MW (g/mol)"
-                  style="width: 130px;"
-                  [(ngModel)]="molecularWeightMin"
-                  (ngModelChange)="onReagentFilterChange()"
-                  min="0"
-                  step="0.01">
-                <input
-                  type="number"
-                  class="form-control form-control-sm"
-                  placeholder="Max MW (g/mol)"
-                  style="width: 130px;"
-                  [(ngModel)]="molecularWeightMax"
-                  (ngModelChange)="onReagentFilterChange()"
-                  min="0"
-                  step="0.01">
-              </div>
-              <small class="text-muted" style="font-size: 0.75rem;">Filter by molecular weight</small>
+            <div class="input-group input-group-sm molecular-weight-filter" title="Filter by molecular weight">
+              <span class="input-group-text">MW</span>
+              <input
+                type="number"
+                class="form-control"
+                placeholder="Min"
+                aria-label="Minimum molecular weight in g/mol"
+                [(ngModel)]="molecularWeightMin"
+                (ngModelChange)="onReagentFilterChange()"
+                min="0"
+                step="0.01">
+              <input
+                type="number"
+                class="form-control"
+                placeholder="Max"
+                aria-label="Maximum molecular weight in g/mol"
+                [(ngModel)]="molecularWeightMax"
+                (ngModelChange)="onReagentFilterChange()"
+                min="0"
+                step="0.01">
+              <span class="input-group-text">g/mol</span>
             </div>
           }
           <button class="btn btn-sm btn-primary" (click)="openCreateModal(currentStorage())">

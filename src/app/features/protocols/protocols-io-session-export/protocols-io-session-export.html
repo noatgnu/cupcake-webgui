@@ -1,0 +1,212 @@
+<div class="container-fluid h-100 d-flex flex-column p-0">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center gap-3">
+        <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/protocols/sessions', sessionId()]">
+          <i class="bi bi-arrow-left me-1"></i>
+          Back
+        </a>
+        <h4 class="navbar-brand m-0 fw-bold">
+          <i class="bi bi-cloud-upload me-2"></i>Export session to protocols.io
+        </h4>
+      </div>
+    </div>
+  </nav>
+
+  <div class="flex-grow-1 p-3 overflow-auto">
+    <div class="row">
+      <div class="col-lg-8 mx-auto d-flex flex-column gap-3">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="bi bi-journal-check me-2"></i>{{ sessionTitle() }}
+            </h6>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb breadcrumb-sm mb-0">
+                <li class="breadcrumb-item">
+                  <a routerLink="/protocols/sessions"><i class="bi bi-house-door"></i></a>
+                </li>
+                <li class="breadcrumb-item">
+                  <a [routerLink]="['/protocols/sessions', sessionId()]">{{ sessionTitle() }}</a>
+                </li>
+                <li class="breadcrumb-item active"><span>Export to protocols.io</span></li>
+              </ol>
+            </nav>
+          </div>
+          <div class="card-body">
+            @if (connected() === null || rows() === null) {
+              <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            } @else if (connected() === false) {
+              <div class="empty-state-small text-center text-muted p-3 not-connected">
+                <i class="bi bi-plug fs-2 mb-2 d-block"></i>
+                <small>Connect your protocols.io account to export sessions.</small>
+                <a routerLink="/home/integrations/protocols-io" class="small mt-1">Connect an account</a>
+              </div>
+            } @else if (taskId()) {
+              @if (task(); as current) {
+                @if (!finished()) {
+                  <div class="mb-1 small">{{ current.progressDescription || 'Queued' }}</div>
+                  <div class="progress" role="progressbar" [attr.aria-valuenow]="progress()" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" [style.width.%]="progress()"></div>
+                  </div>
+                } @else if (result(); as exported) {
+                  <ul class="list-group list-group-flush small mb-3 export-runs">
+                    @for (run of exported.runs; track run.runId) {
+                      <li class="list-group-item px-0">
+                        <div class="d-flex align-items-center gap-2">
+                          <i class="bi bi-check-circle text-success"></i>
+                          <a [href]="run.recordUrl" target="_blank" rel="noopener" class="fw-semibold">{{ run.title }}</a>
+                          @if (run.created) {
+                            <span class="badge bg-primary">New run</span>
+                          }
+                        </div>
+                        @if (run.protocolCopyUrl) {
+                          <div class="protocol-copy">
+                            {{ run.variationsUsed }} varied step(s) in
+                            <a [href]="run.protocolCopyUrl" target="_blank" rel="noopener">the protocol copy</a>
+                          </div>
+                        }
+                        <div class="text-muted">
+                          {{ run.commentsAdded }} added, {{ run.commentsUpdated }} updated, {{ run.commentsDeleted }} removed,
+                          {{ run.commentsUnchanged }} unchanged, {{ run.filesUploaded }} file(s) uploaded
+                        </div>
+                        @for (warning of run.warnings; track $index) {
+                          <div class="export-warning"><i class="bi bi-exclamation-triangle text-warning me-1"></i>{{ warning }}</div>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportAgain()">Done</button>
+                } @else {
+                  <div class="alert alert-danger export-failure">
+                    <i class="bi bi-x-circle me-2"></i>{{ current.errorMessage || 'The export failed' }}
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportAgain()">Try again</button>
+                }
+              } @else {
+                <div class="text-center p-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              }
+            } @else if (rows()!.length === 0) {
+              <div class="empty-state-small text-center text-muted p-3 no-protocols">
+                <i class="bi bi-journal-x fs-2 mb-2 d-block"></i>
+                <small>This session has no protocols.</small>
+              </div>
+            } @else {
+              <p class="text-muted small mb-2">
+                Each protocol becomes its own protocols.io run, with step annotations posted as comments on the
+                matching steps. Protocols with steps varied in this session are exported as a new protocol with the
+                varied steps, and the run follows that protocol.
+              </p>
+              <ul class="list-group mb-3 protocol-rows">
+                @for (row of rows(); track row.protocol) {
+                  <li class="list-group-item protocol-row">
+                    <div class="d-flex align-items-center gap-2">
+                      <input
+                        class="form-check-input mt-0"
+                        type="checkbox"
+                        [id]="'protocol-' + row.protocol"
+                        [disabled]="!exportable(row)"
+                        [checked]="selected().has(row.protocol)"
+                        (change)="toggle(row.protocol, $any($event.target).checked)">
+                      <label class="flex-grow-1 min-width-0" [for]="'protocol-' + row.protocol">
+                        <span class="fw-semibold">{{ row.protocolTitle || 'Untitled protocol' }}</span>
+                        <span class="d-block small text-muted">
+                          @if (row.variedSteps > 0) {
+                            <span class="varied-steps">{{ row.variedSteps }} step(s) varied in this session, exported as a copy of the protocol</span>
+                          } @else if (row.protocolExport; as latest) {
+                            Exported to {{ latest.protocolsIoUri }} on {{ latest.exportedAt | date: 'medium' }}
+                          } @else {
+                            Not exported to protocols.io yet
+                          }
+                        </span>
+                      </label>
+                      @if (!exportable(row)) {
+                        <a class="btn btn-sm btn-outline-secondary export-protocol" [routerLink]="['/protocols', row.protocol, 'export', 'protocols-io']">
+                          Export protocol
+                        </a>
+                      } @else if (updatesRun(row)) {
+                        <a class="small existing-run" [href]="row.run!.recordUrl" target="_blank" rel="noopener">Updates {{ row.run!.title }}</a>
+                      } @else if (row.run && !row.runIsCurrent && !newRuns()) {
+                        <span class="small text-warning outdated-run">New run, variations changed</span>
+                      } @else {
+                        <span class="small text-muted">New run</span>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+
+              <div class="form-check mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="newRuns"
+                  [ngModel]="newRuns()"
+                  (ngModelChange)="newRuns.set($event)">
+                <label class="form-check-label" for="newRuns">Start new runs instead of updating earlier ones</label>
+              </div>
+
+              @if (createsRuns()) {
+                <div class="mb-3 d-flex align-items-center gap-2 small run-folder">
+                  <span class="text-muted">Folder for new runs:</span>
+                  @if (folder(); as chosen) {
+                    <span class="fw-semibold"><i class="bi bi-folder me-1"></i>{{ chosen.title }}</span>
+                    <span class="text-muted">({{ chosen.workspace.title }})</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 clear-folder" (click)="clearFolder()">Use my own folder</button>
+                  } @else {
+                    <span class="fw-semibold">Your own folder</span>
+                  }
+                  <button type="button" class="btn btn-sm btn-outline-secondary choose-folder-toggle" (click)="choosingFolder.set(!choosingFolder())">
+                    {{ choosingFolder() ? 'Close' : 'Choose folder' }}
+                  </button>
+                </div>
+              }
+
+              <div class="alert alert-warning small">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Comments show as Anonymous on protocols.io, and uploaded files can be opened by anyone with their address.
+              </div>
+
+              <button type="button" class="btn btn-primary start-export" (click)="startExport()" [disabled]="!canExport()">
+                @if (queuing()) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                }
+                Export
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (connected() && !taskId() && choosingFolder() && createsRuns()) {
+          <app-protocols-io-browser mode="folder" actionLabel="Use" (folderChosen)="chooseFolder($event)"></app-protocols-io-browser>
+        }
+
+        @if (runs().length > 0 && !taskId()) {
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Runs on protocols.io</h6>
+            </div>
+            <ul class="list-group list-group-flush small session-runs">
+              @for (run of runs(); track run.id) {
+                <li class="list-group-item d-flex align-items-center gap-2">
+                  <a [href]="run.recordUrl" target="_blank" rel="noopener" class="flex-grow-1 text-truncate">{{ run.title }}</a>
+                  <span class="text-muted">{{ run.commentCount }} comment(s)</span>
+                  <span class="text-muted">{{ run.exportedByUsername }}</span>
+                  <span class="text-muted">{{ run.exportedAt | date: 'medium' }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

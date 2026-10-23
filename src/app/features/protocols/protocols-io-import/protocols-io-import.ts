@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { ToastService } from '@noatgnu/cupcake-core';
-import { ProtocolsIOProtocolEntry, ProtocolService } from '@noatgnu/cupcake-red-velvet';
+import { ProtocolsIOProtocolEntry, ProtocolsIOProtocolService } from '@noatgnu/cupcake-protocols-io';
 
 import { ProtocolsIoBrowser } from '../protocols-io-browser/protocols-io-browser';
 
@@ -14,7 +14,7 @@ import { ProtocolsIoBrowser } from '../protocols-io-browser/protocols-io-browser
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProtocolsIoImport {
-  private protocolService = inject(ProtocolService);
+  private protocolsIOProtocolService = inject(ProtocolsIOProtocolService);
   private toastService = inject(ToastService);
   private router = inject(Router);
 
@@ -22,7 +22,7 @@ export class ProtocolsIoImport {
 
   importProtocol(entry: ProtocolsIOProtocolEntry): void {
     this.importingUri.set(entry.uri);
-    this.protocolService.importFromProtocolsIOAccount(entry.uri).subscribe({
+    this.protocolsIOProtocolService.importFromAccount(entry.uri).subscribe({
       next: protocol => {
         this.importingUri.set(null);
         this.toastService.success(`Imported ${entry.title}`);
