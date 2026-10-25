@@ -20,6 +20,7 @@ env:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Check out frontend
