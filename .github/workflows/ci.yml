@@ -251,7 +251,7 @@ jobs:
           fi
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+        run: go install ${{ matrix.gtk3 && '-tags gtk3' || '' }} github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
       - name: Install root dependencies
         run: npm ci
