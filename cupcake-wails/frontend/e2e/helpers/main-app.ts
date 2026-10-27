@@ -125,7 +125,8 @@ export async function exportTable(kind: ImportKind): Promise<void> {
 
 /**
  * Creates a metadata table template from the first standalone schema offered, optionally
- * assigning it to a lab group so jobs for that group can use it.
+ * assigning it to a lab group so jobs for that group can use it. Returns once the template is
+ * listed, which happens only after the backend has finished creating it; the dialog closes earlier.
  */
 export async function createTemplateFromSchemas(name: string, templatesRoute = TEMPLATES_ROUTE, labGroupName?: string): Promise<void> {
   await goTo(templatesRoute);
@@ -181,6 +182,14 @@ export async function createTemplateFromSchemas(name: string, templatesRoute = T
   expectTrue(
     await mcp.clickUntilGone('ngb-modal-window .modal-footer .btn-primary', 'ngb-modal-window #templateName', MAIN),
     'Schema selection dialog did not close',
+  );
+  await mcp.fill('#templateSearch', name, MAIN);
+  expectTrue(
+    await mcp.waitFor(() => mcp.evaluate(
+      `return [...document.querySelectorAll('tr')].some(r => r.textContent.includes(${JSON.stringify(name)}));`,
+      MAIN,
+    ), 60000, 1000),
+    `Template "${name}" was not listed after creation`,
   );
 }
 
