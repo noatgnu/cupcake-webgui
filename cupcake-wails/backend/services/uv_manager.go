@@ -7,7 +7,6 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -23,7 +22,9 @@ import (
 )
 
 const (
-	UvReleasesURL = "https://api.github.com/repos/astral-sh/uv/releases/latest"
+	// UvDownloadBaseURL serves the newest uv release assets by name without going through the
+	// rate-limited GitHub API.
+	UvDownloadBaseURL = "https://github.com/astral-sh/uv/releases/latest/download"
 
 	// ManagedPythonVersion is the interpreter version uv installs for native backends,
 	// matching the Python bundled with portable releases.
@@ -39,25 +40,15 @@ const (
 // writes (binary, interpreters, cache) is kept under the app's user data directory.
 type UvManager struct {
 	userDataPath    string
-	releasesURL     string
+	downloadBaseURL string
 	logCallback     func(message string, msgType string)
 	progressHandler func(models.DownloadProgress)
 }
 
-type githubReleaseAsset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-type githubRelease struct {
-	TagName string               `json:"tag_name"`
-	Assets  []githubReleaseAsset `json:"assets"`
-}
-
 func NewUvManager(userDataPath string) *UvManager {
 	return &UvManager{
-		userDataPath: userDataPath,
-		releasesURL:  UvReleasesURL,
+		userDataPath:    userDataPath,
+		downloadBaseURL: UvDownloadBaseURL,
 	}
 }
 
@@ -164,7 +155,7 @@ func (u *UvManager) EnsureUv() (string, error) {
 }
 
 // DownloadUv fetches the latest uv release for this platform, verifies its published
-// SHA-256 checksum when available, and installs the binary at ManagedUvPath.
+// SHA-256 checksum, and installs the binary at ManagedUvPath.
 func (u *UvManager) DownloadUv() error {
 	assetName, err := UvReleaseAsset(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -173,23 +164,7 @@ func (u *UvManager) DownloadUv() error {
 
 	u.log(fmt.Sprintf("Downloading uv (%s)...", assetName), "info")
 
-	release, err := fetchLatestRelease(u.releasesURL)
-	if err != nil {
-		return fmt.Errorf("failed to query uv releases: %w", err)
-	}
-
-	var downloadURL, checksumURL string
-	for _, asset := range release.Assets {
-		switch asset.Name {
-		case assetName:
-			downloadURL = asset.BrowserDownloadURL
-		case assetName + ".sha256":
-			checksumURL = asset.BrowserDownloadURL
-		}
-	}
-	if downloadURL == "" {
-		return fmt.Errorf("uv release %s has no asset %s", release.TagName, assetName)
-	}
+	downloadURL := u.downloadBaseURL + "/" + assetName
 
 	tempDir, err := os.MkdirTemp("", "cupcake-uv-")
 	if err != nil {
@@ -204,14 +179,10 @@ func (u *UvManager) DownloadUv() error {
 		return fmt.Errorf("uv download failed: %w", err)
 	}
 
-	if checksumURL != "" {
-		if err := verifySHA256(archivePath, checksumURL); err != nil {
-			return err
-		}
-		u.log("uv download verified", "info")
-	} else {
-		u.log("uv release has no checksum asset, skipping verification", "warning")
+	if err := verifySHA256(archivePath, downloadURL+".sha256"); err != nil {
+		return err
 	}
+	u.log("uv download verified", "info")
 
 	destPath := u.ManagedUvPath()
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -221,7 +192,7 @@ func (u *UvManager) DownloadUv() error {
 		return err
 	}
 
-	u.log(fmt.Sprintf("uv %s installed at %s", release.TagName, destPath), "success")
+	u.log(fmt.Sprintf("uv installed at %s", destPath), "success")
 	return nil
 }
 
@@ -318,30 +289,6 @@ func venvPythonPath(venvDir string) string {
 		return filepath.Join(venvDir, "Scripts", "python.exe")
 	}
 	return filepath.Join(venvDir, "bin", "python")
-}
-
-func fetchLatestRelease(url string) (*githubRelease, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, err
-	}
-	return &release, nil
 }
 
 func verifySHA256(filePath, checksumURL string) error {
