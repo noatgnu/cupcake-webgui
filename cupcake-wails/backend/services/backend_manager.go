@@ -16,15 +16,14 @@ import (
 )
 
 type BackendManager struct {
-	userDataPath    string
-	isDev           bool
-	redisManager    *RedisManager
-	backendPort     int
-	djangoProcess   *os.Process
-	rqProcess       *os.Process
-	gunicornProcess *os.Process
-	logCallback     func(message string, msgType string)
-	statusCallback  func(service, status, message string)
+	userDataPath   string
+	isDev          bool
+	redisManager   *RedisManager
+	backendPort    int
+	djangoProcess  *os.Process
+	rqProcess      *os.Process
+	logCallback    func(message string, msgType string)
+	statusCallback func(service, status, message string)
 }
 
 func NewBackendManager(userDataPath string, isDev bool, redisManager *RedisManager) *BackendManager {
@@ -142,6 +141,17 @@ func (b *BackendManager) StartRedisServer() error {
 	return b.redisManager.StartRedis()
 }
 
+// BackendDataDir is where the backend's Wails settings keep their database and media,
+// derived from WAILS_APP_DATA.
+func BackendDataDir(backendDir string) string {
+	return filepath.Join(backendDir, "cupcake-vanilla")
+}
+
+// MediaRoot is the MEDIA_ROOT the Django backend running from backendDir stores files under.
+func MediaRoot(backendDir string) string {
+	return filepath.Join(BackendDataDir(backendDir), "media")
+}
+
 func (b *BackendManager) StartDjangoServer(backendDir, pythonPath string) error {
 	b.log("Starting Django server...", "info")
 
@@ -153,33 +163,9 @@ func (b *BackendManager) StartDjangoServer(backendDir, pythonPath string) error 
 	availablePort := b.findAvailablePort(b.backendPort)
 	b.backendPort = availablePort
 
-	managePy := filepath.Join(backendDir, "manage.py")
-
 	var cmd *exec.Cmd
-	if b.isDev {
-		if runtime.GOOS == "windows" {
-			wrapperScript := fmt.Sprintf(`
-import sys
-import multiprocessing
-
-_original_get_context = multiprocessing.get_context
-def _patched_get_context(method=None):
-    if method == 'fork':
-        return _original_get_context('spawn')
-    return _original_get_context(method)
-multiprocessing.get_context = _patched_get_context
-
-import runpy
-sys.argv = ['manage.py', 'runserver', '0.0.0.0:%d']
-runpy.run_path('manage.py', run_name='__main__')
-`, availablePort)
-			cmd = exec.Command(pythonPath, "-c", wrapperScript)
-		} else {
-			cmd = exec.Command(pythonPath, managePy, "runserver", fmt.Sprintf("0.0.0.0:%d", availablePort))
-		}
-	} else {
-		if runtime.GOOS == "windows" {
-			wrapperScript := fmt.Sprintf(`
+	if runtime.GOOS == "windows" {
+		wrapperScript := fmt.Sprintf(`
 import sys
 import multiprocessing
 
@@ -198,16 +184,14 @@ uvicorn.run(
     workers=1,
 )
 `, availablePort)
-			cmd = exec.Command(pythonPath, "-c", wrapperScript)
-		} else {
-			cmd = exec.Command(pythonPath, "-m", "gunicorn",
-				"--bind", fmt.Sprintf("0.0.0.0:%d", availablePort),
-				"--workers", "4",
-				"--timeout", "120",
-				"cupcake_vanilla.wsgi:application",
-			)
-			b.gunicornProcess = nil
-		}
+		cmd = exec.Command(pythonPath, "-c", wrapperScript)
+	} else {
+		cmd = exec.Command(pythonPath, "-m", "uvicorn",
+			"cupcake_vanilla.asgi_wails:application",
+			"--host", "0.0.0.0",
+			"--port", fmt.Sprintf("%d", availablePort),
+			"--workers", "1",
+		)
 	}
 
 	cmd.Dir = backendDir
@@ -222,9 +206,6 @@ uvicorn.run(
 	}
 
 	b.djangoProcess = cmd.Process
-	if !b.isDev && runtime.GOOS != "windows" {
-		b.gunicornProcess = cmd.Process
-	}
 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
@@ -243,7 +224,6 @@ uvicorn.run(
 	go func() {
 		cmd.Wait()
 		b.djangoProcess = nil
-		b.gunicornProcess = nil
 	}()
 
 	maxRetries := 10
@@ -341,11 +321,6 @@ func (b *BackendManager) StopServices() {
 		b.djangoProcess = nil
 	}
 
-	if b.gunicornProcess != nil {
-		b.stopProcess(b.gunicornProcess, "Gunicorn")
-		b.gunicornProcess = nil
-	}
-
 	if b.redisManager != nil {
 		b.redisManager.StopRedis()
 	}
@@ -400,7 +375,7 @@ func (b *BackendManager) getBackendEnv(backendDir string) []string {
 
 	secretKey := "development-secret-key-change-in-production"
 	dbPath := filepath.Join(backendDir, "db.sqlite3")
-	mediaPath := filepath.Join(backendDir, "media")
+	mediaPath := MediaRoot(backendDir)
 	backupPath := filepath.Join(backendDir, "backups")
 
 	debugValue := "false"
@@ -420,6 +395,7 @@ func (b *BackendManager) getBackendEnv(backendDir string) []string {
 		"REDIS_PORT":                    fmt.Sprintf("%d", b.redisManager.GetRedisPort()),
 		"WAILS_APP_DATA":                backendDir,
 		"MEDIA_ROOT":                    mediaPath,
+		"WAILS_MEDIA_ROOT":              mediaPath,
 		"DBBACKUP_STORAGE_LOCATION":     backupPath,
 		"ENABLE_CUPCAKE_MACARON":        "true",
 		"ENABLE_CUPCAKE_MINT_CHOCOLATE": "true",
@@ -547,7 +523,7 @@ func (b *BackendManager) KillOrphanedProcesses() {
 		hideWindow(cmd)
 		cmd.Run()
 	} else {
-		cmd1 := exec.Command("pkill", "-f", "gunicorn.*catapult")
+		cmd1 := exec.Command("pkill", "-f", "uvicorn cupcake_vanilla.asgi_wails")
 		hideWindow(cmd1)
 		cmd1.Run()
 		cmd2 := exec.Command("pkill", "-f", "rqworker")

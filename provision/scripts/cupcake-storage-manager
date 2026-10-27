@@ -42,6 +42,30 @@ def send_result(conn, result):
     conn.shutdown(socket.SHUT_WR)
 
 
+def mount_arguments(config):
+    """
+    Translate a saved storage config into configure-storage.sh arguments.
+
+    The admin UI saves {"mountType", "label", "host", "share", "username", "password"};
+    configure-storage.sh takes positional arguments per mount type, with SMB shares as
+    //host/share.
+    """
+    mount_type = config.get("mountType", "")
+    if mount_type == "usb":
+        return ["usb", config.get("label", ""), config.get("fsType") or "auto"]
+    if mount_type == "nfs":
+        return ["nfs", config.get("host", ""), config.get("share", "")]
+    if mount_type == "smb":
+        share = config.get("share", "").strip("/")
+        return [
+            "smb",
+            f"//{config.get('host', '')}/{share}",
+            config.get("username", ""),
+            config.get("password", ""),
+        ]
+    raise ValueError(f"Unsupported mountType: {mount_type!r}")
+
+
 def handle(conn):
     raw = recv_all(conn)
     try:
@@ -55,6 +79,12 @@ def handle(conn):
     if command == "mount":
         config = payload.get("config", {})
         try:
+            arguments = mount_arguments(config)
+        except ValueError as e:
+            send_result(conn, {"ok": False, "error": str(e)})
+            return
+
+        try:
             CONFIG_PATH.write_text(json.dumps(config, indent=2))
         except Exception as e:
             send_result(conn, {"ok": False, "error": f"Could not write config: {e}"})
@@ -62,7 +92,7 @@ def handle(conn):
 
         try:
             result = subprocess.run(
-                [str(MOUNT_SCRIPT)],
+                [str(MOUNT_SCRIPT), *arguments],
                 capture_output=True,
                 text=True,
                 timeout=60,

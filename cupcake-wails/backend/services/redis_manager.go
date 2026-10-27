@@ -103,7 +103,7 @@ func (r *RedisManager) FindRedisServer() (string, error) {
 }
 
 func (r *RedisManager) StartRedis() error {
-	if r.IsRedisRunning() {
+	if r.redisProcess != nil && r.IsRedisRunning() {
 		r.log("Redis is already running", "info")
 		return nil
 	}

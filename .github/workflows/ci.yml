@@ -32,7 +32,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache-dependency-path: cupcake-wails/go.sum
 
       - name: Set up Node.js
@@ -50,7 +50,7 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
       - name: Install root dependencies
         run: npm ci
@@ -87,6 +87,118 @@ jobs:
         working-directory: cupcake-wails/frontend
         run: npm run test:e2e
 
+  ui-test:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [wails-ui, wails-ui-native]
+    defaults:
+      run:
+        working-directory: cupcake-wails
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: cupcake-wails/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            cupcake-wails/frontend/package-lock.json
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libgtk-4-dev libwebkitgtk-6.0-dev \
+            xvfb fluxbox dbus-x11 redis-server
+          sudo systemctl stop redis-server || true
+
+      - name: Allow unprivileged user namespaces (required by bubblewrap/WebKitGTK sandbox)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+
+      - name: Install dependencies
+        run: |
+          (cd .. && npm ci)
+          (cd frontend && npm ci)
+
+      - name: Build application with MCP automation
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          ENABLE_MCP=true ./build.sh release
+
+      - name: Run UI tests against the running app
+        env:
+          CI: 'true'
+          MCP_URL: 'http://127.0.0.1:9099/mcp'
+        run: |
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/cupcake-config"
+          mkdir -p "$XDG_CONFIG_HOME"
+
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 2
+          DISPLAY=:99 fluxbox &
+          sleep 2
+
+          DISPLAY=:99 dbus-run-session -- env WEBKIT_DISABLE_SANDBOX=1 \
+            ./build/bin/linux-amd64/cupcake > "$RUNNER_TEMP/cupcake-ui.log" 2>&1 &
+          APP_PID=$!
+
+          echo "Waiting for MCP server..."
+          for i in {1..60}; do
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "App process exited unexpectedly while waiting for MCP server"
+              cat "$RUNNER_TEMP/cupcake-ui.log"
+              exit 1
+            fi
+            if curl -s -X POST "$MCP_URL" \
+                 -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null | grep -q '"tools"'; then
+              echo "MCP server is ready"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for MCP server"
+              cat "$RUNNER_TEMP/cupcake-ui.log"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          cd frontend
+          set +e
+          npm run test:${{ matrix.suite }}
+          TEST_EXIT=$?
+          set -e
+
+          kill $APP_PID 2>/dev/null || true
+          exit $TEST_EXIT
+
+      - name: Upload UI test report and app logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.suite }}-test-results
+          path: |
+            cupcake-wails/frontend/playwright-report-ui/
+            cupcake-wails/frontend/test-results/ui/
+            ${{ runner.temp }}/cupcake-ui.log
+            ${{ runner.temp }}/cupcake-config/cupcake/*.log
+          retention-days: 7
+
   build:
     needs: test
     runs-on: ${{ matrix.os }}
@@ -96,6 +208,10 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: amd64
+          - os: ubuntu-22.04
+            platform: linux
+            arch: amd64
+            gtk3: true
           - os: windows-latest
             platform: windows
             arch: amd64
@@ -112,7 +228,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache-dependency-path: cupcake-wails/go.sum
 
       - name: Set up Node.js
@@ -128,10 +244,14 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libgtk-4-dev libwebkitgtk-6.0-dev
+          if [ "${{ matrix.gtk3 }}" = "true" ]; then
+            sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          else
+            sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libgtk-4-dev libwebkitgtk-6.0-dev
+          fi
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
       - name: Install root dependencies
         run: npm ci
@@ -145,7 +265,11 @@ jobs:
         shell: bash
         run: |
           export PATH="$HOME/go/bin:$PATH"
-          wails3 generate bindings -ts -d frontend/bindings
+          if [ "${{ matrix.gtk3 }}" = "true" ]; then
+            wails3 generate bindings -ts -f "-tags gtk3" -d frontend/bindings
+          else
+            wails3 generate bindings -ts -d frontend/bindings
+          fi
 
       - name: Build frontend
         working-directory: cupcake-wails/frontend
@@ -166,6 +290,7 @@ jobs:
           export PATH="$HOME/go/bin:$PATH"
           mkdir -p build/bin/${{ matrix.platform }}-${{ matrix.arch }}
           GOOS=${{ matrix.platform }} GOARCH=${{ matrix.arch }} CGO_ENABLED=1 go build \
+            -tags "${{ matrix.gtk3 && 'gtk3' || '' }}" \
             -ldflags="-s -w" \
             -o build/bin/${{ matrix.platform }}-${{ matrix.arch }}/cupcake
 
@@ -183,6 +308,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cupcake-${{ matrix.platform }}-${{ matrix.arch }}
+          name: cupcake-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.gtk3 && '-gtk3' || '' }}
           path: cupcake-wails/build/bin/${{ matrix.platform }}-${{ matrix.arch }}/
           retention-days: 7

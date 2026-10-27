@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -116,29 +115,11 @@ func TestFullInitializationFlow(t *testing.T) {
 
 	t.Run("VenvCreation", func(t *testing.T) {
 		pythonManager := services.NewPythonManager(testDataPath)
-		candidates := pythonManager.DetectPythonCandidates()
-
-		if len(candidates) == 0 {
-			t.Skip("No Python 3.12+ found - skipping venv creation test")
-		}
-
-		var pythonPath string
-		for _, c := range candidates {
-			if c.Version >= "3.12" {
-				pythonPath = c.Path
-				break
-			}
-		}
-		if pythonPath == "" {
-			t.Skip("No Python 3.12+ found - skipping venv creation test")
-		}
+		pythonPath := services.UvManagedPythonPrefix + services.ManagedPythonVersion
 		log.Printf("Creating venv with Python: %s", pythonPath)
 
 		venvPython, err := pythonManager.CreateVirtualEnvironment(pythonPath)
 		if err != nil {
-			if strings.Contains(err.Error(), "ensurepip") || strings.Contains(err.Error(), "venv") {
-				t.Skipf("Venv module not available (install python3.12-venv): %v", err)
-			}
 			t.Fatalf("Failed to create venv: %v", err)
 		}
 
@@ -209,24 +190,8 @@ func TestNativeBackendSetup(t *testing.T) {
 	}
 
 	pythonManager := services.NewPythonManager(testDataPath)
-	candidates := pythonManager.DetectPythonCandidates()
-
-	if len(candidates) == 0 {
-		t.Skip("No Python 3.12+ found on system")
-	}
-
-	var pythonPath string
-	var selectedVersion string
-	for _, c := range candidates {
-		if c.Version >= "3.12" {
-			pythonPath = c.Path
-			selectedVersion = c.Version
-			break
-		}
-	}
-	if pythonPath == "" {
-		t.Skip("No Python 3.12+ found on system")
-	}
+	pythonPath := services.UvManagedPythonPrefix + services.ManagedPythonVersion
+	selectedVersion := services.ManagedPythonVersion
 	log.Printf("Using Python: %s (%s)", pythonPath, selectedVersion)
 
 	backendPath := filepath.Join(testDataPath, "backend")
@@ -249,9 +214,6 @@ func TestNativeBackendSetup(t *testing.T) {
 	log.Println("Step 2: Creating virtual environment...")
 	venvPython, err := pythonManager.CreateVirtualEnvironment(pythonPath)
 	if err != nil {
-		if strings.Contains(err.Error(), "ensurepip") || strings.Contains(err.Error(), "venv") {
-			t.Skipf("Venv module not available (install python3.12-venv): %v", err)
-		}
 		t.Fatalf("Failed to create venv: %v", err)
 	}
 	log.Printf("Venv created: %s", venvPython)
@@ -360,22 +322,7 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 
 	pythonManager := services.NewPythonManager(testDataPath)
-	candidates := pythonManager.DetectPythonCandidates()
-
-	if len(candidates) == 0 {
-		t.Skip("No Python found on system")
-	}
-
-	var pythonPath string
-	for _, c := range candidates {
-		if c.Version >= "3.12" {
-			pythonPath = c.Path
-			break
-		}
-	}
-	if pythonPath == "" {
-		t.Skip("No Python 3.12+ found on system")
-	}
+	pythonPath := services.UvManagedPythonPrefix + services.ManagedPythonVersion
 
 	backendPath := filepath.Join(testDataPath, "backend")
 	downloader := services.NewBackendDownloader(nil)
@@ -388,9 +335,6 @@ func TestBackupAndRestore(t *testing.T) {
 	log.Println("Creating virtual environment...")
 	venvPython, err := pythonManager.CreateVirtualEnvironment(pythonPath)
 	if err != nil {
-		if strings.Contains(err.Error(), "ensurepip") || strings.Contains(err.Error(), "venv") {
-			t.Skipf("Venv module not available: %v", err)
-		}
 		t.Fatalf("Failed to create venv: %v", err)
 	}
 
@@ -564,22 +508,7 @@ func TestWebSocketConnection(t *testing.T) {
 	}
 
 	pythonManager := services.NewPythonManager(testDataPath)
-	candidates := pythonManager.DetectPythonCandidates()
-
-	if len(candidates) == 0 {
-		t.Skip("No Python found on system")
-	}
-
-	var pythonPath string
-	for _, c := range candidates {
-		if c.Version >= "3.12" {
-			pythonPath = c.Path
-			break
-		}
-	}
-	if pythonPath == "" {
-		t.Skip("No Python 3.12+ found on system")
-	}
+	pythonPath := services.UvManagedPythonPrefix + services.ManagedPythonVersion
 
 	backendPath := filepath.Join(testDataPath, "backend")
 	downloader := services.NewBackendDownloader(nil)
@@ -592,9 +521,6 @@ func TestWebSocketConnection(t *testing.T) {
 	log.Println("Creating virtual environment...")
 	venvPython, err := pythonManager.CreateVirtualEnvironment(pythonPath)
 	if err != nil {
-		if strings.Contains(err.Error(), "ensurepip") || strings.Contains(err.Error(), "venv") {
-			t.Skipf("Venv module not available: %v", err)
-		}
 		t.Fatalf("Failed to create venv: %v", err)
 	}
 
@@ -656,7 +582,7 @@ func TestWebSocketConnection(t *testing.T) {
 	}
 
 	t.Run("ObtainJWTToken", func(t *testing.T) {
-		loginURL := fmt.Sprintf("http://localhost:%d/api/token/", backendPort)
+		loginURL := fmt.Sprintf("http://localhost:%d/api/v1/auth/token/", backendPort)
 		credentials := map[string]string{
 			"username": testUsername,
 			"password": testPassword,
@@ -687,7 +613,7 @@ func TestWebSocketConnection(t *testing.T) {
 	})
 
 	t.Run("WebSocketConnection", func(t *testing.T) {
-		loginURL := fmt.Sprintf("http://localhost:%d/api/token/", backendPort)
+		loginURL := fmt.Sprintf("http://localhost:%d/api/v1/auth/token/", backendPort)
 		credentials := map[string]string{
 			"username": testUsername,
 			"password": testPassword,
@@ -710,7 +636,7 @@ func TestWebSocketConnection(t *testing.T) {
 		wsURL := url.URL{
 			Scheme:   "ws",
 			Host:     fmt.Sprintf("localhost:%d", backendPort),
-			Path:     "/ws/notifications/",
+			Path:     "/ws/ccc/notifications/",
 			RawQuery: fmt.Sprintf("token=%s", accessToken),
 		}
 
@@ -743,7 +669,7 @@ func TestWebSocketConnection(t *testing.T) {
 	})
 
 	t.Run("WebSocketPingPong", func(t *testing.T) {
-		loginURL := fmt.Sprintf("http://localhost:%d/api/token/", backendPort)
+		loginURL := fmt.Sprintf("http://localhost:%d/api/v1/auth/token/", backendPort)
 		credentials := map[string]string{
 			"username": testUsername,
 			"password": testPassword,
@@ -766,7 +692,7 @@ func TestWebSocketConnection(t *testing.T) {
 		wsURL := url.URL{
 			Scheme:   "ws",
 			Host:     fmt.Sprintf("localhost:%d", backendPort),
-			Path:     "/ws/notifications/",
+			Path:     "/ws/ccc/notifications/",
 			RawQuery: fmt.Sprintf("token=%s", accessToken),
 		}
 
@@ -808,7 +734,7 @@ func TestWebSocketConnection(t *testing.T) {
 	})
 
 	t.Run("AdminWebSocketConnection", func(t *testing.T) {
-		loginURL := fmt.Sprintf("http://localhost:%d/api/token/", backendPort)
+		loginURL := fmt.Sprintf("http://localhost:%d/api/v1/auth/token/", backendPort)
 		credentials := map[string]string{
 			"username": testUsername,
 			"password": testPassword,
@@ -831,7 +757,7 @@ func TestWebSocketConnection(t *testing.T) {
 		wsURL := url.URL{
 			Scheme:   "ws",
 			Host:     fmt.Sprintf("localhost:%d", backendPort),
-			Path:     "/ws/admin/",
+			Path:     "/ws/ccc/admin/",
 			RawQuery: fmt.Sprintf("token=%s", accessToken),
 		}
 
@@ -856,8 +782,8 @@ func TestWebSocketConnection(t *testing.T) {
 			t.Fatalf("Failed to parse initial message: %v", err)
 		}
 
-		if initialMsg["type"] != "connection.established" {
-			t.Errorf("Expected connection.established, got %v", initialMsg["type"])
+		if initialMsg["type"] != "admin.connection.established" {
+			t.Errorf("Expected admin.connection.established, got %v", initialMsg["type"])
 		}
 
 		log.Printf("Admin WebSocket initial message: %s", string(message))

@@ -16,7 +16,11 @@
           <div class="candidate-row" [class.active]="selectedPath() === candidate.path" (click)="selectCandidate(candidate)">
             <span class="dot" [class.active]="selectedPath() === candidate.path"></span>
             <span class="version">Python {{ candidate.version }}</span>
-            <code class="path">{{ candidate.path }}</code>
+            @if (candidate.managed) {
+              <span class="path">Installed by uv</span>
+            } @else {
+              <code class="path">{{ candidate.path }}</code>
+            }
             @if (selectedPath() === candidate.path) {
               <i class="bi bi-check-circle-fill check"></i>
             }

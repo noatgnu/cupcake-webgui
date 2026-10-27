@@ -73,16 +73,21 @@ cat > /opt/cupcake/first-boot.sh << 'FBEOF'
 set -e
 ENV_FILE=/opt/cupcake/.env
 
-if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
+MACHINE_ID=$(cat /etc/machine-id 2>/dev/null || true)
+SECRETS_MARKER=/opt/cupcake/.secrets-machine-id
+if [ -n "$MACHINE_ID" ] && [ "$(cat "$SECRETS_MARKER" 2>/dev/null || true)" != "$MACHINE_ID" ]; then
+    echo "Generating secrets for this machine..."
     SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')
-    sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
-fi
-
-if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
     COTURN_SECRET=$(openssl rand -hex 20)
-    sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
-    sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+    sed -i "s|^SECRET_KEY=.*|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+    sed -i "s|^COTURN_SECRET=.*|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
+    if [ -f /etc/turnserver.conf ]; then
+        sed -i "s|^static-auth-secret=.*|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+    fi
+    printf '%s\n' "$MACHINE_ID" > "$SECRETS_MARKER"
+    chmod 600 "$SECRETS_MARKER"
     systemctl restart coturn 2>/dev/null || true
+    echo "Secrets generated"
 fi
 
 TAILSCALE_CONFIG=/opt/cupcake/tailscale-auth.txt

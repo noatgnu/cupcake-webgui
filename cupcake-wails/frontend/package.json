@@ -16,6 +16,9 @@
     "test:integration:headed": "playwright test --config=playwright.integration.config.ts --headed",
     "test:setup-flows": "playwright test --config=playwright.setup-flows.config.ts",
     "test:setup-flows:headed": "playwright test --config=playwright.setup-flows.config.ts --headed",
+    "test:wails-ui": "playwright test --config=playwright.ui.config.ts --project=workflows",
+    "test:wails-ui-native": "playwright test --config=playwright.ui.config.ts --project=native-setup",
+    "test:wails-ui-workflows": "playwright test --config=playwright.ui.config.ts --project=workflows --no-deps",
     "test:all": "npm run test:e2e && npm run test:integration && npm run test:setup-flows"
   },
   "dependencies": {
@@ -29,7 +32,7 @@
     "@ng-bootstrap/ng-bootstrap": "21.0.0",
     "@noatgnu/cupcake-core": "^1.4.0",
     "@popperjs/core": "^2.11.8",
-    "@wailsio/runtime": "^3.0.0-alpha.79",
+    "@wailsio/runtime": "3.0.0",
     "bootstrap": "^5.3.6",
     "bootstrap-icons": "^1.13.1",
     "rxjs": "~7.8.0",

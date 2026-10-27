@@ -8,8 +8,9 @@ describe('PythonSelectionComponent', () => {
   let mockWailsService: jasmine.SpyObj<WailsService>;
 
   const mockCandidates: PythonCandidate[] = [
-    { command: 'python3.12', version: '3.12.0', path: '/usr/bin/python3.12' },
-    { command: 'python3.11', version: '3.11.0', path: '/usr/bin/python3.11' }
+    { command: 'uv', version: '3.12', path: 'uv:3.12', managed: true },
+    { command: 'python3.12', version: '3.12.0', path: '/usr/bin/python3.12', managed: false },
+    { command: 'python3.11', version: '3.11.0', path: '/usr/bin/python3.11', managed: false }
   ];
 
   beforeEach(async () => {
@@ -57,7 +58,15 @@ describe('PythonSelectionComponent', () => {
 
     it('should auto-select first candidate', async () => {
       await component.ngOnInit();
-      expect(component.selectedPath()).toBe('/usr/bin/python3.12');
+      expect(component.selectedPath()).toBe('uv:3.12');
+    });
+
+    it('should label the uv-managed candidate instead of showing a path', async () => {
+      await component.ngOnInit();
+      fixture.detectChanges();
+      const paths = Array.from(fixture.nativeElement.querySelectorAll('.candidate-row .path') as NodeListOf<HTMLElement>)
+        .map(el => el.textContent?.trim());
+      expect(paths).toEqual(['Installed by uv', '/usr/bin/python3.12', '/usr/bin/python3.11']);
     });
 
     it('should stop loading after init', async () => {
@@ -74,7 +83,7 @@ describe('PythonSelectionComponent', () => {
 
   describe('selectCandidate', () => {
     it('should set selected path', () => {
-      const candidate = mockCandidates[1];
+      const candidate = mockCandidates[2];
       component.selectCandidate(candidate);
       expect(component.selectedPath()).toBe('/usr/bin/python3.11');
     });
@@ -176,7 +185,7 @@ describe('PythonSelectionComponent', () => {
     it('should call selectPython with selected path', async () => {
       await component.ngOnInit();
       await component.proceed();
-      expect(mockWailsService.selectPython).toHaveBeenCalledWith('/usr/bin/python3.12', true);
+      expect(mockWailsService.selectPython).toHaveBeenCalledWith('uv:3.12', true);
     });
 
     it('should call selectPython with custom path', async () => {

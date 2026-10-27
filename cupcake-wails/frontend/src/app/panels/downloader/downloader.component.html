@@ -68,7 +68,11 @@
               @for (python of pythonCandidates(); track python.path) {
                 <div class="select-row" [class.active]="selectedPython() === python.path" (click)="selectPython(python)">
                   <span class="row-main">Python {{ python.version }}</span>
-                  <code class="row-path">{{ python.path }}</code>
+                  @if (python.managed) {
+                    <span class="row-meta">Installed by uv</span>
+                  } @else {
+                    <code class="row-path">{{ python.path }}</code>
+                  }
                 </div>
               }
             }

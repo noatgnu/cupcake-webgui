@@ -1,9 +1,10 @@
 [Unit]
 Description=Cupcake Network Manager
 Requires=cupcake-network-manager.socket
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 User=root
 ExecStart=/usr/local/bin/cupcake-network-manager
-StandardInput=socket
+StandardInput=null

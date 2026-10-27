@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 )
@@ -147,9 +149,9 @@ func (b *BackendDownloader) DownloadPortable(opts BackendDownloadOptions) error 
 	}
 
 	assetFormats := []string{
-		fmt.Sprintf("cupcake-%s-py%s-%s-%s.tar.gz", opts.Version, pythonVer, osName, arch),
-		fmt.Sprintf("cupcake-%s-%s-%s.tar.gz", opts.Version, osName, arch),
-		fmt.Sprintf("cupcake-%s-%s-%s-python%s.tar.gz", opts.Version, osName, arch, pythonVer),
+		fmt.Sprintf("cupcake_vanilla-%s-py%s-%s-%s.tar.gz", opts.Version, pythonVer, osName, arch),
+		fmt.Sprintf("cupcake_vanilla-%s-%s-%s.tar.gz", opts.Version, osName, arch),
+		fmt.Sprintf("cupcake_vanilla-%s-%s-%s-python%s.tar.gz", opts.Version, osName, arch, pythonVer),
 	}
 
 	var downloadURL string
@@ -217,8 +219,9 @@ func (b *BackendDownloader) DownloadSource(destPath string, branch string) error
 	return b.cloneRepo(destPath, branch)
 }
 
-func (b *BackendDownloader) cloneRepo(destPath string, branch string) error {
-	log.Printf("[BackendDownloader] Cloning repository (branch: %s) to %s", branch, destPath)
+// cloneRepo shallow-clones ref, which may name either a branch or a release tag.
+func (b *BackendDownloader) cloneRepo(destPath string, ref string) error {
+	log.Printf("[BackendDownloader] Cloning repository (ref: %s) to %s", ref, destPath)
 
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
@@ -228,19 +231,19 @@ func (b *BackendDownloader) cloneRepo(destPath string, branch string) error {
 		gitDir := filepath.Join(destPath, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
 			log.Printf("[BackendDownloader] Repository already exists, pulling latest changes")
-			return b.pullRepo(destPath, branch)
+			return b.pullRepo(destPath, ref)
 		}
 		if err := b.CleanBackend(destPath); err != nil {
 			return err
 		}
 	}
 
-	_, err := git.PlainClone(destPath, false, &git.CloneOptions{
-		URL:           GithubCloneURL,
-		ReferenceName: plumbing.NewBranchReferenceName(branch),
-		Depth:         1,
-		Progress:      nil,
-	})
+	err := b.shallowClone(destPath, plumbing.NewBranchReferenceName(ref))
+	if isMissingRef(err) {
+		log.Printf("[BackendDownloader] No branch named %s, cloning it as a tag", ref)
+		os.RemoveAll(destPath)
+		err = b.shallowClone(destPath, plumbing.NewTagReferenceName(ref))
+	}
 	if err != nil {
 		return fmt.Errorf("git clone failed: %w", err)
 	}
@@ -249,7 +252,25 @@ func (b *BackendDownloader) cloneRepo(destPath string, branch string) error {
 	return nil
 }
 
-func (b *BackendDownloader) pullRepo(destPath string, branch string) error {
+// isMissingRef reports whether a clone failed because the requested ref does not exist on the
+// remote; go-git signals this differently depending on the clone options.
+func isMissingRef(err error) bool {
+	return errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, git.NoMatchingRefSpecError{})
+}
+
+func (b *BackendDownloader) shallowClone(destPath string, ref plumbing.ReferenceName) error {
+	_, err := git.PlainClone(destPath, false, &git.CloneOptions{
+		URL:           GithubCloneURL,
+		ReferenceName: ref,
+		SingleBranch:  true,
+		Depth:         1,
+	})
+	return err
+}
+
+// pullRepo updates an existing checkout to ref: branches are checked out and pulled,
+// release tags are fetched and checked out directly since they never move.
+func (b *BackendDownloader) pullRepo(destPath string, ref string) error {
 	repo, err := git.PlainOpen(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)
@@ -261,9 +282,13 @@ func (b *BackendDownloader) pullRepo(destPath string, branch string) error {
 	}
 
 	err = worktree.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(branch),
+		Branch: plumbing.NewBranchReferenceName(ref),
 	})
 	if err != nil {
+		if tagErr := b.checkoutTag(repo, worktree, ref); tagErr == nil {
+			log.Printf("[BackendDownloader] Checked out tag %s", ref)
+			return nil
+		}
 		log.Printf("[BackendDownloader] Warning: checkout failed: %v", err)
 	}
 
@@ -276,6 +301,25 @@ func (b *BackendDownloader) pullRepo(destPath string, branch string) error {
 
 	log.Printf("[BackendDownloader] Pull complete")
 	return nil
+}
+
+func (b *BackendDownloader) checkoutTag(repo *git.Repository, worktree *git.Worktree, tag string) error {
+	tagRef := plumbing.NewTagReferenceName(tag)
+	err := repo.Fetch(&git.FetchOptions{
+		RemoteName: "origin",
+		RefSpecs:   []gitconfig.RefSpec{gitconfig.RefSpec(fmt.Sprintf("+%s:%s", tagRef, tagRef))},
+		Depth:      1,
+		Tags:       git.NoTags,
+	})
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return err
+	}
+
+	hash, err := repo.ResolveRevision(plumbing.Revision(tagRef.String()))
+	if err != nil {
+		return err
+	}
+	return worktree.Checkout(&git.CheckoutOptions{Hash: *hash, Force: true})
 }
 
 func (b *BackendDownloader) downloadZip(destPath string, branch string) error {

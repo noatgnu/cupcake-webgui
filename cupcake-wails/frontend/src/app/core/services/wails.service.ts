@@ -29,6 +29,7 @@ export interface PythonCandidate {
   command: string;
   version: string;
   path: string;
+  managed: boolean;
 }
 
 export interface ValidationResult {

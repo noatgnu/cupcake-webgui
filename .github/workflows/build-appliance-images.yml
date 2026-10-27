@@ -683,10 +683,13 @@ jobs:
           path: /tmp/ui-test/screenshot-*.png
           retention-days: 3
 
-      - name: Remove CI SSH key
+      - name: Remove CI SSH key and machine identity
         run: |
+          CI_SECRET_HASH=$(ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "sudo grep '^SECRET_KEY=' /opt/cupcake/.env | sha256sum | cut -d' ' -f1")
+          echo "CI_SECRET_HASH=$CI_SECRET_HASH" >> $GITHUB_ENV
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "sudo rm -f /home/cupcake/.ssh/authorized_keys"
+            "sudo truncate -s 0 /etc/machine-id && sudo rm -f /var/lib/dbus/machine-id /opt/cupcake/.secrets-machine-id && sudo rm -f /home/cupcake/.ssh/authorized_keys"
 
       - name: Shutdown VM
         run: |
@@ -696,10 +699,130 @@ jobs:
               echo "QEMU exited after ${i}x3s"
               break
             fi
-            sleep 33
+            sleep 3
           done
           kill $QEMU_PID 2>/dev/null || true
           sleep 2
+
+      - name: Storage tests — prepare overlay, USB stick and NFS share
+        run: |
+          qemu-img create -q -f qcow2 -b vm-disk.qcow2 -F qcow2 storage-test.qcow2
+          sed "s|SSH_PUBKEY_PLACEHOLDER|${SSH_PUBKEY}|" \
+            provision/http/cloud-init-user-data.tmpl > storage-user-data
+          printf 'instance-id: cupcake-storage-test\nlocal-hostname: cupcake\n' > storage-meta-data
+          cloud-localds storage-seed.iso storage-user-data storage-meta-data
+          ssh-keygen -R "[localhost]:2222" 2>/dev/null || true
+
+          truncate -s 1G usb-stick.img
+          printf 'label: gpt\n,,L\n' | sfdisk -q usb-stick.img
+          mkfs.ext4 -q -F -L CUPCAKE-DATA -E offset=1048576 usb-stick.img 1022M
+
+          sudo apt-get install -y nfs-kernel-server
+          sudo mkdir -p /srv/cupcake-nfs
+          echo '/srv/cupcake-nfs 127.0.0.1(rw,sync,no_subtree_check,no_root_squash,insecure)' | sudo tee /etc/exports
+          sudo exportfs -ra
+          sudo systemctl restart nfs-server
+          showmount -e 127.0.0.1
+
+      - name: Storage tests — boot overlay with the USB stick attached
+        timeout-minutes: 10
+        run: |
+          qemu-system-x86_64 \
+            -m 4096 -smp 2 \
+            -drive file=storage-test.qcow2,format=qcow2,if=virtio \
+            -drive file=storage-seed.iso,format=raw,if=virtio \
+            -device qemu-xhci,id=xhci \
+            -drive if=none,id=usbstick,file=usb-stick.img,format=raw \
+            -device usb-storage,bus=xhci.0,drive=usbstick \
+            -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+            -device virtio-net-pci,netdev=net0 \
+            -machine type=pc,accel=kvm -cpu host \
+            -display none -serial file:storage-serial.log &
+          echo "STORAGE_QEMU_PID=$!" >> $GITHUB_ENV
+          for i in $(seq 1 60); do
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -i cupckey -p 2222 cupcake@localhost true 2>/dev/null && exit 0
+            sleep 5
+          done
+          tail -50 storage-serial.log
+          exit 1
+
+      - name: Storage tests — drop-in files, USB stick, backup and NFS
+        timeout-minutes: 40
+        run: |
+          SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i cupckey -p 2222 cupcake@localhost"
+          phase() { $SSH "sudo /tmp/test-storage.sh $*"; }
+          reboot_vm() {
+            $SSH 'sudo systemctl reboot' 2>/dev/null || true
+            sleep 15
+            for i in $(seq 1 60); do
+              if $SSH true 2>/dev/null; then
+                $SSH 'systemctl is-system-running --wait >/dev/null 2>&1; true'
+                return 0
+              fi
+              sleep 5
+            done
+            tail -50 storage-serial.log
+            return 1
+          }
+
+          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/test-storage.sh cupcake@localhost:/tmp/
+          $SSH 'chmod +x /tmp/test-storage.sh'
+
+          echo "::group::Secrets are generated for this machine on first boot"
+          phase secrets-check "$CI_SECRET_HASH"
+          echo "::endgroup::"
+
+          echo "::group::Drop-in naming a drive that is not attached"
+          phase missing-prepare
+          reboot_vm
+          phase missing-check
+          echo "::endgroup::"
+
+          echo "::group::Drop-in mounting the USB stick by label"
+          phase usb-prepare
+          reboot_vm
+          phase usb-check
+          echo "::endgroup::"
+
+          echo "::group::USB storage survives a reboot"
+          reboot_vm
+          phase persist-check usb
+          echo "::endgroup::"
+
+          echo "::group::A broken drop-in leaves working storage untouched"
+          phase bad-drop-in-prepare
+          reboot_vm
+          phase bad-drop-in-check usb
+          echo "::endgroup::"
+
+          echo "::group::Full backup onto the USB stick"
+          phase backup-check
+          echo "::endgroup::"
+
+          echo "::group::Switch to NFS through the admin API"
+          phase nfs-apply 10.0.2.2 /srv/cupcake-nfs
+          echo "::endgroup::"
+
+          echo "::group::NFS storage survives a reboot"
+          reboot_vm
+          phase persist-check nfs
+          echo "::endgroup::"
+
+          sudo test -f /srv/cupcake-nfs/media/ci-nfs-marker.txt \
+            || { echo "FAIL: file written by the appliance is missing on the NFS server"; exit 1; }
+          echo "PASS: file written by the appliance arrived on the NFS server"
+
+      - name: Storage tests — discard overlay
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
+          for i in $(seq 1 60); do
+            kill -0 ${STORAGE_QEMU_PID:-0} 2>/dev/null || break
+            sleep 3
+          done
+          kill ${STORAGE_QEMU_PID:-0} 2>/dev/null || true
+          sleep 2
+          rm -f storage-test.qcow2 usb-stick.img storage-seed.iso
 
       - name: Compact and compress
         run: |
@@ -832,6 +955,13 @@ jobs:
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-cloudflared.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-storage.sh" "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
+          cp "${GITHUB_WORKSPACE}/provision/scripts/configure-wifi.sh" "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
+          chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
+          for helper in cupcake-storage-manager cupcake-network-manager; do
+            install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${helper}" "${ROOTFS_DIR}/usr/local/bin/${helper}"
+            install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/${helper}.socket" \
+              "${GITHUB_WORKSPACE}/provision/scripts/${helper}.service" "${ROOTFS_DIR}/etc/systemd/system/"
+          done
 
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/examples"
           cp "${GITHUB_WORKSPACE}/provision/config-examples/"*.example "${ROOTFS_DIR}/opt/cupcake/examples/"
@@ -1026,20 +1156,21 @@ jobs:
 
           ENV_FILE=/opt/cupcake/.env
 
-          if grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-              echo "Generating SECRET_KEY..."
+          MACHINE_ID=$(cat /etc/machine-id 2>/dev/null || true)
+          SECRETS_MARKER=/opt/cupcake/.secrets-machine-id
+          if [ -n "$MACHINE_ID" ] && [ "$(cat "$SECRETS_MARKER" 2>/dev/null || true)" != "$MACHINE_ID" ]; then
+              echo "Generating secrets for this machine..."
               SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')
-              sed -i "s|^SECRET_KEY=CHANGE-ON-FIRST-BOOT|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
-              echo "SECRET_KEY set"
-          fi
-
-          if grep -q "^COTURN_SECRET=CHANGE-ON-FIRST-BOOT" "$ENV_FILE"; then
-              echo "Generating COTURN_SECRET..."
               COTURN_SECRET=$(openssl rand -hex 20)
-              sed -i "s|^COTURN_SECRET=CHANGE-ON-FIRST-BOOT|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
-              sed -i "s|^static-auth-secret=CHANGE-ON-FIRST-BOOT|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+              sed -i "s|^SECRET_KEY=.*|SECRET_KEY=${SECRET_KEY}|" "$ENV_FILE"
+              sed -i "s|^COTURN_SECRET=.*|COTURN_SECRET=${COTURN_SECRET}|" "$ENV_FILE"
+              if [ -f /etc/turnserver.conf ]; then
+                  sed -i "s|^static-auth-secret=.*|static-auth-secret=${COTURN_SECRET}|" /etc/turnserver.conf
+              fi
+              printf '%s\n' "$MACHINE_ID" > "$SECRETS_MARKER"
+              chmod 600 "$SECRETS_MARKER"
               systemctl restart coturn 2>/dev/null || true
-              echo "COTURN_SECRET set"
+              echo "Secrets generated"
           fi
 
           WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
@@ -1355,6 +1486,7 @@ jobs:
           UNITEOF
 
           systemctl --root=/ enable cupcake-firstboot.service
+          systemctl --root=/ enable cupcake-storage-manager.socket cupcake-network-manager.socket
 
           cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
           [Unit]
@@ -1655,9 +1787,149 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+  test-rpi-firstboot:
+    name: RPi first boot (systemd-nspawn, arm64)
+    needs: build-rpi
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - name: Download RPi image
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-pi-arm64
+          path: rpi
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y systemd-container xz-utils
+
+      - name: Mount image and prepare a labelled USB stick
+        run: |
+          IMG=$(ls rpi/*.img.xz | head -1)
+          xz -d -T0 "$IMG"
+          IMG="${IMG%.xz}"
+          LOOP=$(sudo losetup -fP --show "$IMG")
+          echo "IMG_LOOP=$LOOP" >> $GITHUB_ENV
+          sudo mkdir -p /mnt/pi-root
+          sudo mount "${LOOP}p2" /mnt/pi-root
+          sudo mount "${LOOP}p1" /mnt/pi-root/boot/firmware
+
+          truncate -s 1G usb-stick.img
+          printf 'label: gpt\n,,L\n' | sfdisk -q usb-stick.img
+          STICK=$(sudo losetup -fP --show usb-stick.img)
+          sudo mkfs.ext4 -q -L CUPCAKE-DATA "${STICK}p1"
+          echo "STICK_PART=${STICK}p1" >> $GITHUB_ENV
+
+      - name: Drop configuration files onto the boot partition
+        run: |
+          BOOT=/mnt/pi-root/boot/firmware
+          printf 'TYPE=usb\nLABEL=CUPCAKE-DATA\n' | sudo tee "$BOOT/cupcake-storage.txt"
+          printf 'SSID=ci-network-that-does-not-exist\nPASSWORD=not-a-real-password\nCOUNTRY=GB\n' \
+            | sudo tee "$BOOT/cupcake-wifi.txt"
+          printf 'AUTHKEY=tskey-auth-invalid-ci-key\n' | sudo tee "$BOOT/cupcake-tailscale.txt"
+          printf 'TUNNEL_TOKEN=invalid-ci-token\n' | sudo tee "$BOOT/cupcake-cloudflared.txt"
+          if [ -s /mnt/pi-root/etc/machine-id ]; then
+            echo "Image ships a machine-id; every Pi would share the same secrets"
+            exit 1
+          fi
+
+      - name: Boot the image with systemd
+        run: |
+          sudo systemd-nspawn --boot --quiet \
+            --directory=/mnt/pi-root \
+            --machine=cupcake-pi \
+            --private-network \
+            --capability=CAP_SYS_ADMIN,CAP_NET_ADMIN \
+            --bind="$STICK_PART" \
+            --property="DeviceAllow=$STICK_PART rwm" \
+            > nspawn-console.log 2>&1 &
+          for i in $(seq 1 60); do
+            sudo machinectl show cupcake-pi >/dev/null 2>&1 && break
+            sleep 2
+          done
+          STATE=$(sudo timeout 900 systemd-run --machine=cupcake-pi --wait --pipe --quiet \
+            systemctl is-system-running --wait 2>/dev/null || true)
+          echo "System state after boot: ${STATE:-unknown}"
+          sudo systemd-run --machine=cupcake-pi --wait --pipe --quiet \
+            systemctl --failed --no-legend --plain || true
+
+      - name: Check first boot applied the drop-in files
+        run: |
+          cat > firstboot-check.sh << 'CHECKEOF'
+          #!/bin/bash
+          PASS=0
+          FAIL=0
+          check() {
+              local name="$1"
+              shift
+              if "$@" >/dev/null 2>&1; then
+                  echo "PASS: $name"
+                  PASS=$((PASS + 1))
+              else
+                  echo "FAIL: $name"
+                  FAIL=$((FAIL + 1))
+              fi
+          }
+          STICK_PART="$1"
+          MOUNT_POINT=/mnt/cupcake-data
+          MEDIA_PATH=/opt/cupcake/backend/media
+
+          check "first-boot finished" grep -q "=== first-boot.sh completed" /var/log/cupcake/first-boot.log
+          check "first-boot unit succeeded" bash -c \
+              '[ "$(systemctl show -p Result --value cupcake-firstboot)" = success ]'
+          for f in cupcake-storage.txt cupcake-wifi.txt cupcake-tailscale.txt cupcake-cloudflared.txt; do
+              check "drop-in $f consumed" test ! -e "/boot/firmware/$f"
+          done
+          check "SECRET_KEY generated on first boot" bash -c \
+              '! grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" /opt/cupcake/.env'
+          check "secrets tied to this machine" bash -c \
+              '[ "$(cat /opt/cupcake/.secrets-machine-id)" = "$(cat /etc/machine-id)" ]'
+          check "storage mounted" mountpoint -q "$MOUNT_POINT"
+          check "mounted from the labelled stick" bash -c \
+              "[ \"\$(findmnt -n -o SOURCE --target $MOUNT_POINT)\" = '$STICK_PART' ]"
+          check "fstab entry by UUID" grep -q "^UUID=.* $MOUNT_POINT " /etc/fstab
+          check "media on the stick" bash -c "[ \"\$(readlink -f $MEDIA_PATH)\" = '$MOUNT_POINT/media' ]"
+          check "backend user can write media" \
+              sudo -u cupcake-svc bash -c "echo ok > $MEDIA_PATH/ci-write-test.txt && rm $MEDIA_PATH/ci-write-test.txt"
+          check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
+          check "network manager socket active" systemctl is-active cupcake-network-manager.socket
+          check "backend active" systemctl is-active cupcake-backend
+          check "api responds" bash -c 'for i in $(seq 1 60); do
+              curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/ | grep -qE "^[234]" && exit 0
+              sleep 5; done; exit 1'
+
+          echo "=============================="
+          echo "RPi first boot: $PASS passed, $FAIL failed"
+          echo "=============================="
+          [ "$FAIL" -eq 0 ]
+          CHECKEOF
+          sudo install -m 755 firstboot-check.sh /mnt/pi-root/usr/local/sbin/ci-firstboot-check
+          sudo systemd-run --machine=cupcake-pi --wait --pipe --quiet \
+            /usr/local/sbin/ci-firstboot-check "$STICK_PART"
+
+      - name: Show first-boot log
+        if: always()
+        run: |
+          sudo cat /mnt/pi-root/var/log/cupcake/first-boot.log 2>/dev/null || echo "no first-boot log"
+          tail -100 nspawn-console.log 2>/dev/null || true
+
+      - name: Stop container and release loop devices
+        if: always()
+        run: |
+          sudo machinectl poweroff cupcake-pi 2>/dev/null || true
+          for i in $(seq 1 30); do
+            sudo machinectl show cupcake-pi >/dev/null 2>&1 || break
+            sleep 2
+          done
+          sudo machinectl terminate cupcake-pi 2>/dev/null || true
+          sudo umount -R /mnt/pi-root 2>/dev/null || true
+          [ -n "${IMG_LOOP:-}" ] && sudo losetup -d "$IMG_LOOP" || true
+          [ -n "${STICK_PART:-}" ] && sudo losetup -d "${STICK_PART%p1}" || true
+
   publish-release:
     name: Publish RPi image to release
-    needs: [build-rpi, build-db]
+    needs: [build-rpi, build-db, test-rpi-firstboot]
     if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:

@@ -260,7 +260,7 @@ func (b *BackupManager) ListBackups() ([]BackupInfo, error) {
 func (b *BackupManager) ImportDatabaseFromFile(srcPath, backendDir string) error {
 	b.log(fmt.Sprintf("Importing database from: %s", srcPath), "info")
 
-	dbDir := filepath.Join(backendDir, "cupcake-vanilla")
+	dbDir := BackendDataDir(backendDir)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		b.log(fmt.Sprintf("Failed to create database directory: %v", err), "error")
 		return fmt.Errorf("failed to create database directory: %w", err)

@@ -6,11 +6,10 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "http://localhost:4200",
-  "wailsjsdir": "./frontend/src/wailsjs",
   "bindings": {
     "output_dir": "./frontend/bindings",
     "ts_generation": {
-      "output_type": "classes"
+      "outputType": "classes"
     }
   },
   "author": {

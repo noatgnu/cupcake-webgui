@@ -19,49 +19,88 @@ TYPE="${1:-}"
 
 teardown_existing() {
     if mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
-        systemctl stop cupcake-backend cupcake-rqworker cupcake-transcribe-worker 2>/dev/null || true
+        systemctl stop cupcake-rqworker cupcake-transcribe-worker 2>/dev/null || true
         umount "$MOUNT_POINT" || umount -l "$MOUNT_POINT"
     fi
     sed -i "\| $MOUNT_POINT |d" /etc/fstab 2>/dev/null || true
     rm -f "$DROP_IN" "$SMB_CREDS"
 }
 
-teardown_existing
-mkdir -p "$MOUNT_POINT"
+trial_mount() {
+    local trial
+    trial=$(mktemp -d)
+    if mount "$@" "$trial"; then
+        umount "$trial"
+        rmdir "$trial"
+        return 0
+    fi
+    rmdir "$trial"
+    return 1
+}
 
 case "$TYPE" in
     usb)
         LABEL="${2:-}"
         FSTYPE="${3:-auto}"
         [ -z "$LABEL" ] && usage
-        DEVICE=$(blkid -L "$LABEL" 2>/dev/null || true)
+        udevadm settle --timeout=30 2>/dev/null || true
+        DEVICE=""
+        for _ in $(seq 1 15); do
+            DEVICE=$(blkid -L "$LABEL" 2>/dev/null || true)
+            [ -n "$DEVICE" ] && break
+            sleep 2
+        done
         if [ -z "$DEVICE" ]; then
-            echo "ERROR: no device found with label '$LABEL'" >&2
+            echo "ERROR: no device found with label '$LABEL'; existing storage left unchanged" >&2
             exit 1
         fi
-        mount -t "$FSTYPE" -o defaults,nofail "$DEVICE" "$MOUNT_POINT"
-        UUID=$(blkid -s UUID -o value "$DEVICE")
-        echo "UUID=${UUID} ${MOUNT_POINT} ${FSTYPE} defaults,nofail 0 2" >> /etc/fstab
         ;;
     nfs)
         SERVER="${2:-}"
         SHARE="${3:-}"
         [ -z "$SERVER" ] || [ -z "$SHARE" ] && usage
-        mount -t nfs -o defaults,nofail "${SERVER}:${SHARE}" "$MOUNT_POINT"
-        echo "${SERVER}:${SHARE} ${MOUNT_POINT} nfs defaults,nofail 0 0" >> /etc/fstab
+        if ! trial_mount -t nfs "${SERVER}:${SHARE}"; then
+            echo "ERROR: cannot mount ${SERVER}:${SHARE}; existing storage left unchanged" >&2
+            exit 1
+        fi
         ;;
     smb)
         SERVER_SHARE="${2:-}"
         USERNAME="${3:-}"
         PASSWORD="${4:-}"
         [ -z "$SERVER_SHARE" ] && usage
-        printf 'username=%s\npassword=%s\n' "$USERNAME" "$PASSWORD" > "$SMB_CREDS"
-        chmod 600 "$SMB_CREDS"
-        mount -t cifs -o "credentials=${SMB_CREDS},nofail" "$SERVER_SHARE" "$MOUNT_POINT"
-        echo "${SERVER_SHARE} ${MOUNT_POINT} cifs credentials=${SMB_CREDS},nofail 0 0" >> /etc/fstab
+        TRIAL_CREDS=$(mktemp)
+        chmod 600 "$TRIAL_CREDS"
+        printf 'username=%s\npassword=%s\n' "$USERNAME" "$PASSWORD" > "$TRIAL_CREDS"
+        if ! trial_mount -t cifs -o "credentials=${TRIAL_CREDS}" "$SERVER_SHARE"; then
+            rm -f "$TRIAL_CREDS"
+            echo "ERROR: cannot mount ${SERVER_SHARE}; existing storage left unchanged" >&2
+            exit 1
+        fi
         ;;
     *)
         usage
+        ;;
+esac
+
+teardown_existing
+mkdir -p "$MOUNT_POINT"
+
+case "$TYPE" in
+    usb)
+        mount -t "$FSTYPE" -o defaults,nofail "$DEVICE" "$MOUNT_POINT"
+        UUID=$(blkid -s UUID -o value "$DEVICE")
+        echo "UUID=${UUID} ${MOUNT_POINT} ${FSTYPE} defaults,nofail 0 2" >> /etc/fstab
+        ;;
+    nfs)
+        mount -t nfs -o defaults,nofail "${SERVER}:${SHARE}" "$MOUNT_POINT"
+        echo "${SERVER}:${SHARE} ${MOUNT_POINT} nfs defaults,nofail 0 0" >> /etc/fstab
+        ;;
+    smb)
+        mv "$TRIAL_CREDS" "$SMB_CREDS"
+        chmod 600 "$SMB_CREDS"
+        mount -t cifs -o "credentials=${SMB_CREDS},nofail" "$SERVER_SHARE" "$MOUNT_POINT"
+        echo "${SERVER_SHARE} ${MOUNT_POINT} cifs credentials=${SMB_CREDS},nofail 0 0" >> /etc/fstab
         ;;
 esac
 
@@ -88,8 +127,9 @@ RequiresMountsFor=${MOUNT_POINT}
 DROPIN
 
 systemctl daemon-reload
-systemctl is-active cupcake-backend >/dev/null 2>&1 && \
-    systemctl restart cupcake-backend cupcake-rqworker cupcake-transcribe-worker || true
+if systemctl is-active cupcake-backend >/dev/null 2>&1; then
+    systemctl restart --no-block cupcake-backend cupcake-rqworker cupcake-transcribe-worker || true
+fi
 
 echo "Storage configured: ${TYPE} at ${MOUNT_POINT}"
 echo "Media: ${MEDIA_PATH} -> ${MOUNT_POINT}/media"

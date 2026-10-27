@@ -125,6 +125,9 @@ func (a *App) InitializeBackend() {
 	a.pythonManager.SetLogCallback(func(message string, msgType string) {
 		a.sendBackendLog(fmt.Sprintf("python: %s", message), msgType)
 	})
+	a.pythonManager.SetProgressHandler(func(progress models.DownloadProgress) {
+		a.wailsApp.Event.Emit("download:progress", progress)
+	})
 	a.downloader = services.NewDownloadManager()
 
 	a.redisManager = services.NewRedisManager(services.RedisManagerOptions{
@@ -217,6 +220,13 @@ func (a *App) startBackendServices(createNewVenv bool, pythonPath string) {
 		a.sendBackendStatus("python", "error", "No Python selected")
 		return
 	}
+
+	resolvedPython, err := a.pythonManager.ResolvePython(pythonPath)
+	if err != nil {
+		a.sendBackendStatus("python", "error", fmt.Sprintf("Python installation failed: %v", err))
+		return
+	}
+	pythonPath = resolvedPython
 
 	a.sendBackendStatus("python", "ready", fmt.Sprintf("Using Python: %s", pythonPath))
 
@@ -325,7 +335,7 @@ func (a *App) SetAppMenu(menu *application.Menu) {
 func (a *App) transitionToMainWindow() {
 	log.Println("[App.transitionToMainWindow] Transitioning to main application...")
 
-	a.mainWindow = a.wailsApp.Window.New()
+	a.mainWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "main"})
 	a.mainWindow.SetTitle("Cupcake")
 	a.mainWindow.SetSize(1200, 800)
 	a.mainWindow.SetMinSize(800, 600)
@@ -396,7 +406,7 @@ func (a *App) showBackendDownloadDialog() {
 		return
 	}
 
-	a.downloaderWindow = a.wailsApp.Window.New()
+	a.downloaderWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "downloader"})
 	a.downloaderWindow.SetTitle("Download Backend")
 	a.downloaderWindow.SetSize(500, 400)
 	a.downloaderWindow.SetMinSize(400, 300)
@@ -417,7 +427,7 @@ func (a *App) showPythonSelectionDialog() {
 		return
 	}
 
-	a.pythonSelectionWindow = a.wailsApp.Window.New()
+	a.pythonSelectionWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "python-selection"})
 	a.pythonSelectionWindow.SetTitle("Select Python")
 	a.pythonSelectionWindow.SetSize(520, 450)
 	a.pythonSelectionWindow.SetMinSize(400, 350)
@@ -438,7 +448,7 @@ func (a *App) showValkeyDownloadDialog() {
 		return
 	}
 
-	a.downloaderWindow = a.wailsApp.Window.New()
+	a.downloaderWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "downloader"})
 	a.downloaderWindow.SetTitle("Download Valkey")
 	a.downloaderWindow.SetSize(500, 400)
 	a.downloaderWindow.SetMinSize(400, 300)
@@ -459,7 +469,7 @@ func (a *App) showSuperuserCreationModal() {
 		return
 	}
 
-	a.superuserWindow = a.wailsApp.Window.New()
+	a.superuserWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "superuser"})
 	a.superuserWindow.SetTitle("Create Admin Account")
 	a.superuserWindow.SetSize(450, 400)
 	a.superuserWindow.SetMinSize(400, 350)
@@ -628,8 +638,18 @@ func (a *App) SetupNativeBackend(pythonPath string, branch string) error {
 		return err
 	}
 
+	a.sendBackendLog("Preparing Python...", "info")
+	interpreter, err := a.pythonManager.ResolvePython(pythonPath)
+	if err != nil {
+		a.wailsApp.Event.Emit("download:complete", models.DownloadComplete{
+			Success: false,
+			Message: fmt.Sprintf("Failed to install Python: %v", err),
+		})
+		return err
+	}
+
 	a.sendBackendLog("Creating virtual environment...", "info")
-	venvPython, err := a.pythonManager.CreateVirtualEnvironment(pythonPath)
+	venvPython, err := a.pythonManager.CreateVirtualEnvironment(interpreter)
 	if err != nil {
 		a.wailsApp.Event.Emit("download:complete", models.DownloadComplete{
 			Success: false,
@@ -639,7 +659,7 @@ func (a *App) SetupNativeBackend(pythonPath string, branch string) error {
 	}
 
 	config := a.pythonManager.LoadConfig()
-	config.PythonPath = pythonPath
+	config.PythonPath = interpreter
 	config.VenvPath = venvPython
 	config.DistributionType = models.DistributionNative
 	config.BackendSource = models.BackendSourceGit
@@ -1052,6 +1072,22 @@ func (a *App) GetAvailableReleases() ([]models.ReleaseInfo, error) {
 	return downloader.GetAvailableReleases()
 }
 
+// DownloadFile saves a backend download link, such as a finished export, into the user's
+// Downloads folder and returns the saved file's path.
+func (a *App) DownloadFile(downloadURL string, filename string) (string, error) {
+	destDir, err := services.UserDownloadsDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to locate the Downloads folder: %w", err)
+	}
+	saved, err := services.SaveDownload(downloadURL, filename, services.MediaRoot(a.getBackendPath()), destDir)
+	if err != nil {
+		log.Printf("[App.DownloadFile] %v", err)
+		return "", err
+	}
+	log.Printf("[App.DownloadFile] Saved %s", saved)
+	return saved, nil
+}
+
 func (a *App) OpenFile(title string) (string, error) {
 	return a.wailsApp.Dialog.OpenFile().
 		SetTitle(title).
@@ -1107,7 +1143,7 @@ func (a *App) OpenManagementPanel() {
 		return
 	}
 
-	a.managementWindow = a.wailsApp.Window.New()
+	a.managementWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "management"})
 	a.managementWindow.SetTitle("Database Setup")
 	a.managementWindow.SetSize(700, 600)
 	a.managementWindow.SetMinSize(600, 500)
@@ -1128,7 +1164,7 @@ func (a *App) OpenDebugPanel() {
 		return
 	}
 
-	a.debugWindow = a.wailsApp.Window.New()
+	a.debugWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "debug"})
 	a.debugWindow.SetTitle("Debug Panel")
 	a.debugWindow.SetSize(800, 600)
 	a.debugWindow.SetMinSize(600, 400)
@@ -1179,7 +1215,7 @@ func (a *App) CloseDebugWindow() {
 func (a *App) OpenBackendSetupPanel() {
 	log.Println("[App] Opening backend setup panel window...")
 
-	window := a.wailsApp.Window.New()
+	window := a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "backend-setup"})
 	window.SetTitle("Backend Setup")
 	window.SetSize(600, 500)
 	window.SetMinSize(500, 400)
@@ -1217,7 +1253,7 @@ func (a *App) OpenPasswordResetPanel() {
 		return
 	}
 
-	a.passwordResetWindow = a.wailsApp.Window.New()
+	a.passwordResetWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "password-reset"})
 	a.passwordResetWindow.SetTitle("Reset Password")
 	a.passwordResetWindow.SetSize(450, 350)
 	a.passwordResetWindow.SetMinSize(400, 300)

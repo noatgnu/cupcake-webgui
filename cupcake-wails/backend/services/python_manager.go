@@ -18,6 +18,7 @@ import (
 type PythonManager struct {
 	userDataPath string
 	configPath   string
+	uv           *UvManager
 	logCallback  func(message string, msgType string)
 }
 
@@ -25,11 +26,25 @@ func NewPythonManager(userDataPath string) *PythonManager {
 	return &PythonManager{
 		userDataPath: userDataPath,
 		configPath:   filepath.Join(userDataPath, "python-config.json"),
+		uv:           NewUvManager(userDataPath),
 	}
 }
 
 func (p *PythonManager) SetLogCallback(callback func(message string, msgType string)) {
 	p.logCallback = callback
+	p.uv.SetLogCallback(func(message string, msgType string) {
+		p.log(fmt.Sprintf("uv: %s", message), msgType)
+	})
+}
+
+// SetProgressHandler receives download progress while uv itself is being fetched.
+func (p *PythonManager) SetProgressHandler(handler func(models.DownloadProgress)) {
+	p.uv.SetProgressHandler(handler)
+}
+
+// Uv exposes the uv manager used for native installs.
+func (p *PythonManager) Uv() *UvManager {
+	return p.uv
 }
 
 func (p *PythonManager) log(message string, msgType string) {
@@ -73,8 +88,15 @@ func (p *PythonManager) IsConfigurationValid() bool {
 	return result.Valid
 }
 
+// DetectPythonCandidates lists the uv-managed interpreter first, followed by every compatible
+// system, pyenv and conda interpreter found on this machine.
 func (p *PythonManager) DetectPythonCandidates() []models.PythonCandidate {
-	var candidates []models.PythonCandidate
+	candidates := []models.PythonCandidate{{
+		Command: "uv",
+		Version: ManagedPythonVersion,
+		Path:    UvManagedPythonPrefix + ManagedPythonVersion,
+		Managed: true,
+	}}
 	seen := make(map[string]bool)
 
 	pythonCommands := []string{"python3.12", "python3.13", "python3", "python"}
@@ -171,7 +193,25 @@ func (p *PythonManager) DetectPythonCandidates() []models.PythonCandidate {
 	return candidates
 }
 
+// ResolvePython turns a uv-managed candidate path into a concrete interpreter, installing it
+// with uv when needed; other paths are returned unchanged.
+func (p *PythonManager) ResolvePython(pythonPath string) (string, error) {
+	version, managed := IsUvManagedPythonPath(pythonPath)
+	if !managed {
+		return pythonPath, nil
+	}
+	return p.uv.InstallPython(version)
+}
+
 func (p *PythonManager) VerifyPython(pythonPath string) models.ValidationResult {
+	if version, managed := IsUvManagedPythonPath(pythonPath); managed {
+		return models.ValidationResult{
+			Valid:   true,
+			Version: version,
+			Message: "Python will be installed and managed by uv",
+		}
+	}
+
 	parts := strings.Fields(pythonPath)
 	var cmd *exec.Cmd
 	if len(parts) > 1 {
@@ -233,28 +273,18 @@ func (p *PythonManager) CreateVirtualEnvironment(basePythonPath string) (string,
 		os.RemoveAll(venvDir)
 	}
 
+	basePythonPath, err := p.ResolvePython(basePythonPath)
+	if err != nil {
+		p.log(fmt.Sprintf("Python installation failed: %v", err), "error")
+		return "", err
+	}
+
 	p.log(fmt.Sprintf("Creating virtual environment using %s...", basePythonPath), "info")
 
-	parts := strings.Fields(basePythonPath)
-	var cmd *exec.Cmd
-	if len(parts) > 1 {
-		cmd = exec.Command(parts[0], append(parts[1:], "-m", "venv", venvDir)...)
-	} else {
-		cmd = exec.Command(basePythonPath, "-m", "venv", venvDir)
-	}
-	hideWindow(cmd)
-
-	output, err := cmd.CombinedOutput()
+	venvPython, err := p.createVenv(basePythonPath, venvDir)
 	if err != nil {
 		p.log(fmt.Sprintf("Virtual environment creation failed: %v", err), "error")
-		return "", fmt.Errorf("failed to create venv: %v, output: %s", err, string(output))
-	}
-
-	var venvPython string
-	if runtime.GOOS == "windows" {
-		venvPython = filepath.Join(venvDir, "Scripts", "python.exe")
-	} else {
-		venvPython = filepath.Join(venvDir, "bin", "python")
+		return "", err
 	}
 
 	if _, err := os.Stat(venvPython); os.IsNotExist(err) {
@@ -268,6 +298,30 @@ func (p *PythonManager) CreateVirtualEnvironment(basePythonPath string) (string,
 
 	p.log("Virtual environment created successfully", "success")
 	return venvPython, nil
+}
+
+// createVenv prefers uv and falls back to the interpreter's own venv module when uv cannot be obtained.
+func (p *PythonManager) createVenv(basePythonPath, venvDir string) (string, error) {
+	_, uvErr := p.uv.EnsureUv()
+	if uvErr == nil {
+		return p.uv.CreateVenv(basePythonPath, venvDir)
+	}
+	p.log(fmt.Sprintf("uv unavailable, using python -m venv: %v", uvErr), "warning")
+
+	parts := strings.Fields(basePythonPath)
+	var cmd *exec.Cmd
+	if len(parts) > 1 {
+		cmd = exec.Command(parts[0], append(parts[1:], "-m", "venv", venvDir)...)
+	} else {
+		cmd = exec.Command(basePythonPath, "-m", "venv", venvDir)
+	}
+	hideWindow(cmd)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to create venv: %v, output: %s", err, string(output))
+	}
+	return venvPythonPath(venvDir), nil
 }
 
 func (p *PythonManager) CheckVirtualEnvironment() string {
@@ -296,6 +350,16 @@ func (p *PythonManager) CheckVirtualEnvironment() string {
 func (p *PythonManager) InstallDependencies(pythonPath, requirementsPath string) error {
 	if _, err := os.Stat(requirementsPath); os.IsNotExist(err) {
 		p.log("No requirements.txt found, skipping dependency installation", "warning")
+		return nil
+	}
+
+	if p.uv.IsAvailable() {
+		p.log("Installing Python dependencies with uv...", "info")
+		if err := p.uv.InstallRequirements(pythonPath, requirementsPath); err != nil {
+			p.log(fmt.Sprintf("Dependency installation failed: %v", err), "error")
+			return err
+		}
+		p.log("All dependencies installed successfully", "success")
 		return nil
 	}
 

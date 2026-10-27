@@ -18,8 +18,9 @@ describe('DownloaderComponent', () => {
   ];
 
   const mockPythonCandidates: PythonCandidate[] = [
-    { command: 'python3.12', version: '3.12.0', path: '/usr/bin/python3.12' },
-    { command: 'python3.11', version: '3.11.0', path: '/usr/bin/python3.11' }
+    { command: 'uv', version: '3.12', path: 'uv:3.12', managed: true },
+    { command: 'python3.12', version: '3.12.0', path: '/usr/bin/python3.12', managed: false },
+    { command: 'python3.11', version: '3.11.0', path: '/usr/bin/python3.11', managed: false }
   ];
 
   beforeEach(async () => {
@@ -83,7 +84,18 @@ describe('DownloaderComponent', () => {
       await component.ngOnInit();
       expect(component.selectedVersion()).toBe('master');
       expect(component.selectedBranch()).toBe('master');
-      expect(component.selectedPython()).toBe('/usr/bin/python3.12');
+      expect(component.selectedPython()).toBe('uv:3.12');
+    });
+
+    it('should label the uv-managed python in native mode', async () => {
+      await component.ngOnInit();
+      component.setDistributionMode('native');
+      fixture.detectChanges();
+      const rows = Array.from(fixture.nativeElement.querySelectorAll('.python-section .select-row') as NodeListOf<HTMLElement>);
+      expect(rows.length).toBe(3);
+      expect(rows[0].textContent).toContain('Installed by uv');
+      expect(rows[0].querySelector('code')).toBeNull();
+      expect(rows[1].querySelector('code')?.textContent?.trim()).toBe('/usr/bin/python3.12');
     });
 
     it('should default to portable distribution mode', () => {
@@ -139,7 +151,7 @@ describe('DownloaderComponent', () => {
       await component.ngOnInit();
       component.setDistributionMode('native');
       await component.startDownload();
-      expect(mockWailsService.setupNativeBackend).toHaveBeenCalledWith('/usr/bin/python3.12', 'master');
+      expect(mockWailsService.setupNativeBackend).toHaveBeenCalledWith('uv:3.12', 'master');
     });
   });
 

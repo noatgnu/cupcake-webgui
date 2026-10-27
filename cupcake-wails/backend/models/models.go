@@ -38,6 +38,7 @@ type PythonCandidate struct {
 	Command string `json:"command"`
 	Version string `json:"version"`
 	Path    string `json:"path"`
+	Managed bool   `json:"managed"`
 }
 
 type ValidationResult struct {

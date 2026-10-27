@@ -311,7 +311,7 @@ func main() {
 	testAPI := NewTestAPI(app)
 	testAPI.Start(9999)
 
-	splashWindow := wailsApp.Window.New()
+	splashWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "splash"})
 	splashWindow.SetTitle("Cupcake - Starting...")
 	splashWindow.SetSize(600, 500)
 	splashWindow.SetResizable(false)

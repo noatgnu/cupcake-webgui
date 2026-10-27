@@ -22,23 +22,34 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+WAILS_VERSION="v3.0.0"
+
 BUILD_MODE="${1:-release}"
 PLATFORM="${2:-$(go env GOOS)}"
 ARCH="${3:-$(go env GOARCH)}"
 DEBUG_BUILD="${DEBUG_BUILD:-false}"
+ENABLE_MCP="${ENABLE_MCP:-false}"
 
 log_info "Building Cupcake Wails..."
 log_info "Mode: $BUILD_MODE"
 log_info "Platform: $PLATFORM"
 log_info "Architecture: $ARCH"
 log_info "Debug: $DEBUG_BUILD"
+log_info "MCP: $ENABLE_MCP"
 
 check_wails() {
     export PATH="$HOME/go/bin:$PATH"
     if ! command -v wails3 &> /dev/null; then
         log_error "wails3 command not found. Installing..."
-        go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}"
     fi
+}
+
+needs_gtk3_tag() {
+    if command -v pkg-config &> /dev/null && pkg-config --atleast-version=4.10 gtk4 2>/dev/null; then
+        return 1
+    fi
+    return 0
 }
 
 build_frontend() {
@@ -144,6 +155,16 @@ build_app() {
             ldflags="${ldflags} -H windowsgui"
         fi
 
+        if [ "$PLATFORM" = "linux" ] && needs_gtk3_tag; then
+            log_info "GTK4 >= 4.10 not found, building with -tags gtk3"
+            build_tags="${build_tags:+${build_tags},}gtk3"
+        fi
+
+        if [ "$ENABLE_MCP" = "true" ]; then
+            log_info "MCP build: Wails MCP automation server enabled"
+            build_tags="${build_tags:+${build_tags},}mcp"
+        fi
+
         local cc=""
         local cgo_enabled=1
         local current_os=$(go env GOOS)
@@ -192,7 +213,11 @@ build_app() {
 
 generate_bindings() {
     log_info "Generating TypeScript bindings..."
-    wails3 generate bindings -ts -d frontend/bindings
+    if [ "$(go env GOOS)" = "linux" ] && needs_gtk3_tag; then
+        wails3 generate bindings -ts -f "-tags gtk3" -d frontend/bindings
+    else
+        wails3 generate bindings -ts -d frontend/bindings
+    fi
 }
 
 generate_windows_resources() {
@@ -230,7 +255,11 @@ clean() {
 
 run_go_tests() {
     log_info "Running Go unit tests..."
-    go test -v ./... -count=1 2>&1 | tee test_results.log
+    local test_tags=""
+    if [ "$(go env GOOS)" = "linux" ] && needs_gtk3_tag; then
+        test_tags="-tags gtk3"
+    fi
+    go test $test_tags -v ./... -count=1 2>&1 | tee test_results.log
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
         log_error "Go tests failed!"
         exit 1
@@ -464,6 +493,7 @@ case "$BUILD_MODE" in
         echo ""
         echo "Environment variables:"
         echo "  DEBUG_BUILD=true    - Force debug build (devtools enabled)"
+        echo "  ENABLE_MCP=true     - Compile in the Wails MCP server used by UI tests"
         echo ""
         echo "Examples:"
         echo "  $0 all-platforms         # Build release for Linux + Windows + tests"

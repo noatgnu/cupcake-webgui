@@ -54,6 +54,8 @@ Thumbs.db
 /cupcake-wails/frontend/src/wailsjs
 /cupcake-wails/frontend/.angular
 /cupcake-wails/frontend/test-results
+/cupcake-wails/frontend/playwright-report
+/cupcake-wails/frontend/playwright-report-ui
 /cupcake-wails/mainapp/dist
 /cupcake-wails/build
 
