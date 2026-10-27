@@ -347,15 +347,63 @@ func (p *PythonManager) CheckVirtualEnvironment() string {
 	return ""
 }
 
+// localPackageTargets returns pip install targets for requirementsPath with the backend's own
+// packages/ entries, which the export records as absolute paths on the exporting machine,
+// replaced by the packages/ directories next to the requirements file. The returned cleanup
+// removes the filtered requirements file.
+func localPackageTargets(requirementsPath string) ([]string, func(), error) {
+	content, err := os.ReadFile(requirementsPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var kept []string
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.Contains(filepath.ToSlash(line), "packages/") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+
+	filtered, err := os.CreateTemp("", "cupcake-requirements-*.txt")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { os.Remove(filtered.Name()) }
+	if _, err := filtered.WriteString(strings.Join(kept, "\n")); err != nil {
+		filtered.Close()
+		cleanup()
+		return nil, nil, err
+	}
+	if err := filtered.Close(); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+
+	targets := []string{"-r", filtered.Name()}
+	projects, _ := filepath.Glob(filepath.Join(filepath.Dir(requirementsPath), "packages", "*", "pyproject.toml"))
+	for _, project := range projects {
+		targets = append(targets, filepath.Dir(project))
+	}
+	return targets, cleanup, nil
+}
+
 func (p *PythonManager) InstallDependencies(pythonPath, requirementsPath string) error {
 	if _, err := os.Stat(requirementsPath); os.IsNotExist(err) {
 		p.log("No requirements.txt found, skipping dependency installation", "warning")
 		return nil
 	}
 
+	targets, cleanup, err := localPackageTargets(requirementsPath)
+	if err != nil {
+		p.log(fmt.Sprintf("Failed to read requirements: %v", err), "error")
+		return err
+	}
+	defer cleanup()
+
 	if p.uv.IsAvailable() {
 		p.log("Installing Python dependencies with uv...", "info")
-		if err := p.uv.InstallRequirements(pythonPath, requirementsPath); err != nil {
+		if err := p.uv.InstallPackages(pythonPath, targets); err != nil {
 			p.log(fmt.Sprintf("Dependency installation failed: %v", err), "error")
 			return err
 		}
@@ -365,7 +413,7 @@ func (p *PythonManager) InstallDependencies(pythonPath, requirementsPath string)
 
 	p.log("Installing Python dependencies...", "info")
 
-	cmd := exec.Command(pythonPath, "-m", "pip", "install", "--progress-bar", "off", "-r", requirementsPath)
+	cmd := exec.Command(pythonPath, append([]string{"-m", "pip", "install", "--progress-bar", "off"}, targets...)...)
 	hideWindow(cmd)
 
 	stdout, err := cmd.StdoutPipe()

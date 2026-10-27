@@ -37,12 +37,18 @@ test.describe('First run: native backend provisioned with uv-managed Python', ()
     await mcp.click('.panel-footer .btn-primary', 'downloader');
     expect(await mcp.waitForElement('.progress-section, .success-bar', 30000, 'downloader')).toBe(true);
 
+    const logPath: string = await mcp.callBoundMethod('main.App.GetLogFilePath');
     let downloadError: string | undefined;
+    let serviceError: string | undefined;
     const settled = await mcp.waitFor(async () => {
       downloadError = await mcp.elementText('.error-bar .error-text', 'downloader').catch(() => undefined);
-      return !!downloadError || (await mcp.callBoundMethod('main.App.IsBackendReady'));
+      serviceError = readFileSync(logPath, 'utf8')
+        .split('\n')
+        .find(line => /^\S+ \S+ \[\w+\] error: /.test(line));
+      return !!downloadError || !!serviceError || (await mcp.callBoundMethod('main.App.IsBackendReady'));
     }, BACKEND_READY_TIMEOUT, 5000);
     expect(downloadError).toBeUndefined();
+    expect(serviceError).toBeUndefined();
     expect(settled).toBe(true);
   });
 

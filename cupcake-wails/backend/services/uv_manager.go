@@ -279,13 +279,14 @@ func (u *UvManager) CreateVenv(interpreter, venvDir string) (string, error) {
 	return venvPythonPath(venvDir), nil
 }
 
-// InstallRequirements installs a requirements file into the environment owning venvPython.
-func (u *UvManager) InstallRequirements(venvPython, requirementsPath string) error {
+// InstallPackages runs uv pip install with the given targets into the environment owning venvPython.
+func (u *UvManager) InstallPackages(venvPython string, targets []string) error {
 	uvPath, err := u.EnsureUv()
 	if err != nil {
 		return err
 	}
-	if err := u.stream(u.command(uvPath, "pip", "install", "--python", venvPython, "-r", requirementsPath)); err != nil {
+	args := append([]string{"pip", "install", "--python", venvPython}, targets...)
+	if err := u.stream(u.command(uvPath, args...)); err != nil {
 		return fmt.Errorf("uv pip install failed: %w", err)
 	}
 	return nil
