@@ -1956,7 +1956,7 @@ jobs:
     if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     env:
-      MIRROR_HOST: ${{ secrets.MIRROR_HOST }}
+      MIRROR_SSH_HOST: ${{ secrets.MIRROR_SSH_HOST }}
     steps:
       - uses: actions/checkout@v4
 
@@ -1987,19 +1987,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload release to the download mirror
-        if: env.MIRROR_HOST != ''
+        if: env.MIRROR_SSH_HOST != ''
         env:
+          MIRROR_URL: ${{ vars.MIRROR_URL }}
           MIRROR_PORT: ${{ secrets.MIRROR_PORT }}
           MIRROR_HOST_KEY: ${{ secrets.MIRROR_HOST_KEY }}
           MIRROR_SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
           TAG: ${{ github.event.release.tag_name || github.ref_name }}
           PRERELEASE: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PORT="${MIRROR_PORT:-22}"
           install -d -m 700 ~/.ssh
           printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/mirror
           chmod 600 ~/.ssh/mirror
-          if [ "$PORT" = 22 ]; then KNOWN="$MIRROR_HOST"; else KNOWN="[$MIRROR_HOST]:$PORT"; fi
+          if [ "$PORT" = 22 ]; then KNOWN="$MIRROR_SSH_HOST"; else KNOWN="[$MIRROR_SSH_HOST]:$PORT"; fi
           printf '%s %s\n' "$KNOWN" "$MIRROR_HOST_KEY" > ~/.ssh/known_hosts
           SSH="ssh -i $HOME/.ssh/mirror -p $PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
 
@@ -2008,13 +2010,26 @@ jobs:
           cp release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 
-          rsync -rt --partial --chmod=D755,F644 -e "$SSH" mirror/cupcake/ "mirror@$MIRROR_HOST:cupcake/"
+          rsync -rt --partial --chmod=D755,F644 -e "$SSH" mirror/cupcake/ "mirror@$MIRROR_SSH_HOST:cupcake/"
 
           if [ "$PRERELEASE" != "true" ]; then
             echo "$TAG" > mirror/LATEST
-            rsync -t --chmod=F644 -e "$SSH" mirror/LATEST "mirror@$MIRROR_HOST:cupcake/LATEST"
+            rsync -t --chmod=F644 -e "$SSH" mirror/LATEST "mirror@$MIRROR_SSH_HOST:cupcake/LATEST"
           fi
-          echo "Mirrored $TAG to $MIRROR_HOST" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$MIRROR_URL" ]; then
+            echo "Uploaded $TAG to the mirror; set the MIRROR_URL variable to verify and link it" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          RELEASE_URL="${MIRROR_URL%/}/cupcake/$TAG/"
+          curl -fsS "${RELEASE_URL}SHA256SUMS" | diff - "$RELEASE_DIR/SHA256SUMS"
+          echo "Mirrored $TAG: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
+
+          NOTES=$(gh release view "$TAG" --json body --jq .body)
+          if ! grep -qF "$RELEASE_URL" <<< "$NOTES"; then
+            printf '%s\n\nMirror download: %s\n' "$NOTES" "$RELEASE_URL" > release-notes.md
+            gh release edit "$TAG" --notes-file release-notes.md
+          fi
 
   summary:
     name: Summary
