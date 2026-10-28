@@ -282,6 +282,7 @@
       ansible.builtin.pip:
         requirements: /opt/cupcake/backend/requirements.txt
         virtualenv: /opt/cupcake/venv
+        chdir: /opt/cupcake/backend
       tags: [backend]
 
     - name: Install additional Python packages
