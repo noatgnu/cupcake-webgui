@@ -6,4 +6,4 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-tailscale up --authkey "$1" --ssh
+tailscale up --authkey "$1" --ssh --timeout=90s

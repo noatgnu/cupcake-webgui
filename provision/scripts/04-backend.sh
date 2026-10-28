@@ -94,7 +94,8 @@ TAILSCALE_CONFIG=/opt/cupcake/tailscale-auth.txt
 if [ -f "$TAILSCALE_CONFIG" ]; then
     AUTHKEY=$(grep "^AUTHKEY=" "$TAILSCALE_CONFIG" | cut -d= -f2-)
     if [ -n "$AUTHKEY" ]; then
-        tailscale up --authkey "$AUTHKEY" --ssh 2>/dev/null || true
+        tailscale up --authkey "$AUTHKEY" --ssh --timeout=90s \
+            || echo "Tailscale did not connect; check the auth key and network"
     fi
     rm -f "$TAILSCALE_CONFIG"
 fi
@@ -103,7 +104,8 @@ CLOUDFLARED_CONFIG=/opt/cupcake/cloudflared-token.txt
 if [ -f "$CLOUDFLARED_CONFIG" ]; then
     TOKEN=$(grep "^TUNNEL_TOKEN=" "$CLOUDFLARED_CONFIG" | cut -d= -f2-)
     if [ -n "$TOKEN" ]; then
-        cloudflared service install "$TOKEN" 2>/dev/null || true
+        timeout 60 cloudflared service install "$TOKEN" \
+            || echo "Cloudflare tunnel was not installed; check the tunnel token"
         systemctl enable --now cloudflared 2>/dev/null || true
     fi
     rm -f "$CLOUDFLARED_CONFIG"

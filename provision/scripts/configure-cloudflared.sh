@@ -7,5 +7,5 @@ if [ -z "$1" ]; then
 fi
 
 cloudflared service uninstall 2>/dev/null || true
-cloudflared service install "$1"
+timeout 60 cloudflared service install "$1"
 systemctl enable --now cloudflared
