@@ -28,6 +28,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build-frontend:
@@ -1801,11 +1802,12 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download RPi image
-        uses: actions/download-artifact@v4
-        with:
-          name: cupcake-pi-arm64
-          path: rpi
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/download-artifact-verified.sh cupcake-pi-arm64 rpi
 
       - name: Install tools
         run: |
@@ -1961,17 +1963,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download RPi image
-        uses: actions/download-artifact@v4
-        with:
-          name: cupcake-pi-arm64
-          path: release-assets/
-
-      - name: Download mobile snapshot
-        uses: actions/download-artifact@v4
-        with:
-          name: cupcake-mobile-snapshot
-          path: release-assets/
+      - name: Download RPi image and mobile snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .github/scripts/download-artifact-verified.sh cupcake-pi-arm64 release-assets
+          .github/scripts/download-artifact-verified.sh cupcake-mobile-snapshot release-assets
 
       - name: Publish to GitHub release
         uses: softprops/action-gh-release@v2
