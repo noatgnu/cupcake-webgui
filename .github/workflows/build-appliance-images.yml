@@ -889,8 +889,12 @@ jobs:
 
       - name: Patch pi-gen for qemu-user-static compatibility
         run: |
-          sed -i 's/qemu-arm:qemu-user-binfmt/qemu-arm-static:qemu-user-static/' pi-gen/depends
-          sudo ln -sf /usr/bin/qemu-arm-static /usr/local/bin/qemu-arm
+          sed -i -E 's/^qemu-[a-z0-9_]+:qemu-user-binfmt$/qemu-aarch64-static:qemu-user-static/' pi-gen/depends
+          if grep -q "qemu-user-binfmt" pi-gen/depends; then
+            echo "pi-gen/depends still requires qemu-user-binfmt; update the patch:"
+            grep -n "qemu" pi-gen/depends
+            exit 1
+          fi
 
           cat >> pi-gen/stage0/prerun.sh << 'SCRIPT'
           mkdir -p "${ROOTFS_DIR}/usr/share/keyrings"
