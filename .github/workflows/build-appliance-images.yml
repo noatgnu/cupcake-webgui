@@ -1955,6 +1955,7 @@ jobs:
     needs: [build-rpi, build-db, test-rpi-firstboot]
     if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
+    environment: MIRROR_HOST
     env:
       MIRROR_SSH_HOST: ${{ secrets.MIRROR_SSH_HOST }}
     steps:
