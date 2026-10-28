@@ -1853,15 +1853,29 @@ jobs:
             --bind="$STICK_PART" \
             --property="DeviceAllow=$STICK_PART rwm" \
             > nspawn-console.log 2>&1 &
+          LEADER=""
           for i in $(seq 1 60); do
-            sudo machinectl show cupcake-pi >/dev/null 2>&1 && break
+            LEADER=$(sudo machinectl show cupcake-pi --property=Leader --value 2>/dev/null || true)
+            [ -n "$LEADER" ] && break
             sleep 2
           done
-          STATE=$(sudo timeout 900 systemd-run --machine=cupcake-pi --wait --pipe --quiet \
-            systemctl is-system-running --wait 2>/dev/null || true)
+          if [ -z "$LEADER" ]; then
+            echo "Container did not start"
+            cat nspawn-console.log
+            exit 1
+          fi
+          echo "CONTAINER_LEADER=$LEADER" >> "$GITHUB_ENV"
+
+          in_container() { sudo nsenter --target "$LEADER" -m -u -i -n -p -r -w "$@"; }
+          STATE=""
+          for i in $(seq 1 180); do
+            STATE=$(in_container systemctl is-system-running 2>/dev/null || true)
+            case "$STATE" in running|degraded) break ;; esac
+            sleep 5
+          done
           echo "System state after boot: ${STATE:-unknown}"
-          sudo systemd-run --machine=cupcake-pi --wait --pipe --quiet \
-            systemctl --failed --no-legend --plain || true
+          in_container systemctl --failed --no-legend --plain || true
+          in_container systemctl list-jobs --no-legend || true
 
       - name: Check first boot applied the drop-in files
         run: |
@@ -1914,7 +1928,7 @@ jobs:
           [ "$FAIL" -eq 0 ]
           CHECKEOF
           sudo install -m 755 firstboot-check.sh /mnt/pi-root/usr/local/sbin/ci-firstboot-check
-          sudo systemd-run --machine=cupcake-pi --wait --pipe --quiet \
+          sudo nsenter --target "$CONTAINER_LEADER" -m -u -i -n -p -r -w \
             /usr/local/sbin/ci-firstboot-check "$STICK_PART"
 
       - name: Show first-boot log
@@ -1941,6 +1955,8 @@ jobs:
     needs: [build-rpi, build-db, test-rpi-firstboot]
     if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
+    env:
+      MIRROR_HOST: ${{ secrets.MIRROR_HOST }}
     steps:
       - uses: actions/checkout@v4
 
@@ -1969,6 +1985,36 @@ jobs:
             release-assets/manifest-*.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release to the download mirror
+        if: env.MIRROR_HOST != ''
+        env:
+          MIRROR_PORT: ${{ secrets.MIRROR_PORT }}
+          MIRROR_HOST_KEY: ${{ secrets.MIRROR_HOST_KEY }}
+          MIRROR_SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          PRERELEASE: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+        run: |
+          PORT="${MIRROR_PORT:-22}"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/mirror
+          chmod 600 ~/.ssh/mirror
+          if [ "$PORT" = 22 ]; then KNOWN="$MIRROR_HOST"; else KNOWN="[$MIRROR_HOST]:$PORT"; fi
+          printf '%s %s\n' "$KNOWN" "$MIRROR_HOST_KEY" > ~/.ssh/known_hosts
+          SSH="ssh -i $HOME/.ssh/mirror -p $PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
+
+          RELEASE_DIR="mirror/cupcake/$TAG"
+          mkdir -p "$RELEASE_DIR"
+          cp release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
+          (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
+
+          rsync -rt --partial --chmod=D755,F644 -e "$SSH" mirror/cupcake/ "mirror@$MIRROR_HOST:cupcake/"
+
+          if [ "$PRERELEASE" != "true" ]; then
+            echo "$TAG" > mirror/LATEST
+            rsync -t --chmod=F644 -e "$SSH" mirror/LATEST "mirror@$MIRROR_HOST:cupcake/LATEST"
+          fi
+          echo "Mirrored $TAG to $MIRROR_HOST" >> "$GITHUB_STEP_SUMMARY"
 
   summary:
     name: Summary
