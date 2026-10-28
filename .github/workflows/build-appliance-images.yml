@@ -1997,24 +1997,16 @@ jobs:
           PRERELEASE: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PORT="${MIRROR_PORT:-22}"
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/mirror
-          chmod 600 ~/.ssh/mirror
-          if [ "$PORT" = 22 ]; then KNOWN="$MIRROR_SSH_HOST"; else KNOWN="[$MIRROR_SSH_HOST]:$PORT"; fi
-          printf '%s %s\n' "$KNOWN" "$MIRROR_HOST_KEY" > ~/.ssh/known_hosts
-          SSH="ssh -i $HOME/.ssh/mirror -p $PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
-
           RELEASE_DIR="mirror/cupcake/$TAG"
           mkdir -p "$RELEASE_DIR"
           cp release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 
-          rsync -rt --partial --chmod=D755,F644 -e "$SSH" mirror/cupcake/ "mirror@$MIRROR_SSH_HOST:cupcake/"
+          provision/mirror/mirror-rsync.sh mirror/cupcake/ cupcake/
 
           if [ "$PRERELEASE" != "true" ]; then
             echo "$TAG" > mirror/LATEST
-            rsync -t --chmod=F644 -e "$SSH" mirror/LATEST "mirror@$MIRROR_SSH_HOST:cupcake/LATEST"
+            provision/mirror/mirror-rsync.sh mirror/LATEST cupcake/LATEST
           fi
 
           if [ -z "$MIRROR_URL" ]; then

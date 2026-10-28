@@ -1,0 +1,53 @@
+name: Test Download Mirror
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'provision/mirror/**'
+      - '.github/workflows/test-mirror.yml'
+
+jobs:
+  mirror:
+    name: Upload and read back through the mirror
+    runs-on: ubuntu-latest
+    env:
+      MIRROR_SSH_HOST: ${{ secrets.MIRROR_SSH_HOST }}
+      MIRROR_SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
+      MIRROR_HOST_KEY: ${{ secrets.MIRROR_HOST_KEY }}
+      MIRROR_PORT: ${{ secrets.MIRROR_PORT }}
+      MIRROR_URL: ${{ vars.MIRROR_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report missing configuration
+        if: env.MIRROR_SSH_HOST == ''
+        run: |
+          echo "::warning::MIRROR_SSH_HOST is not set; add the mirror secrets to run this test"
+
+      - name: Upload a check file
+        if: env.MIRROR_SSH_HOST != ''
+        run: |
+          mkdir -p check
+          echo "run ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT} at $(date -u +%FT%TZ)" > check/mirror-check.txt
+          provision/mirror/mirror-rsync.sh check/mirror-check.txt cupcake/mirror-check.txt
+          echo "PASS: upload over SSH"
+
+      - name: Uploads outside the mirror root are refused
+        if: env.MIRROR_SSH_HOST != ''
+        run: |
+          if provision/mirror/mirror-rsync.sh check/mirror-check.txt ../mirror-escape.txt 2>/dev/null; then
+            echo "FAIL: the upload key can write outside the mirror root"
+            exit 1
+          fi
+          echo "PASS: upload key is confined to the mirror root"
+
+      - name: Read the check file back from the public URL
+        if: env.MIRROR_SSH_HOST != '' && env.MIRROR_URL != ''
+        run: |
+          URL="${MIRROR_URL%/}/cupcake/mirror-check.txt?run=${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          curl -fsS "$URL" | diff - check/mirror-check.txt
+          echo "PASS: served at ${MIRROR_URL%/}/cupcake/mirror-check.txt"
+          curl -fsS -r 0-3 -o /dev/null -w "%{http_code}\n" "$URL" | grep -qx 206
+          echo "PASS: range requests supported, so downloads can resume"
