@@ -1837,8 +1837,9 @@ jobs:
             | sudo tee "$BOOT/cupcake-wifi.txt"
           printf 'AUTHKEY=tskey-auth-invalid-ci-key\n' | sudo tee "$BOOT/cupcake-tailscale.txt"
           printf 'TUNNEL_TOKEN=invalid-ci-token\n' | sudo tee "$BOOT/cupcake-cloudflared.txt"
-          if [ -s /mnt/pi-root/etc/machine-id ]; then
-            echo "Image ships a machine-id; every Pi would share the same secrets"
+          SHIPPED_ID=$(cat /mnt/pi-root/etc/machine-id 2>/dev/null || true)
+          if [ -n "$SHIPPED_ID" ] && [ "$SHIPPED_ID" != "uninitialized" ]; then
+            echo "Image ships machine-id $SHIPPED_ID; every Pi would share the same secrets"
             exit 1
           fi
 
