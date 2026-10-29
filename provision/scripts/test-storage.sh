@@ -10,7 +10,7 @@
 #   nfs-apply <host> <share>           switch storage to NFS through the admin API
 #   bad-drop-in-prepare / -check <kind> a broken drop-in must leave working storage untouched
 #
-# Usage: sudo test-storage.sh <phase> [args]
+# Usage: sudo cupcake-test-storage <phase> [args]
 set -u
 
 PHASE="${1:-}"
@@ -70,11 +70,24 @@ api() {
     fi
 }
 
+wait_active() {
+    for _ in $(seq 1 30); do
+        systemctl is-active --quiet "$1" && return 0
+        sleep 2
+    done
+    return 1
+}
+
 services_healthy() {
-    check "backend active"   systemctl is-active cupcake-backend
-    check "rqworker active"  systemctl is-active cupcake-rqworker
-    check "nginx active"     systemctl is-active nginx
-    check "api responds"     wait_for_api
+    local unit
+    for unit in cupcake-backend cupcake-rqworker nginx; do
+        check "${unit#cupcake-} active" wait_active "$unit"
+        if ! systemctl is-active --quiet "$unit"; then
+            systemctl status "$unit" --no-pager --lines=0 || true
+            journalctl -b -u "$unit" --no-pager --lines=30 || true
+        fi
+    done
+    check "api responds" wait_for_api
 }
 
 media_on_storage() {

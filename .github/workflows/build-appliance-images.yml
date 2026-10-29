@@ -762,8 +762,12 @@ jobs:
             -machine type=pc,accel=kvm -cpu host \
             -display none -serial file:storage-serial.log &
           echo "STORAGE_QEMU_PID=$!" >> $GITHUB_ENV
+          SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -i cupckey -p 2222 cupcake@localhost"
           for i in $(seq 1 60); do
-            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -i cupckey -p 2222 cupcake@localhost true 2>/dev/null && exit 0
+            if $SSH true 2>/dev/null; then
+              $SSH 'systemctl is-system-running --wait >/dev/null 2>&1; true'
+              exit 0
+            fi
             sleep 5
           done
           tail -50 storage-serial.log
@@ -773,7 +777,7 @@ jobs:
         timeout-minutes: 40
         run: |
           SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i cupckey -p 2222 cupcake@localhost"
-          phase() { $SSH "sudo /tmp/test-storage.sh $*"; }
+          phase() { $SSH "sudo cupcake-test-storage $*"; }
           reboot_vm() {
             $SSH 'sudo systemctl reboot' 2>/dev/null || true
             sleep 15
@@ -789,7 +793,7 @@ jobs:
           }
 
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/test-storage.sh cupcake@localhost:/tmp/
-          $SSH 'chmod +x /tmp/test-storage.sh'
+          $SSH 'sudo install -m 755 /tmp/test-storage.sh /usr/local/sbin/cupcake-test-storage'
 
           echo "::group::Secrets are generated for this machine on first boot"
           phase secrets-check "$CI_SECRET_HASH"
