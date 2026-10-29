@@ -38,14 +38,12 @@ cp /tmp/cupcake-plugin-manager.service /etc/systemd/system/cupcake-plugin-manage
 
 cat > /usr/local/bin/cupcake-plugin-register << 'SCRIPTEOF'
 #!/bin/bash
-set -e
+set -euo pipefail
 
+PLUGIN_NAME=${1:-}
+PLUGIN_BASE_URL=${2:-}
+PLUGIN_VERSION=${3:-1.0.0}
 BACKEND=${CUPCAKE_BACKEND:-"http://localhost:8000"}
-PLUGIN_NAME=$1
-PLUGIN_BASE_URL=$2
-PLUGIN_VERSION=${3:-"1.0.0"}
-ADMIN_USER=${CUPCAKE_ADMIN:-"admin"}
-ADMIN_PASS=${CUPCAKE_ADMIN_PASS:-""}
 ENV_FILE="/etc/cupcake/plugins/${PLUGIN_NAME}.env"
 
 if [ -z "$PLUGIN_NAME" ] || [ -z "$PLUGIN_BASE_URL" ]; then
@@ -55,17 +53,16 @@ if [ -z "$PLUGIN_NAME" ] || [ -z "$PLUGIN_BASE_URL" ]; then
     exit 1
 fi
 
-JWT=$(curl -sf -X POST "$BACKEND/api/v1/auth/token/" \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['access'])")
-
-RESPONSE=$(curl -sf -X POST "$BACKEND/api/v1/plugins/register/" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $JWT" \
-    -d "{\"name\":\"$PLUGIN_NAME\",\"version\":\"$PLUGIN_VERSION\",\"base_url\":\"$PLUGIN_BASE_URL\",\"manifest\":{\"name\":\"$PLUGIN_NAME\",\"displayName\":\"$PLUGIN_NAME\",\"version\":\"$PLUGIN_VERSION\",\"baseUrl\":\"$PLUGIN_BASE_URL\"}}")
-
-PLUGIN_TOKEN=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+set -a
+source /opt/cupcake/.env
+set +a
+cd /opt/cupcake/backend
+PLUGIN_TOKEN=$(runuser -u cupcake-svc -- /opt/cupcake/venv/bin/python manage.py register_plugin \
+    "$PLUGIN_NAME" "$PLUGIN_BASE_URL" --plugin-version "$PLUGIN_VERSION" | tail -n 1)
+if [ -z "$PLUGIN_TOKEN" ]; then
+    echo "Registration of '$PLUGIN_NAME' returned no startup token" >&2
+    exit 1
+fi
 
 mkdir -p /etc/cupcake/plugins
 cat > "$ENV_FILE" << ENVEOF
@@ -83,47 +80,19 @@ chmod +x /usr/local/bin/cupcake-plugin-register
 
 cat > /usr/local/bin/cupcake-plugin-deregister << 'SCRIPTEOF'
 #!/bin/bash
-set -e
+set -euo pipefail
 
-BACKEND=${CUPCAKE_BACKEND:-"http://localhost:8000"}
-PLUGIN_NAME=$1
-ADMIN_USER=${CUPCAKE_ADMIN:-"admin"}
-ADMIN_PASS=${CUPCAKE_ADMIN_PASS:-""}
-
+PLUGIN_NAME=${1:-}
 if [ -z "$PLUGIN_NAME" ]; then
     echo "Usage: cupcake-plugin-deregister <name>"
     exit 1
 fi
 
-JWT=$(curl -sf -X POST "$BACKEND/api/v1/auth/token/" \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['access'])")
-
-PLUGIN_ID=$(curl -sf "$BACKEND/api/v1/plugins/" \
-    -H "Authorization: Bearer $JWT" \
-    | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-plugins = data.get('results', data)
-match = next((p for p in plugins if p['name'] == '$PLUGIN_NAME'), None)
-print(match['id'] if match else '')
-")
-
-if [ -z "$PLUGIN_ID" ]; then
-    echo "Plugin '$PLUGIN_NAME' not found in backend, skipping deregistration"
-    exit 0
-fi
-
-curl -sf -X PATCH "$BACKEND/api/v1/plugins/$PLUGIN_ID/" \
-    -H "Authorization: Bearer $JWT" \
-    -H "Content-Type: application/json" \
-    -d '{"is_active": false}'
-
-curl -sf -X DELETE "$BACKEND/api/v1/plugins/$PLUGIN_ID/" \
-    -H "Authorization: Bearer $JWT"
-
-echo "Plugin '$PLUGIN_NAME' removed from backend"
+set -a
+source /opt/cupcake/.env
+set +a
+cd /opt/cupcake/backend
+runuser -u cupcake-svc -- /opt/cupcake/venv/bin/python manage.py deregister_plugin "$PLUGIN_NAME"
 SCRIPTEOF
 
 chmod +x /usr/local/bin/cupcake-plugin-deregister

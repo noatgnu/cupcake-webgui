@@ -45,6 +45,8 @@ check "run.sh copied"           test -f "/opt/cupcake/plugins/${PLUGIN_NAME}/run
 echo ""
 echo "--- List ---"
 check "plugin appears in list" bash -c "cupcake-plugin list | grep -q '${PLUGIN_NAME}'"
+check "register with the backend" cupcake-plugin register "${PLUGIN_NAME}" http://cupcake.local:8001 1.0.0
+check "startup token written" grep -qE '^PLUGIN_TOKEN=.{64}$' "/etc/cupcake/plugins/${PLUGIN_NAME}.env"
 
 echo ""
 echo "--- Status ---"
@@ -64,6 +66,7 @@ echo "--- Uninstall ---"
 check "uninstall"                    cupcake-plugin uninstall "${PLUGIN_NAME}"
 check "plugin directory removed"     bash -c "test ! -d '/opt/cupcake/plugins/${PLUGIN_NAME}'"
 check "plugin not in list"           bash -c "! cupcake-plugin list | grep -q '${PLUGIN_NAME}'"
+check "deregistered from the backend" bash -c "cupcake-plugin-deregister '${PLUGIN_NAME}' | grep -q 'is not registered'"
 
 echo ""
 echo "--- Reinstall after uninstall ---"
