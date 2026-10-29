@@ -20,9 +20,6 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
 
@@ -224,10 +221,35 @@ jobs:
           path: cupcake-seed.sql.gz
           retention-days: 1
 
+  mirror-check:
+    name: Check download mirror
+    runs-on: ubuntu-latest
+    environment: MIRROR_HOST
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - name: Check that the mirror is configured and reachable
+        id: check
+        env:
+          MIRROR_SSH_HOST: ${{ secrets.MIRROR_SSH_HOST }}
+          MIRROR_PORT: ${{ secrets.MIRROR_PORT }}
+        run: |
+          if [ -z "$MIRROR_SSH_HOST" ]; then
+            echo "::notice::No download mirror is configured; VM images are only built for manual runs"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          elif timeout 15 bash -c "</dev/tcp/$MIRROR_SSH_HOST/${MIRROR_PORT:-22}" 2>/dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The download mirror is not reachable over SSH; VM images are skipped for this release"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-vm:
     name: VM Image (${{ matrix.distro }}, amd64)
-    if: github.event_name == 'workflow_dispatch' && inputs.image_type != 'rpi'
-    needs: build-db
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.image_type != 'rpi') ||
+      (github.event_name == 'release' && needs.mirror-check.outputs.available == 'true')
+    needs: [build-db, mirror-check]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -1955,9 +1977,15 @@ jobs:
           [ -n "${STICK_PART:-}" ] && sudo losetup -d "${STICK_PART%p1}" || true
 
   publish-release:
-    name: Publish RPi image to release
-    needs: [build-rpi, build-db, test-rpi-firstboot]
-    if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+    name: Publish release
+    needs: [build-rpi, build-db, test-rpi-firstboot, build-vm]
+    if: >-
+      !cancelled() &&
+      github.event_name == 'release' &&
+      needs.build-rpi.result == 'success' &&
+      needs.build-db.result == 'success' &&
+      needs.test-rpi-firstboot.result == 'success' &&
+      (needs.build-vm.result == 'success' || needs.build-vm.result == 'skipped')
     runs-on: ubuntu-latest
     environment: MIRROR_HOST
     env:
@@ -1972,19 +2000,38 @@ jobs:
           .github/scripts/download-artifact-verified.sh cupcake-pi-arm64 release-assets
           .github/scripts/download-artifact-verified.sh cupcake-mobile-snapshot release-assets
 
+      - name: Download VM images
+        if: needs.build-vm.result == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-ubuntu vm-assets
+          .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-debian vm-assets
+
       - name: Publish to GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           name: Cupcake ${{ github.event.release.name || github.ref_name }}
           draft: false
-          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          prerelease: ${{ github.event.release.prerelease }}
           files: |
             release-assets/*.img.xz
             release-assets/*.sqlite.gz
             release-assets/manifest-*.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add reference data versions to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          MANIFEST=$(ls release-assets/manifest-*.json | head -1)
+          gh release view "$TAG" --json body --jq .body > release-notes.md
+          python3 .github/scripts/release-notes-data.py "$MANIFEST" --notes release-notes.md
+          gh release edit "$TAG" --notes-file release-notes.md
+          python3 .github/scripts/release-notes-data.py "$MANIFEST" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload release to the download mirror
         if: env.MIRROR_SSH_HOST != ''
@@ -1994,12 +2041,17 @@ jobs:
           MIRROR_HOST_KEY: ${{ secrets.MIRROR_HOST_KEY }}
           MIRROR_SSH_KEY: ${{ secrets.MIRROR_SSH_KEY }}
           TAG: ${{ github.event.release.tag_name || github.ref_name }}
-          PRERELEASE: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_DIR="mirror/cupcake/$TAG"
           mkdir -p "$RELEASE_DIR"
-          cp release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
+          cp -l release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
+          CONTENTS="Raspberry Pi image and reference databases"
+          if ls vm-assets/*.qcow2.xz >/dev/null 2>&1; then
+            cp -l vm-assets/*.qcow2.xz "$RELEASE_DIR/"
+            CONTENTS="Raspberry Pi and VM images, and reference databases"
+          fi
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 
           provision/mirror/mirror-rsync.sh mirror/cupcake/ cupcake/
@@ -2015,17 +2067,19 @@ jobs:
           fi
           RELEASE_URL="${MIRROR_URL%/}/cupcake/$TAG/"
           curl -fsS "${RELEASE_URL}SHA256SUMS" | diff - "$RELEASE_DIR/SHA256SUMS"
-          echo "Mirrored $TAG: $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Mirrored $TAG ($CONTENTS): $RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
 
           NOTES=$(gh release view "$TAG" --json body --jq .body)
-          if ! grep -qF "$RELEASE_URL" <<< "$NOTES"; then
-            printf '%s\n\nMirror download: %s\n' "$NOTES" "$RELEASE_URL" > release-notes.md
+          MIRROR_LINE="Mirror download ($CONTENTS): $RELEASE_URL"
+          if ! grep -qxF "$MIRROR_LINE" <<< "$NOTES"; then
+            NOTES=$(grep -vF "$RELEASE_URL" <<< "$NOTES" || true)
+            printf '%s\n\n%s\n' "$NOTES" "$MIRROR_LINE" > release-notes.md
             gh release edit "$TAG" --notes-file release-notes.md
           fi
 
   summary:
     name: Summary
-    needs: [build-db, build-frontend, build-vm, build-rpi]
+    needs: [build-db, build-frontend, mirror-check, build-vm, build-rpi]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -2035,6 +2089,7 @@ jobs:
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Seed DB | ${{ needs.build-db.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Download mirror available | ${{ needs.mirror-check.outputs.available || 'unknown' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| VM ubuntu (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| VM debian (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| RPi (arm64) | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
