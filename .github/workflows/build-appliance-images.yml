@@ -260,7 +260,7 @@ jobs:
             python_version: "3.12"
             pg_version: "16"
           - distro: debian
-            image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-genericcloud-amd64-daily.qcow2
+            image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-amd64-daily.qcow2
             python_version: "3.13"
             pg_version: "17"
     steps:

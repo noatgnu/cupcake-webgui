@@ -104,8 +104,8 @@ case "$TYPE" in
         ;;
 esac
 
-mkdir -p "${MOUNT_POINT}/media"
-chown cupcake-svc:cupcake-svc "${MOUNT_POINT}/media"
+mkdir -p "${MOUNT_POINT}/media" "${MOUNT_POINT}/backups"
+chown cupcake-svc:cupcake-svc "${MOUNT_POINT}/media" "${MOUNT_POINT}/backups"
 
 if [ -d "$MEDIA_PATH" ] && [ ! -L "$MEDIA_PATH" ]; then
     if [ "$(ls -A "$MEDIA_PATH" 2>/dev/null)" ]; then

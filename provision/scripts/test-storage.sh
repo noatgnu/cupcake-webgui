@@ -96,6 +96,8 @@ media_on_storage() {
     check "backend user can write media" \
         sudo -u cupcake-svc bash -c "echo ok > '$MEDIA_PATH/ci-write-test.txt' && rm '$MEDIA_PATH/ci-write-test.txt'"
     check "backend waits for the mount" grep -q "RequiresMountsFor=${MOUNT_POINT}" "$UNIT_DROP_IN"
+    check "backend user can write backups" \
+        sudo -u cupcake-svc bash -c "echo ok > '${MOUNT_POINT}/backups/ci-write-test.txt' && rm '${MOUNT_POINT}/backups/ci-write-test.txt'"
 }
 
 case "$PHASE" in
