@@ -261,4 +261,5 @@ LAST_UPDATE=
 VEREOF
 chown cupcake-svc:cupcake-svc /opt/cupcake/versions.txt
 
+mkdir -p /opt/cupcake/backend/media
 chown -R cupcake-svc:cupcake-svc /opt/cupcake/backend

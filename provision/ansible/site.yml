@@ -223,6 +223,15 @@
         force: true
       tags: [backend]
 
+    - name: Create backend media directory
+      ansible.builtin.file:
+        path: /opt/cupcake/backend/media
+        state: directory
+        owner: cupcake-svc
+        group: cupcake-svc
+        mode: '0755'
+      tags: [backend]
+
     - name: Download uv installer script
       ansible.builtin.get_url:
         url: https://astral.sh/uv/install.sh

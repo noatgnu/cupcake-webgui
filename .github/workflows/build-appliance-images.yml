@@ -1090,7 +1090,7 @@ jobs:
           sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
 
           echo "=== CUPCAKE: creating users ==="
-          mkdir -p /opt/cupcake/{backend,static,media,backups,venv}
+          mkdir -p /opt/cupcake/{backend/media,static,backups,venv}
           mkdir -p /var/log/cupcake
 
           useradd -r -s /usr/sbin/nologin -M -d /opt/cupcake cupcake-svc || true
