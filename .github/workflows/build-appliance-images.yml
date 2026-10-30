@@ -2038,21 +2038,35 @@ jobs:
           echo "PASS: one-boot self-test passed and cleaned up"
           echo "::endgroup::"
 
-          echo "::group::With the USB stick the self-test configures storage, backs up and reboots"
+          echo "::group::With the USB stick the self-test configures storage, backs up, reboots and resumes"
           stop_container
           fresh_image
           boot_container --bind="$STICK_PART" --property="DeviceAllow=$STICK_PART rwm"
-          for i in $(seq 1 240); do
+          for i in $(seq 1 300); do
+            [ "$(report_field "['result']")" = pass ] || [ "$(report_field "['result']")" = fail ] && break
             running || break
             sleep 5
           done
-          running && { echo "FAIL: the self-test did not reboot the device"; exit 1; }
           sudo cat /mnt/pi-root/boot/firmware/cupcake-selftest-report.txt || true
-          [ "$(sudo cat "$STAGE" 2>/dev/null)" = after-reboot ] \
-            || { echo "FAIL: stage is '$(sudo cat "$STAGE" 2>/dev/null)', expected after-reboot"; exit 1; }
-          [ "$(report_field "['result']")" = incomplete ] || { echo "FAIL: interim report not marked incomplete"; exit 1; }
-          all_passed "First boot" "Services" "USB storage" "Backup onto USB storage"
-          echo "PASS: storage self-test passed and rebooted to check persistence"
+          case "$(report_field "['result']")" in
+            pass|fail) ;;
+            *) echo "FAIL: the self-test did not finish (report: $(report_field "['result']"))"; exit 1 ;;
+          esac
+          sudo test ! -e "$STAGE" || { echo "FAIL: self-test left its stage file behind"; exit 1; }
+          sudo python3 -c "
+          import json, sys
+          report = json.load(open('$REPORT'))
+          names = [s['name'] for s in report['sections']]
+          required = ['First boot', 'Services', 'USB storage', 'Backup onto USB storage', 'USB storage after reboot']
+          missing = [n for n in required if n not in names]
+          failed = [f\"{s['name']}: {c['name']}\" for s in report['sections'] for c in s['checks']
+                    if not c['passed'] and s['name'] != 'USB storage after reboot']
+          after = [c['passed'] for s in report['sections'] if s['name'] == 'USB storage after reboot' for c in s['checks']]
+          print('missing sections:', missing or 'none', '| failed before the reboot:', failed or 'none',
+                f'| after the reboot: {sum(after)}/{len(after)} passed (the mount needs udev, absent in a container)')
+          sys.exit(1 if missing or failed else 0)
+          "
+          echo "PASS: storage self-test passed, rebooted and resumed"
           echo "::endgroup::"
 
       - name: Show first-boot log
@@ -2060,6 +2074,7 @@ jobs:
         run: |
           sudo cat /mnt/pi-root/var/log/cupcake/first-boot.log 2>/dev/null || echo "no first-boot log"
           tail -100 nspawn-console.log 2>/dev/null || true
+          tail -100 selftest-console.log 2>/dev/null || true
 
       - name: Stop container and release loop devices
         if: always()
