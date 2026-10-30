@@ -1,0 +1,115 @@
+#!/bin/bash
+# Hardware self-test for the Cupcake Raspberry Pi appliance.
+#
+# First-boot starts it when cupcake-selftest.txt is on the boot partition. It checks the first-boot
+# work, service health and, with a USB stick labelled CUPCAKE-DATA attached, configures that stick
+# as storage, backs up onto it and reboots to confirm the storage survives. The report is written
+# to the boot partition as cupcake-selftest-report.json and .txt, readable on any computer.
+#
+# The activity LED shows the outcome until the next reboot: a heartbeat for pass, a fast blink
+# for failure.
+set -u
+
+STATE_DIR=/var/lib/cupcake-selftest
+STAGE_FILE="$STATE_DIR/stage"
+RESULTS="$STATE_DIR/results.txt"
+REPORT_DIR=/boot/firmware
+STORAGE_TEST=/usr/local/sbin/cupcake-test-storage
+REPORT=/usr/local/sbin/cupcake-selftest-report
+USB_LABEL=CUPCAKE-DATA
+
+check() {
+    local name="$1"
+    shift
+    if "$@" >/dev/null 2>&1; then
+        echo "PASS: $name" >> "$RESULTS"
+    else
+        echo "FAIL: $name" >> "$RESULTS"
+    fi
+}
+
+section() {
+    echo "## $1" >> "$RESULTS"
+}
+
+storage_phase() {
+    local name="$1" output
+    shift
+    section "$name"
+    output=$("$STORAGE_TEST" "$@" 2>&1 | grep -E '^(PASS|FAIL): ')
+    if [ -n "$output" ]; then
+        echo "$output" >> "$RESULTS"
+    else
+        echo "FAIL: $* produced no results" >> "$RESULTS"
+    fi
+}
+
+first_boot_checks() {
+    section "First boot"
+    check "first-boot finished" grep -q "=== first-boot.sh completed" /var/log/cupcake/first-boot.log
+    check "SECRET_KEY generated" bash -c \
+        'grep -qE "^SECRET_KEY=.{20,}" /opt/cupcake/.env && ! grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" /opt/cupcake/.env'
+    check "secrets tied to this machine" \
+        bash -c '[ "$(cat /opt/cupcake/.secrets-machine-id)" = "$(cat /etc/machine-id)" ]'
+    check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
+    check "network manager socket active" systemctl is-active cupcake-network-manager.socket
+}
+
+show_result() {
+    local led
+    led=$(ls -d /sys/class/leds/ACT /sys/class/leds/led0 2>/dev/null | head -1)
+    [ -n "$led" ] || return 0
+    if [ "$1" = pass ]; then
+        echo heartbeat > "$led/trigger" 2>/dev/null || true
+    else
+        echo timer > "$led/trigger" 2>/dev/null || true
+        echo 100 > "$led/delay_on" 2>/dev/null || true
+        echo 100 > "$led/delay_off" 2>/dev/null || true
+    fi
+}
+
+finish() {
+    local result
+    result=$("$REPORT" write "$STATE_DIR" "$REPORT_DIR" complete)
+    rm -f "$STAGE_FILE"
+    show_result "$result"
+    echo "Self-test finished: $result"
+}
+
+mkdir -p "$STATE_DIR"
+STAGE=$(cat "$STAGE_FILE" 2>/dev/null || echo requested)
+
+case "$STAGE" in
+    requested)
+        rm -f "$RESULTS" "$STATE_DIR"/facts-*.json
+        "$REPORT" facts "$STATE_DIR/facts-first-boot.json"
+        first_boot_checks
+        storage_phase "Services" health
+
+        if blkid -L "$USB_LABEL" >/dev/null 2>&1; then
+            storage_phase "USB storage" usb-apply
+            storage_phase "Backup onto USB storage" backup-check
+            echo after-reboot > "$STAGE_FILE"
+            "$REPORT" write "$STATE_DIR" "$REPORT_DIR" incomplete >/dev/null
+            echo "Self-test rebooting to check that storage survives a restart"
+            systemctl --no-block reboot
+            exit 0
+        fi
+
+        echo "NOTE: USB storage not tested; attach a stick labelled $USB_LABEL to include it" >> "$RESULTS"
+        "$REPORT" facts "$STATE_DIR/facts-final.json"
+        finish
+        ;;
+
+    after-reboot)
+        storage_phase "USB storage after reboot" persist-check usb
+        "$REPORT" facts "$STATE_DIR/facts-final.json"
+        finish
+        ;;
+
+    *)
+        echo "Unknown self-test stage: $STAGE" >&2
+        rm -f "$STAGE_FILE"
+        exit 1
+        ;;
+esac

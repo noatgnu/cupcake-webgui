@@ -1,0 +1,13 @@
+[Unit]
+Description=Cupcake hardware self-test
+After=cupcake-firstboot.service cupcake-backend.service cupcake-rqworker.service nginx.service
+Wants=cupcake-backend.service
+ConditionPathExists=/var/lib/cupcake-selftest/stage
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-selftest
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

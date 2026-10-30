@@ -1,0 +1,24 @@
+# Cupcake Hardware Self-Test
+#
+# RPi : copy as  /boot/firmware/cupcake-selftest.txt
+#
+# The file only needs to exist; its contents are ignored. It is read on every
+# boot and deleted once the self-test has been queued, so each copy runs the
+# self-test once.
+#
+# What it checks:
+#   - first boot completed, secrets generated, services and API running
+#   - with a USB stick labelled CUPCAKE-DATA attached: the stick is configured
+#     as storage, a full backup is written onto it, and the Pi reboots once to
+#     confirm the storage survives a restart
+#   - board model, memory, temperature, power and throttling problems, SD card
+#     write speed, boot time and failed services
+#
+# Results are written to the boot partition, readable on any computer:
+#   cupcake-selftest-report.txt   summary
+#   cupcake-selftest-report.json  full report
+#
+# The activity LED shows the outcome: a heartbeat for pass, a fast blink for
+# failure.
+#
+# The self-test leaves test data on the device. Reflash before real use.

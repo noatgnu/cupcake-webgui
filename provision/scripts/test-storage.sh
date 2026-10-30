@@ -2,7 +2,9 @@
 # Exercises appliance storage end to end on a booted VM, one phase per invocation so the
 # workflow can reboot the VM between phases:
 #
+#   health                             services running and the API answering
 #   secrets-check <hash>               secrets regenerated for this machine, unlike the image build
+#   usb-apply                          configure the labelled USB stick directly, as the storage manager does
 #   missing-prepare / missing-check    drop-in naming a drive that is not attached
 #   usb-prepare / usb-check            drop-in mounting the emulated USB stick by label
 #   persist-check <usb|nfs>            storage still mounted and in use after a reboot
@@ -101,6 +103,26 @@ media_on_storage() {
 }
 
 case "$PHASE" in
+    health)
+        services_healthy
+        ;;
+
+    usb-apply)
+        DEVICE=$(blkid -L "$USB_LABEL" 2>/dev/null || true)
+        check "USB stick visible by label" test -n "$DEVICE"
+        sudo -u cupcake-svc bash -c "echo 'written before storage was configured' > '$MEDIA_PATH/$MARKER'"
+        check "marker written to media" test -f "$MEDIA_PATH/$MARKER"
+        check "storage configured" /opt/cupcake/configure-storage.sh usb "$USB_LABEL"
+        UUID=$(blkid -s UUID -o value "$DEVICE" 2>/dev/null || true)
+        SOURCE=$(findmnt -n -o SOURCE --target "$MOUNT_POINT" 2>/dev/null || true)
+        check "storage mounted" mountpoint -q "$MOUNT_POINT"
+        check "mounted from the labelled stick" test -n "$DEVICE" -a "$SOURCE" = "$DEVICE"
+        check "fstab entry by UUID" grep -q "^UUID=${UUID} $MOUNT_POINT " /etc/fstab
+        check "existing media migrated" test -f "${MOUNT_POINT}/media/$MARKER"
+        media_on_storage
+        services_healthy
+        ;;
+
     secrets-check)
         IMAGE_SECRET_HASH="${2:?hash of the SECRET_KEY line baked during the image build required}"
         MACHINE_ID=$(cat /etc/machine-id)

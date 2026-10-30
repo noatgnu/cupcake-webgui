@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""
+Hardware facts and report writer for the Cupcake appliance self-test.
+
+  cupcake-selftest-report facts <output.json>
+      Record the board, memory, storage, temperature, throttling, boot timing and failed units.
+
+  cupcake-selftest-report write <state dir> <report dir> <complete|incomplete>
+      Combine results.txt and the facts-*.json files in the state directory into
+      cupcake-selftest-report.json and cupcake-selftest-report.txt in the report directory.
+
+The report holds check results and hardware facts only; it never reads the appliance's .env,
+so no generated secrets can end up in it.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+THROTTLE_FLAGS = {
+    0: "under-voltage now",
+    1: "frequency capped now",
+    2: "throttled now",
+    3: "soft temperature limit now",
+    16: "under-voltage has occurred",
+    17: "frequency capping has occurred",
+    18: "throttling has occurred",
+    19: "soft temperature limit has occurred",
+}
+WRITE_TEST_BYTES = 64 * 1024 * 1024
+STAGES = ("first-boot", "final")
+
+
+def run(*command):
+    """Return the stripped stdout of command, or None when it cannot be run or fails."""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def read(path):
+    """Return the stripped contents of a text file, or None when it is missing."""
+    try:
+        return Path(path).read_text(errors="replace").strip("\x00\n ")
+    except OSError:
+        return None
+
+
+def os_name():
+    for line in (read("/etc/os-release") or "").splitlines():
+        if line.startswith("PRETTY_NAME="):
+            return line.split("=", 1)[1].strip('"')
+    return None
+
+
+def memory_mb():
+    match = re.search(r"^MemTotal:\s+(\d+) kB", read("/proc/meminfo") or "", re.MULTILINE)
+    return int(match.group(1)) // 1024 if match else None
+
+
+def board_revision():
+    match = re.search(r"^Revision\s*:\s*(\S+)", read("/proc/cpuinfo") or "", re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def temperature_c():
+    raw = read("/sys/class/thermal/thermal_zone0/temp")
+    return round(int(raw) / 1000, 1) if raw and raw.isdigit() else None
+
+
+def throttling():
+    raw = run("vcgencmd", "get_throttled")
+    if not raw or "=" not in raw:
+        return None
+    value = int(raw.split("=", 1)[1], 16)
+    return {
+        "raw": hex(value),
+        "flags": [label for bit, label in THROTTLE_FLAGS.items() if value & (1 << bit)],
+    }
+
+
+def storage():
+    root_source = run("findmnt", "-n", "-o", "SOURCE", "/")
+    facts = {"root_device": root_source}
+    if not root_source:
+        return facts
+    disk = run("lsblk", "-n", "-o", "PKNAME", root_source)
+    partition_bytes = run("lsblk", "-b", "-n", "-d", "-o", "SIZE", root_source)
+    disk_bytes = run("lsblk", "-b", "-n", "-d", "-o", "SIZE", f"/dev/{disk}") if disk else None
+    if partition_bytes and partition_bytes.isdigit():
+        facts["root_partition_bytes"] = int(partition_bytes)
+    if disk_bytes and disk_bytes.isdigit():
+        facts["disk_bytes"] = int(disk_bytes)
+        facts["root_filesystem_grown"] = int(partition_bytes or 0) > int(disk_bytes) * 0.9
+    card = read(f"/sys/block/{disk}/device/name") if disk else None
+    if card:
+        facts["sd_card"] = {
+            "name": card,
+            "manufacturer_id": read(f"/sys/block/{disk}/device/manfid"),
+            "date": read(f"/sys/block/{disk}/device/date"),
+        }
+    return facts
+
+
+def write_speed_mb_s():
+    """Write and sync 64 MiB on the root filesystem to estimate the card's sustained write speed."""
+    target = Path("/var/tmp/cupcake-selftest-write-test")
+    block = os.urandom(1024 * 1024)
+    start = time.monotonic()
+    try:
+        with open(target, "wb") as handle:
+            for _ in range(WRITE_TEST_BYTES // len(block)):
+                handle.write(block)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError:
+        return None
+    finally:
+        target.unlink(missing_ok=True)
+    return round(WRITE_TEST_BYTES / (1024 * 1024) / (time.monotonic() - start), 1)
+
+
+def failed_units():
+    output = run("systemctl", "--failed", "--no-legend", "--plain") or ""
+    units = []
+    for line in output.splitlines():
+        unit = line.split()[0] if line.split() else ""
+        if unit:
+            journal = run("journalctl", "-b", "-u", unit, "--no-pager", "--lines=20", "--output=cat") or ""
+            units.append({"unit": unit, "journal": journal.splitlines()})
+    return units
+
+
+def facts():
+    return {
+        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "board": {
+            "model": read("/proc/device-tree/model"),
+            "revision": board_revision(),
+            "memory_mb": memory_mb(),
+        },
+        "software": {
+            "os": os_name(),
+            "kernel": run("uname", "-r"),
+            "bootloader": run("vcgencmd", "bootloader_version"),
+            "appliance_versions": read("/opt/cupcake/versions.txt"),
+        },
+        "temperature_c": temperature_c(),
+        "throttling": throttling(),
+        "storage": storage(),
+        "write_speed_mb_s": write_speed_mb_s(),
+        "boot": {
+            "time": run("systemd-analyze", "time"),
+            "slowest_units": (run("systemd-analyze", "blame", "--no-pager") or "").splitlines()[:10],
+        },
+        "failed_units": failed_units(),
+    }
+
+
+def parse_results(path):
+    """Read "## section" headers with "PASS: name" / "FAIL: name" lines, and "NOTE: text" lines."""
+    sections = []
+    notes = []
+    for line in (read(path) or "").splitlines():
+        if line.startswith("## "):
+            sections.append({"name": line[3:], "checks": []})
+        elif line.startswith("NOTE: "):
+            notes.append(line[6:])
+        elif sections and line.startswith(("PASS: ", "FAIL: ")):
+            sections[-1]["checks"].append({"name": line[6:], "passed": line.startswith("PASS")})
+    return sections, notes
+
+
+def summary(report):
+    lines = [
+        f"Cupcake self-test: {report['result'].upper()}",
+        f"Written: {report['written_at']}",
+        "",
+    ]
+    if report["result"] != "incomplete":
+        lines.append("This device ran tests that leave data behind; reflash it before real use.")
+        lines.append("")
+    lines.extend(f"Note: {note}" for note in report["notes"])
+    if report["notes"]:
+        lines.append("")
+    for section in report["sections"]:
+        passed = sum(check["passed"] for check in section["checks"])
+        lines.append(f"{section['name']}: {passed}/{len(section['checks'])} passed")
+        lines.extend(f"  FAIL: {check['name']}" for check in section["checks"] if not check["passed"])
+    for stage, stage_facts in report["hardware"].items():
+        board = stage_facts["board"]
+        throttle = stage_facts.get("throttling") or {}
+        lines += [
+            "",
+            f"[{stage}] {board.get('model')} rev {board.get('revision')}, {board.get('memory_mb')} MB RAM",
+            f"  temperature {stage_facts.get('temperature_c')} C, write speed {stage_facts.get('write_speed_mb_s')} MB/s",
+            f"  throttling: {', '.join(throttle.get('flags') or ['none']) if throttle else 'unknown'}",
+            f"  root filesystem grown: {stage_facts['storage'].get('root_filesystem_grown')}",
+        ]
+        lines.extend(f"  failed unit: {unit['unit']}" for unit in stage_facts.get("failed_units", []))
+    return "\n".join(lines) + "\n"
+
+
+def write(state_dir, report_dir, completion):
+    state_dir = Path(state_dir)
+    sections, notes = parse_results(state_dir / "results.txt")
+    all_passed = all(check["passed"] for section in sections for check in section["checks"])
+    report = {
+        "format_version": 1,
+        "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "result": "incomplete" if completion != "complete" else ("pass" if all_passed else "fail"),
+        "sections": sections,
+        "notes": notes,
+        "hardware": {
+            stage: json.loads((state_dir / f"facts-{stage}.json").read_text())
+            for stage in STAGES
+            if (state_dir / f"facts-{stage}.json").exists()
+        },
+    }
+    report_dir = Path(report_dir)
+    (report_dir / "cupcake-selftest-report.json").write_text(json.dumps(report, indent=2) + "\n")
+    (report_dir / "cupcake-selftest-report.txt").write_text(summary(report))
+    os.sync()
+    print(report["result"])
+
+
+def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "facts":
+        Path(sys.argv[2]).write_text(json.dumps(facts(), indent=2) + "\n")
+        return 0
+    if len(sys.argv) == 5 and sys.argv[1] == "write":
+        write(sys.argv[2], sys.argv[3], sys.argv[4])
+        return 0
+    print(__doc__, file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

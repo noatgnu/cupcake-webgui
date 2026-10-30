@@ -993,6 +993,12 @@ jobs:
             install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/${helper}.socket" \
               "${GITHUB_WORKSPACE}/provision/scripts/${helper}.service" "${ROOTFS_DIR}/etc/systemd/system/"
           done
+          install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest" \
+            "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest-report" "${ROOTFS_DIR}/usr/local/sbin/"
+          install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/test-storage.sh" \
+            "${ROOTFS_DIR}/usr/local/sbin/cupcake-test-storage"
+          install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
+            "${ROOTFS_DIR}/etc/systemd/system/"
 
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/examples"
           cp "${GITHUB_WORKSPACE}/provision/config-examples/"*.example "${ROOTFS_DIR}/opt/cupcake/examples/"
@@ -1277,6 +1283,14 @@ jobs:
               esac
               rm -f "$STORAGE_CONFIG"
           fi
+
+          SELFTEST_CONFIG=/boot/firmware/cupcake-selftest.txt
+          if [ -f "$SELFTEST_CONFIG" ]; then
+              mkdir -p /var/lib/cupcake-selftest
+              echo requested > /var/lib/cupcake-selftest/stage
+              rm -f "$SELFTEST_CONFIG" /boot/firmware/cupcake-selftest-report.json /boot/firmware/cupcake-selftest-report.txt
+              echo "Self-test requested; the report will be written to the boot partition"
+          fi
           echo "=== first-boot.sh completed $(date -u) ==="
           FBEOF
           chmod +x /opt/cupcake/first-boot.sh
@@ -1524,6 +1538,7 @@ jobs:
 
           systemctl --root=/ enable cupcake-firstboot.service
           systemctl --root=/ enable cupcake-storage-manager.socket cupcake-network-manager.socket
+          systemctl --root=/ enable cupcake-selftest.service
 
           cat > /etc/systemd/system/cupcake-backend.service << 'UNITEOF'
           [Unit]
@@ -1845,7 +1860,7 @@ jobs:
       - name: Mount image and prepare a labelled USB stick
         run: |
           IMG=$(ls rpi/*.img.xz | head -1)
-          xz -d -T0 "$IMG"
+          xz -dk -T0 "$IMG"
           IMG="${IMG%.xz}"
           LOOP=$(sudo losetup -fP --show "$IMG")
           echo "IMG_LOOP=$LOOP" >> $GITHUB_ENV
@@ -1960,6 +1975,85 @@ jobs:
           sudo install -m 755 firstboot-check.sh /mnt/pi-root/usr/local/sbin/ci-firstboot-check
           sudo nsenter --target "$CONTAINER_LEADER" -m -u -i -n -p -r -w \
             /usr/local/sbin/ci-firstboot-check "$STICK_PART"
+
+      - name: Self-test on fresh copies of the image, without and with the USB stick
+        timeout-minutes: 60
+        run: |
+          REPORT=/mnt/pi-root/boot/firmware/cupcake-selftest-report.json
+          STAGE=/mnt/pi-root/var/lib/cupcake-selftest/stage
+
+          running() { sudo machinectl show cupcake-pi >/dev/null 2>&1; }
+          stop_container() {
+            sudo machinectl poweroff cupcake-pi 2>/dev/null || true
+            for i in $(seq 1 60); do running || return 0; sleep 2; done
+            sudo machinectl terminate cupcake-pi 2>/dev/null || true
+            sleep 5
+          }
+          fresh_image() {
+            sudo umount -R /mnt/pi-root
+            sudo losetup -d "$IMG_LOOP"
+            IMG=$(ls rpi/*.img.xz | head -1)
+            xz -dkf -T0 "$IMG"
+            IMG_LOOP=$(sudo losetup -fP --show "${IMG%.xz}")
+            echo "IMG_LOOP=$IMG_LOOP" >> "$GITHUB_ENV"
+            sudo mount "${IMG_LOOP}p2" /mnt/pi-root
+            sudo mount "${IMG_LOOP}p1" /mnt/pi-root/boot/firmware
+            sudo touch /mnt/pi-root/boot/firmware/cupcake-selftest.txt
+          }
+          boot_container() {
+            sudo systemd-nspawn --boot --quiet --directory=/mnt/pi-root --machine=cupcake-pi \
+              --private-network --capability=CAP_SYS_ADMIN,CAP_NET_ADMIN "$@" >> selftest-console.log 2>&1 &
+            for i in $(seq 1 60); do running && return 0; sleep 2; done
+            return 1
+          }
+          report_field() { sudo python3 -c "import json; print(json.load(open('$REPORT'))$1)" 2>/dev/null; }
+          all_passed() {
+            sudo python3 -c "
+          import json, sys
+          report = json.load(open('$REPORT'))
+          failed = [f\"{s['name']}: {c['name']}\" for s in report['sections'] for c in s['checks'] if not c['passed']]
+          names = [s['name'] for s in report['sections']]
+          missing = [n for n in sys.argv[1:] if n not in names]
+          print('failed:', failed or 'none', '| missing sections:', missing or 'none')
+          sys.exit(1 if failed or missing else 0)
+          " "$@"
+          }
+
+          echo "::group::Without a USB stick the self-test finishes in one boot"
+          stop_container
+          fresh_image
+          boot_container
+          for i in $(seq 1 240); do
+            [ "$(report_field "['result']")" = pass ] || [ "$(report_field "['result']")" = fail ] && break
+            running || break
+            sleep 5
+          done
+          sudo cat /mnt/pi-root/boot/firmware/cupcake-selftest-report.txt || true
+          [ "$(report_field "['result']")" = pass ] || { echo "FAIL: self-test did not pass"; exit 1; }
+          all_passed "First boot" "Services"
+          report_field "['notes']" | grep -q "USB storage not tested" || { echo "FAIL: missing-stick note"; exit 1; }
+          sudo test ! -e "$STAGE" || { echo "FAIL: self-test left its stage file behind"; exit 1; }
+          report_field "['hardware']['final']['board']['memory_mb']" | grep -qE '^[0-9]+$' \
+            || { echo "FAIL: hardware facts missing"; exit 1; }
+          echo "PASS: one-boot self-test passed and cleaned up"
+          echo "::endgroup::"
+
+          echo "::group::With the USB stick the self-test configures storage, backs up and reboots"
+          stop_container
+          fresh_image
+          boot_container --bind="$STICK_PART" --property="DeviceAllow=$STICK_PART rwm"
+          for i in $(seq 1 240); do
+            running || break
+            sleep 5
+          done
+          running && { echo "FAIL: the self-test did not reboot the device"; exit 1; }
+          sudo cat /mnt/pi-root/boot/firmware/cupcake-selftest-report.txt || true
+          [ "$(sudo cat "$STAGE" 2>/dev/null)" = after-reboot ] \
+            || { echo "FAIL: stage is '$(sudo cat "$STAGE" 2>/dev/null)', expected after-reboot"; exit 1; }
+          [ "$(report_field "['result']")" = incomplete ] || { echo "FAIL: interim report not marked incomplete"; exit 1; }
+          all_passed "First boot" "Services" "USB storage" "Backup onto USB storage"
+          echo "PASS: storage self-test passed and rebooted to check persistence"
+          echo "::endgroup::"
 
       - name: Show first-boot log
         if: always()
