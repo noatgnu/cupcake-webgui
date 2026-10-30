@@ -9,6 +9,7 @@
 #   usb-prepare / usb-check            drop-in mounting the emulated USB stick by label
 #   persist-check <usb|nfs>            storage still mounted and in use after a reboot
 #   backup-check                       full backup through the API onto the mounted storage
+#   restore-check                      back up, change data, restore with restore-backup.sh, data is back
 #   nfs-apply <host> <share>           switch storage to NFS through the admin API
 #   bad-drop-in-prepare / -check <kind> a broken drop-in must leave working storage untouched
 #
@@ -90,6 +91,37 @@ services_healthy() {
         fi
     done
     check "api responds" wait_for_api
+}
+
+manage() {
+    (cd /opt/cupcake/backend && set -a && source /opt/cupcake/.env && set +a \
+        && runuser -u cupcake-svc -- /opt/cupcake/venv/bin/python manage.py "$@")
+}
+
+metadata_tables() {
+    manage shell -c "from ccv.models import MetadataTable; $1"
+}
+
+metadata_table_exists() {
+    metadata_tables "import sys; sys.exit(0 if MetadataTable.objects.filter(name='$1').exists() else 1)"
+}
+
+metadata_table_absent() {
+    ! metadata_table_exists "$1"
+}
+
+# Run a full backup through the API into $1 and wait for it; prints the final status.
+api_backup() {
+    local destination="$1" log_id status=""
+    log_id=$(api POST appliance/run-backup/ "{\"backup_type\":\"full\",\"destination\":\"$destination\"}" \
+        | jq -r '.id // empty')
+    [ -n "$log_id" ] || { echo "rejected"; return; }
+    for _ in $(seq 1 120); do
+        status=$(api GET "appliance/$log_id/" | jq -r '.status // empty')
+        [ "$status" = "running" ] || break
+        sleep 5
+    done
+    echo "${status:-unknown}"
 }
 
 media_on_storage() {
@@ -253,6 +285,39 @@ case "$PHASE" in
         sudo -u cupcake-svc bash -c "echo 'written on NFS' > '$MEDIA_PATH/ci-nfs-marker.txt'"
         media_on_storage
         services_healthy
+        ;;
+
+    restore-check)
+        wait_for_api
+        TOKEN=$(token)
+        check "admin login" test -n "$TOKEN"
+        STAMP=$(date +%s)
+        KEPT="CI restore kept $STAMP"
+        DISCARDED="CI restore discarded $STAMP"
+        RESTORE_MARKER="$MEDIA_PATH/ci-restore-marker.txt"
+        DESTINATION="${MOUNT_POINT}/backups/ci-restore-$STAMP"
+
+        metadata_tables "MetadataTable.objects.create(name='$KEPT')" >/dev/null 2>&1
+        sudo -u cupcake-svc bash -c "echo 'in the backup' > '$RESTORE_MARKER'"
+        check "data to back up created" metadata_table_exists "$KEPT"
+        check "backup taken" test "$(api_backup "$DESTINATION")" = completed
+
+        metadata_tables "MetadataTable.objects.filter(name='$KEPT').delete(); MetadataTable.objects.create(name='$DISCARDED')" \
+            >/dev/null 2>&1
+        rm -f "$RESTORE_MARKER"
+        check "data changed after the backup" metadata_table_absent "$KEPT"
+
+        /opt/cupcake/restore-backup.sh "$DESTINATION"
+        check "restore script succeeded" test $? -eq 0
+        check "table from the backup is back" metadata_table_exists "$KEPT"
+        check "table created after the backup is gone" metadata_table_absent "$DISCARDED"
+        check "media file from the backup is back" test -f "$RESTORE_MARKER"
+        check "database saved before the restore" \
+            bash -c "ls /opt/cupcake/backups/pre-restore-*/default-pre-restore.psql.bin"
+        check "no unapplied migrations" manage migrate --check
+        services_healthy
+        TOKEN=$(token)
+        check "admin login after the restore" test -n "$TOKEN"
         ;;
 
     *)

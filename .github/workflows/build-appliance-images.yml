@@ -588,6 +588,7 @@ jobs:
             provision/scripts/configure-tailscale.sh \
             provision/scripts/configure-cloudflared.sh \
             provision/scripts/configure-storage.sh \
+            provision/scripts/restore-backup.sh \
             cupcake@localhost:/tmp/
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 -r \
             provision/config-examples \
@@ -773,8 +774,8 @@ jobs:
           tail -50 storage-serial.log
           exit 1
 
-      - name: Storage tests — drop-in files, USB stick, backup and NFS
-        timeout-minutes: 40
+      - name: Storage tests — drop-in files, USB stick, backup, restore and NFS
+        timeout-minutes: 60
         run: |
           SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i cupckey -p 2222 cupcake@localhost"
           phase() { $SSH "sudo cupcake-test-storage $*"; }
@@ -824,6 +825,10 @@ jobs:
 
           echo "::group::Full backup onto the USB stick"
           phase backup-check
+          echo "::endgroup::"
+
+          echo "::group::Restore a backup with restore-backup.sh"
+          phase restore-check
           echo "::endgroup::"
 
           echo "::group::Switch to NFS through the admin API"
@@ -986,6 +991,7 @@ jobs:
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-cloudflared.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-storage.sh" "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-storage.sh"
+          install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/restore-backup.sh" "${ROOTFS_DIR}/opt/cupcake/restore-backup.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-wifi.sh" "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
           for helper in cupcake-storage-manager cupcake-network-manager; do

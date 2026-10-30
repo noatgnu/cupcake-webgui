@@ -110,6 +110,10 @@ cp "$(dirname "$0")/configure-storage.sh" /opt/cupcake/configure-storage.sh
 chmod +x /opt/cupcake/configure-storage.sh
 chown root:root /opt/cupcake/configure-storage.sh
 
+cp "$(dirname "$0")/restore-backup.sh" /opt/cupcake/restore-backup.sh
+chmod +x /opt/cupcake/restore-backup.sh
+chown root:root /opt/cupcake/restore-backup.sh
+
 mkdir -p /opt/cupcake/examples
 EXAMPLES_DIR="$(dirname "$0")/../config-examples"
 if [ ! -d "$EXAMPLES_DIR" ]; then
