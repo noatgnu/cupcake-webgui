@@ -8,7 +8,7 @@
 #
 # What it checks:
 #   - first boot completed, secrets generated, services and API running
-#   - with a USB stick labelled CUPCAKE-DATA attached: the stick is configured
+#   - with a USB stick labelled CUPCAKEDATA attached: the stick is configured
 #     as storage, a full backup is written onto it, and the Pi reboots once to
 #     confirm the storage survives a restart
 #   - board model, memory, temperature, power and throttling problems, SD card

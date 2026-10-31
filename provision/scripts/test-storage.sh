@@ -23,7 +23,7 @@ DROP_IN=/opt/cupcake/storage-config.txt
 UNIT_DROP_IN=/etc/systemd/system/cupcake-backend.service.d/storage.conf
 MARKER=ci-storage-marker.txt
 API="http://localhost/api/v1"
-USB_LABEL=CUPCAKE-DATA
+USB_LABEL=${USB_LABEL:-CUPCAKEDATA}
 
 PASS=0
 FAIL=0

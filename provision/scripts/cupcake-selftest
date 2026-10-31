@@ -2,7 +2,7 @@
 # Hardware self-test for the Cupcake Raspberry Pi appliance.
 #
 # First-boot starts it when cupcake-selftest.txt is on the boot partition. It checks the first-boot
-# work, service health and, with a USB stick labelled CUPCAKE-DATA attached, configures that stick
+# work, service health and, with a USB stick labelled CUPCAKEDATA attached, configures that stick
 # as storage, backs up onto it and reboots to confirm the storage survives. The report is written
 # to the boot partition as cupcake-selftest-report.json and .txt, readable on any computer.
 #
@@ -16,7 +16,7 @@ RESULTS="$STATE_DIR/results.txt"
 REPORT_DIR=/boot/firmware
 STORAGE_TEST=/usr/local/sbin/cupcake-test-storage
 REPORT=/usr/local/sbin/cupcake-selftest-report
-USB_LABEL=CUPCAKE-DATA
+USB_LABELS=(CUPCAKEDATA CUPCAKE-DATA)
 
 check() {
     local name="$1"
@@ -86,7 +86,17 @@ case "$STAGE" in
         first_boot_checks
         storage_phase "Services" health
 
-        if blkid -L "$USB_LABEL" >/dev/null 2>&1; then
+        USB_LABEL=""
+        for label in "${USB_LABELS[@]}"; do
+            if blkid -L "$label" >/dev/null 2>&1; then
+                USB_LABEL=$label
+                break
+            fi
+        done
+        echo "$USB_LABEL" > "$STATE_DIR/usb-label"
+        export USB_LABEL
+
+        if [ -n "$USB_LABEL" ]; then
             storage_phase "USB storage" usb-apply
             storage_phase "Backup onto USB storage" backup-check
             echo after-reboot > "$STAGE_FILE"
@@ -96,12 +106,14 @@ case "$STAGE" in
             exit 0
         fi
 
-        echo "NOTE: USB storage not tested; attach a stick labelled $USB_LABEL to include it" >> "$RESULTS"
+        echo "NOTE: USB storage not tested; attach a stick labelled ${USB_LABELS[0]} to include it" >> "$RESULTS"
         "$REPORT" facts "$STATE_DIR/facts-final.json"
         finish
         ;;
 
     after-reboot)
+        USB_LABEL=$(cat "$STATE_DIR/usb-label" 2>/dev/null || echo "${USB_LABELS[0]}")
+        export USB_LABEL
         storage_phase "USB storage after reboot" persist-check usb
         "$REPORT" facts "$STATE_DIR/facts-final.json"
         finish

@@ -19,15 +19,21 @@ TYPE=usb
 # ── USB / local block device ──────────────────────────────────────────────────
 #
 # Identify the drive by its filesystem LABEL, not by device path (/dev/sdX).
-# Labels are stable across reboots and port changes.
+# Labels are stable across reboots and port changes. CUPCAKEDATA fits the
+# 11-character limit Windows and macOS apply to FAT32 and exFAT labels; any
+# other label works too as long as it matches the drive.
 #
-# How to label a drive before plugging it in:
-#   Linux (ext4)  :  sudo e2label /dev/sdX1 CUPCAKE-DATA
-#   Linux (exfat) :  sudo exfatlabel /dev/sdX1 CUPCAKE-DATA
-#   macOS         :  diskutil rename /Volumes/Untitled CUPCAKE-DATA
-#   Windows       :  right-click drive in Explorer → Properties → rename
+# How to prepare a drive before plugging it in:
+#   Windows       :  Explorer → right-click the drive → Format → File system exFAT,
+#                    Volume label CUPCAKEDATA
+#   macOS         :  Disk Utility → Erase → Format ExFAT, Name CUPCAKEDATA
+#   Linux (ext4)  :  sudo e2label /dev/sdX1 CUPCAKEDATA
+#   Linux (exfat) :  sudo exfatlabel /dev/sdX1 CUPCAKEDATA
 #
-LABEL=CUPCAKE-DATA
+# Prefer exFAT or ext4. FAT32 cannot store files over 4 GB, which full backups
+# can exceed once there is a lot of media.
+#
+LABEL=CUPCAKEDATA
 #
 # Filesystem type. Omit or set to 'auto' to detect automatically.
 # Supported: auto | ext4 | ext3 | exfat | ntfs | vfat

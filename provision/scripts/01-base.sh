@@ -31,6 +31,10 @@ apt-get install -y \
     wpasupplicant \
     wireless-regdb
 
+if ! modinfo exfat >/dev/null 2>&1 || ! modinfo ntfs3 >/dev/null 2>&1; then
+    apt-get install -y "linux-modules-extra-$(uname -r)" || true
+fi
+
 mkdir -p /opt/cupcake/{backend,webgui,vanilla,static,media,backups,venv}
 mkdir -p /var/log/cupcake
 

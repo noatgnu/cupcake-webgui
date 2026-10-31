@@ -737,9 +737,13 @@ jobs:
           cloud-localds storage-seed.iso storage-user-data storage-meta-data
           ssh-keygen -R "[localhost]:2222" 2>/dev/null || true
 
+          sudo apt-get install -y exfatprogs
           truncate -s 1G usb-stick.img
-          printf 'label: gpt\n,,L\n' | sfdisk -q usb-stick.img
-          mkfs.ext4 -q -F -L CUPCAKE-DATA -E offset=1048576 usb-stick.img 1022M
+          printf 'label: gpt\n,,EBD0A0A2-B9E5-4433-87C0-68B6B72699C7\n' | sfdisk -q usb-stick.img
+          truncate -s 1022M usb-partition.img
+          mkfs.exfat -L CUPCAKEDATA usb-partition.img
+          dd if=usb-partition.img of=usb-stick.img bs=1M seek=1 conv=notrunc status=none
+          rm usb-partition.img
 
           sudo apt-get install -y nfs-kernel-server
           sudo mkdir -p /srv/cupcake-nfs
@@ -1877,13 +1881,13 @@ jobs:
           truncate -s 1G usb-stick.img
           printf 'label: gpt\n,,L\n' | sfdisk -q usb-stick.img
           STICK=$(sudo losetup -fP --show usb-stick.img)
-          sudo mkfs.ext4 -q -L CUPCAKE-DATA "${STICK}p1"
+          sudo mkfs.ext4 -q -L CUPCAKEDATA "${STICK}p1"
           echo "STICK_PART=${STICK}p1" >> $GITHUB_ENV
 
       - name: Drop configuration files onto the boot partition
         run: |
           BOOT=/mnt/pi-root/boot/firmware
-          printf 'TYPE=usb\nLABEL=CUPCAKE-DATA\n' | sudo tee "$BOOT/cupcake-storage.txt"
+          printf 'TYPE=usb\nLABEL=CUPCAKEDATA\n' | sudo tee "$BOOT/cupcake-storage.txt"
           printf 'SSID=ci-network-that-does-not-exist\nPASSWORD=not-a-real-password\nCOUNTRY=GB\n' \
             | sudo tee "$BOOT/cupcake-wifi.txt"
           printf 'AUTHKEY=tskey-auth-invalid-ci-key\n' | sudo tee "$BOOT/cupcake-tailscale.txt"
