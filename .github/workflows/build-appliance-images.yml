@@ -49,6 +49,7 @@ jobs:
           npx ng build --configuration=appliance --base-href /
           mkdir -p "$GITHUB_WORKSPACE/frontend/webgui"
           cp -r dist/cupcake/browser/* "$GITHUB_WORKSPACE/frontend/webgui/"
+          git rev-parse --short HEAD > "$GITHUB_WORKSPACE/frontend/webgui/build-commit.txt"
 
       - name: Build cupcake-vanilla-ng
         env:
@@ -66,6 +67,7 @@ jobs:
           npx ng build --configuration=appliance --base-href /
           mkdir -p "$GITHUB_WORKSPACE/frontend/vanilla"
           cp -r dist/cupcake-vanilla-ng/browser/* "$GITHUB_WORKSPACE/frontend/vanilla/"
+          git rev-parse --short HEAD > "$GITHUB_WORKSPACE/frontend/vanilla/build-commit.txt"
 
       - name: Upload webgui
         uses: actions/upload-artifact@v4
@@ -804,6 +806,10 @@ jobs:
           phase secrets-check "$CI_SECRET_HASH"
           echo "::endgroup::"
 
+          echo "::group::whisper.cpp transcribes the bundled speech sample"
+          phase transcription
+          echo "::endgroup::"
+
           echo "::group::Drop-in naming a drive that is not attached"
           phase missing-prepare
           reboot_vm
@@ -978,8 +984,8 @@ jobs:
           fi
           echo "=== CUPCAKE: frontend titles verified ==="
 
-          WEBGUI_COMMIT=$(git -C /tmp/webgui rev-parse --short HEAD 2>/dev/null || echo "unknown")
-          VANILLA_NG_COMMIT=$(git -C /tmp/vanilla-ng rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          WEBGUI_COMMIT=$(cat "${GITHUB_WORKSPACE}/frontend/webgui/build-commit.txt" 2>/dev/null || echo "unknown")
+          VANILLA_NG_COMMIT=$(cat "${GITHUB_WORKSPACE}/frontend/vanilla/build-commit.txt" 2>/dev/null || echo "unknown")
           printf '%s\n' \
               "WEBGUI_COMMIT=${WEBGUI_COMMIT}" \
               "VANILLA_NG_COMMIT=${VANILLA_NG_COMMIT}" \
@@ -1022,7 +1028,7 @@ jobs:
 
           git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper-build
           cd /tmp/whisper-build
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF \
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
@@ -1031,6 +1037,7 @@ jobs:
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/build/bin"
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models"
           cp build/bin/whisper-cli "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/build/bin/"
+          install -D -m 644 samples/jfk.wav "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/samples/jfk.wav"
           cd /tmp/whisper-build/models
           bash download-ggml-model.sh base
           cp ggml-base.bin "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models/"
@@ -1353,7 +1360,7 @@ jobs:
           site_config.save(update_fields=['whisper_cpp_model'])
           "
 
-          BACKEND_COMMIT=$(git -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          BACKEND_COMMIT=$(git -c safe.directory='*' -C /opt/cupcake/backend rev-parse --short HEAD 2>/dev/null || echo "unknown")
           WEBGUI_COMMIT=$(grep "^WEBGUI_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
           VANILLA_NG_COMMIT=$(grep "^VANILLA_NG_COMMIT=" /opt/cupcake/.frontend-versions 2>/dev/null | cut -d= -f2-)
           cat > /opt/cupcake/versions.txt << VEREOF
@@ -2040,7 +2047,7 @@ jobs:
           done
           sudo cat /mnt/pi-root/boot/firmware/cupcake-selftest-report.txt || true
           [ "$(report_field "['result']")" = pass ] || { echo "FAIL: self-test did not pass"; exit 1; }
-          all_passed "First boot" "Services"
+          all_passed "First boot" "Services" "Transcription"
           report_field "['notes']" | grep -q "USB storage not tested" || { echo "FAIL: missing-stick note"; exit 1; }
           sudo test ! -e "$STAGE" || { echo "FAIL: self-test left its stage file behind"; exit 1; }
           report_field "['hardware']['final']['board']['memory_mb']" | grep -qE '^[0-9]+$' \
@@ -2067,7 +2074,8 @@ jobs:
           import json, sys
           report = json.load(open('$REPORT'))
           names = [s['name'] for s in report['sections']]
-          required = ['First boot', 'Services', 'USB storage', 'Backup onto USB storage', 'USB storage after reboot']
+          required = ['First boot', 'Services', 'Transcription', 'USB storage', 'Backup onto USB storage',
+                      'USB storage after reboot']
           missing = [n for n in required if n not in names]
           failed = [f\"{s['name']}: {c['name']}\" for s in report['sections'] for c in s['checks']
                     if not c['passed'] and s['name'] != 'USB storage after reboot']

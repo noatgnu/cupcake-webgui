@@ -26,7 +26,7 @@ grep -v "packages/" /opt/cupcake/backend/requirements.txt > /tmp/cupcake-backend
 # Build whisper.cpp
 git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /opt/cupcake/whisper.cpp
 cd /opt/cupcake/whisper.cpp
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF
 cmake --build build --config Release -j "$(nproc)"
 mkdir -p /opt/cupcake/whisper.cpp/models
 cd /opt/cupcake/whisper.cpp/models

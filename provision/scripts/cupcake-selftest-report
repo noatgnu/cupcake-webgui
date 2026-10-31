@@ -127,6 +127,27 @@ def write_speed_mb_s():
     return round(WRITE_TEST_BYTES / (1024 * 1024) / (time.monotonic() - start), 1)
 
 
+def boot_timing():
+    """Seconds from power-on to each boot stage, read from systemd while boot may still be running."""
+    names = ["FirmwareTimestampMonotonic", "LoaderTimestampMonotonic", "UserspaceTimestampMonotonic"]
+    raw = run("systemctl", "show", "--property=" + ",".join(names)) or ""
+    values = dict(line.split("=", 1) for line in raw.splitlines() if "=" in line)
+    uptime = read("/proc/uptime")
+    timing = {
+        "userspace_started_s": round(int(values["UserspaceTimestampMonotonic"]) / 1e6, 1)
+        if values.get("UserspaceTimestampMonotonic", "0").isdigit()
+        else None,
+        "selftest_started_s": round(float(uptime.split()[0]), 1) if uptime else None,
+    }
+    firmware = values.get("FirmwareTimestampMonotonic", "0")
+    loader = values.get("LoaderTimestampMonotonic", "0")
+    if firmware.isdigit() and int(firmware):
+        timing["firmware_s"] = round(int(firmware) / 1e6, 1)
+    if loader.isdigit() and int(loader):
+        timing["loader_s"] = round(int(loader) / 1e6, 1)
+    return timing
+
+
 def failed_units():
     output = run("systemctl", "--failed", "--no-legend", "--plain") or ""
     units = []
@@ -157,7 +178,7 @@ def facts():
         "storage": storage(),
         "write_speed_mb_s": write_speed_mb_s(),
         "boot": {
-            "time": run("systemd-analyze", "time"),
+            "timing": boot_timing(),
             "slowest_units": (run("systemd-analyze", "blame", "--no-pager") or "").splitlines()[:10],
         },
         "failed_units": failed_units(),
@@ -165,17 +186,22 @@ def facts():
 
 
 def parse_results(path):
-    """Read "## section" headers with "PASS: name" / "FAIL: name" lines, and "NOTE: text" lines."""
+    """Read "## section" headers with "PASS: name" / "FAIL: name" lines, "NOTE: text" lines and
+    "METRIC: name=value" lines."""
     sections = []
     notes = []
+    metrics = {}
     for line in (read(path) or "").splitlines():
         if line.startswith("## "):
             sections.append({"name": line[3:], "checks": []})
         elif line.startswith("NOTE: "):
             notes.append(line[6:])
+        elif line.startswith("METRIC: ") and "=" in line:
+            name, value = line[8:].split("=", 1)
+            metrics[name.strip()] = value.strip()
         elif sections and line.startswith(("PASS: ", "FAIL: ")):
             sections[-1]["checks"].append({"name": line[6:], "passed": line.startswith("PASS")})
-    return sections, notes
+    return sections, notes, metrics
 
 
 def summary(report):
@@ -190,6 +216,9 @@ def summary(report):
     lines.extend(f"Note: {note}" for note in report["notes"])
     if report["notes"]:
         lines.append("")
+    lines.extend(f"Metric: {name} = {value}" for name, value in report.get("metrics", {}).items())
+    if report.get("metrics"):
+        lines.append("")
     for section in report["sections"]:
         passed = sum(check["passed"] for check in section["checks"])
         lines.append(f"{section['name']}: {passed}/{len(section['checks'])} passed")
@@ -197,12 +226,15 @@ def summary(report):
     for stage, stage_facts in report["hardware"].items():
         board = stage_facts["board"]
         throttle = stage_facts.get("throttling") or {}
+        timing = stage_facts.get("boot", {}).get("timing") or {}
         lines += [
             "",
             f"[{stage}] {board.get('model')} rev {board.get('revision')}, {board.get('memory_mb')} MB RAM",
             f"  temperature {stage_facts.get('temperature_c')} C, write speed {stage_facts.get('write_speed_mb_s')} MB/s",
             f"  throttling: {', '.join(throttle.get('flags') or ['none']) if throttle else 'unknown'}",
             f"  root filesystem grown: {stage_facts['storage'].get('root_filesystem_grown')}",
+            f"  boot: userspace after {timing.get('userspace_started_s')} s, "
+            f"self-test started {timing.get('selftest_started_s')} s after power-on",
         ]
         lines.extend(f"  failed unit: {unit['unit']}" for unit in stage_facts.get("failed_units", []))
     return "\n".join(lines) + "\n"
@@ -210,7 +242,7 @@ def summary(report):
 
 def write(state_dir, report_dir, completion):
     state_dir = Path(state_dir)
-    sections, notes = parse_results(state_dir / "results.txt")
+    sections, notes, metrics = parse_results(state_dir / "results.txt")
     all_passed = all(check["passed"] for section in sections for check in section["checks"])
     report = {
         "format_version": 1,
@@ -218,6 +250,7 @@ def write(state_dir, report_dir, completion):
         "result": "incomplete" if completion != "complete" else ("pass" if all_passed else "fail"),
         "sections": sections,
         "notes": notes,
+        "metrics": metrics,
         "hardware": {
             stage: json.loads((state_dir / f"facts-{stage}.json").read_text())
             for stage in STAGES

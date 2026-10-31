@@ -3,6 +3,7 @@
 # workflow can reboot the VM between phases:
 #
 #   health                             services running and the API answering
+#   transcription                      whisper.cpp transcribes the bundled speech sample
 #   secrets-check <hash>               secrets regenerated for this machine, unlike the image build
 #   usb-apply                          configure the labelled USB stick directly, as the storage manager does
 #   missing-prepare / missing-check    drop-in naming a drive that is not attached
@@ -124,6 +125,10 @@ api_backup() {
     echo "${status:-unknown}"
 }
 
+env_value() {
+    grep "^$1=" /opt/cupcake/.env | cut -d= -f2-
+}
+
 media_on_storage() {
     check "media is a symlink to ${MOUNT_POINT}/media" \
         bash -c "[ \"\$(readlink -f '$MEDIA_PATH')\" = '${MOUNT_POINT}/media' ]"
@@ -137,6 +142,28 @@ media_on_storage() {
 case "$PHASE" in
     health)
         services_healthy
+        ;;
+
+    transcription)
+        WHISPER=$(env_value WHISPERCPP_PATH)
+        MODEL=$(env_value WHISPERCPP_DEFAULT_MODEL)
+        THREADS=$(env_value WHISPERCPP_THREAD_COUNT)
+        SAMPLE=/opt/cupcake/whisper.cpp/samples/jfk.wav
+        check "transcribe worker active" wait_active cupcake-transcribe-worker
+        check "whisper-cli installed" test -x "$WHISPER"
+        check "model installed" test -s "$MODEL"
+        check "speech sample installed" test -s "$SAMPLE"
+        START=$(date +%s.%N)
+        OUTPUT=$(sudo -u cupcake-svc "$WHISPER" -m "$MODEL" -t "${THREADS:-4}" -f "$SAMPLE" -np -nt 2>&1)
+        STATUS=$?
+        ELAPSED=$(awk -v start="$START" -v end="$(date +%s.%N)" 'BEGIN { print end - start }')
+        check "whisper-cli ran" test "$STATUS" -eq 0
+        check "speech sample transcribed" grep -qiE "ask not what your country" <<< "$OUTPUT"
+        printf 'METRIC: transcription_11s_sample_seconds=%.1f\n' "$ELAPSED"
+        printf 'METRIC: transcription_model=%s\n' "$(basename "$MODEL")"
+        if [ "$STATUS" -ne 0 ] || ! grep -qiE "ask not what your country" <<< "$OUTPUT"; then
+            echo "NOTE: whisper-cli output: $(head -c 300 <<< "$OUTPUT" | tr '\n' ' ')"
+        fi
         ;;
 
     usb-apply)
