@@ -884,7 +884,7 @@ jobs:
     name: RPi Image
     if: github.event_name == 'release' || inputs.image_type != 'vm'
     needs: [build-frontend, build-db]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
