@@ -71,6 +71,10 @@ chmod 640 /opt/cupcake/.env
 cat > /opt/cupcake/first-boot.sh << 'FBEOF'
 #!/bin/bash
 set -e
+LOG=/var/log/cupcake/first-boot.log
+mkdir -p /var/log/cupcake
+exec > >(tee -a "$LOG") 2>&1
+echo "=== first-boot.sh started $(date -u) ==="
 ENV_FILE=/opt/cupcake/.env
 CONFIG_STICK_MOUNT=/run/cupcake-config
 
@@ -268,6 +272,7 @@ fi
 if mountpoint -q "$CONFIG_STICK_MOUNT"; then
     umount "$CONFIG_STICK_MOUNT"
 fi
+echo "=== first-boot.sh completed $(date -u) ==="
 FBEOF
 chmod +x /opt/cupcake/first-boot.sh
 chown root:root /opt/cupcake/first-boot.sh
