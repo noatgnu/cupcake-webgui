@@ -11,54 +11,65 @@
 #           Alternative: SSH in, write /opt/cupcake/wifi-config.txt, then
 #           reboot (or run  sudo /opt/cupcake/first-boot.sh  directly).
 #
-# The file is read on every boot but only acted on when present.
-# It is deleted after the connection is applied.
+# The file is read on every boot but only acted on when present. It is deleted,
+# together with any certificate files it names, once the connection is set up,
+# so no password or key is left on the card or stick.
 #
-# ─────────────────────────────────────────────────────────────────────────────
-# Choose ONE auth type and fill in the matching section. Comment out the other.
+# Use ONE of the two templates below: keep its lines, delete or comment out the
+# other.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Network name (required)
-SSID=MyLabNetwork
+# Two-letter country code, for the radio's legal channel set (RPi).
+COUNTRY=GB
 
-# Wireless interface.  Leave blank to auto-detect the first wireless interface.
+# Wireless interface. Leave commented to use the first wireless interface.
 #INTERFACE=wlan0
 
-# Auth type: wpa2-personal | wpa2-enterprise
+
+# ── Template 1: WPA2-Personal (home or lab router with one shared password) ──
+
+SSID=MyLabNetwork
 AUTH_TYPE=wpa2-personal
-
-
-# ── WPA2-Personal (standard home/office password) ────────────────────────────
-
 PASSWORD=MySecretPassphrase
 
 
-# ── WPA2-Enterprise (802.1X — used in universities and large organisations) ──
+# ── Template 2: WPA2-Enterprise / eduroam (university or company network) ────
 #
-# Set AUTH_TYPE=wpa2-enterprise above, then uncomment the relevant lines below.
+# You sign in with your own username and password instead of a shared one.
+# These five lines are enough to connect to eduroam at most universities
+# (PEAP with MSCHAPv2):
 #
-
-# EAP method: peap | ttls | tls
+#SSID=eduroam
+#AUTH_TYPE=wpa2-enterprise
 #EAP_METHOD=peap
-
-# Your login username / identity
-#IDENTITY=user@example.com
-
-# Anonymous outer identity (optional — hides the real identity in phase 1)
-#ANONYMOUS_IDENTITY=anonymous@example.com
-
-# Inner authentication method used with PEAP/TTLS: mschapv2 | pap | chap
+#IDENTITY=ab123@university.ac.uk
+#PASSWORD=YourUniversityPassword
+#
+# Optional settings. Your IT department, or the eduroam Configuration Assistant
+# Tool (https://cat.eduroam.org), lists the right values for your institution.
+#
+# Inner method for PEAP or TTLS: mschapv2 | pap | chap (TTLS often uses pap).
 #PHASE2_AUTH=mschapv2
-
-# Password (required for PEAP and TTLS; not used for TLS)
-#PASSWORD=MyEnterprisePassword
-
-# CA certificate file (recommended — verifies the RADIUS server).
-# Place the PEM file alongside this config file and set the filename here.
-# RPi: /boot/firmware/ca.pem   →  CA_CERT=ca.pem
-#CA_CERT=ca.pem
-
-# Client certificate and key (EAP-TLS only — mutual authentication).
-# Place both PEM files alongside this config file.
+#
+# Outer identity sent before the encrypted tunnel; keeps your username private.
+#ANONYMOUS_IDENTITY=anonymous@university.ac.uk
+#
+# Server verification (recommended, not required). Without it the device does
+# not check that it is talking to your university's server, so a fake access
+# point named "eduroam" could collect the password. Either:
+#
+#   trust the operating system's certificate store and check the server name
+#   (Raspberry Pi; no file needed):
+#CA_CERT=system
+#SERVER_DOMAIN=radius.university.ac.uk
+#
+#   or name a CA certificate file from your IT department, copied next to this
+#   file (Raspberry Pi and x86):
+#CA_CERT=eduroam-ca.pem
+#
+# EAP-TLS only (sign in with a certificate instead of a password). Copy the
+# files next to this one.
+#EAP_METHOD=tls
 #CLIENT_CERT=client.pem
 #CLIENT_KEY=client.key.pem
+#CLIENT_KEY_PASSWORD=KeyPasswordIfAny

@@ -1385,27 +1385,78 @@ jobs:
 
           WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
           if [ -f "$WIFI_CONFIG" ]; then
-              SSID=$(grep "^SSID=" "$WIFI_CONFIG" | cut -d= -f2-)
-              PASSWORD=$(grep "^PASSWORD=" "$WIFI_CONFIG" | cut -d= -f2-)
-              COUNTRY=$(grep "^COUNTRY=" "$WIFI_CONFIG" | cut -d= -f2-)
+              wifi_value() { grep "^$1=" "$WIFI_CONFIG" | cut -d= -f2- || true; }
+              SSID=$(wifi_value SSID)
+              PASSWORD=$(wifi_value PASSWORD)
+              AUTH_TYPE=$(wifi_value AUTH_TYPE)
+              AUTH_TYPE=${AUTH_TYPE:-wpa2-personal}
+              COUNTRY=$(wifi_value COUNTRY)
               COUNTRY=${COUNTRY:-GB}
+              CERT_DIR=/etc/cupcake/wifi-certs
+              CERT_FILES=()
+              WIFI_ARGS=()
+              for key in CA_CERT CLIENT_CERT CLIENT_KEY; do
+                  name=$(wifi_value "$key")
+                  if [ -n "$name" ] && [ "$name" != system ]; then
+                      CERT_FILES+=("/boot/firmware/$(basename "$name")")
+                  fi
+              done
 
-              if [ -n "$SSID" ] && [ -n "$PASSWORD" ]; then
+              wifi_cert() {
+                  local name target="$2"
+                  name=$(basename "$1")
+                  [ -n "$1" ] && [ -f "/boot/firmware/$name" ] || return 0
+                  install -d -m 700 "$CERT_DIR"
+                  install -m 600 "/boot/firmware/$name" "$CERT_DIR/$target"
+                  echo "$CERT_DIR/$target"
+              }
+
+              if [ "$AUTH_TYPE" = wpa2-enterprise ]; then
+                  EAP_METHOD=$(wifi_value EAP_METHOD)
+                  EAP_METHOD=${EAP_METHOD:-peap}
+                  WIFI_ARGS+=(wifi-sec.key-mgmt wpa-eap 802-1x.eap "$EAP_METHOD" 802-1x.identity "$(wifi_value IDENTITY)")
+                  ANONYMOUS_IDENTITY=$(wifi_value ANONYMOUS_IDENTITY)
+                  [ -n "$ANONYMOUS_IDENTITY" ] && WIFI_ARGS+=(802-1x.anonymous-identity "$ANONYMOUS_IDENTITY")
+                  CA_CERT=$(wifi_value CA_CERT)
+                  if [ "$CA_CERT" = system ]; then
+                      WIFI_ARGS+=(802-1x.system-ca-certs yes)
+                  elif [ -n "$CA_CERT" ]; then
+                      CA_PATH=$(wifi_cert "$CA_CERT" ca.pem)
+                      [ -n "$CA_PATH" ] && WIFI_ARGS+=(802-1x.ca-cert "$CA_PATH")
+                  fi
+                  SERVER_DOMAIN=$(wifi_value SERVER_DOMAIN)
+                  [ -n "$SERVER_DOMAIN" ] && WIFI_ARGS+=(802-1x.domain-suffix-match "$SERVER_DOMAIN")
+                  if [ "$EAP_METHOD" = tls ]; then
+                      CLIENT_CERT_PATH=$(wifi_cert "$(wifi_value CLIENT_CERT)" client-cert.pem)
+                      CLIENT_KEY_PATH=$(wifi_cert "$(wifi_value CLIENT_KEY)" client-key.pem)
+                      WIFI_ARGS+=(802-1x.client-cert "$CLIENT_CERT_PATH" 802-1x.private-key "$CLIENT_KEY_PATH")
+                      CLIENT_KEY_PASSWORD=$(wifi_value CLIENT_KEY_PASSWORD)
+                      [ -n "$CLIENT_KEY_PASSWORD" ] && WIFI_ARGS+=(802-1x.private-key-password "$CLIENT_KEY_PASSWORD")
+                  else
+                      PHASE2_AUTH=$(wifi_value PHASE2_AUTH)
+                      WIFI_ARGS+=(802-1x.phase2-auth "${PHASE2_AUTH:-mschapv2}" 802-1x.password "$PASSWORD")
+                  fi
+              elif [ -n "$PASSWORD" ]; then
+                  WIFI_ARGS+=(wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWORD")
+              fi
+
+              if [ -n "$SSID" ] && [ "${#WIFI_ARGS[@]}" -gt 0 ]; then
                   printf 'REGDOMAIN=%s\n' "$COUNTRY" > /etc/default/crda
                   iw reg set "$COUNTRY" 2>/dev/null || true
+                  nmcli connection delete "cupcake-wifi" 2>/dev/null || true
                   nmcli connection add \
                       type wifi \
                       con-name "cupcake-wifi" \
                       ifname "*" \
                       ssid "$SSID" \
-                      wifi-sec.key-mgmt wpa-psk \
-                      wifi-sec.psk "$PASSWORD" \
+                      "${WIFI_ARGS[@]}" \
                       connection.autoconnect yes \
                       ipv4.method auto \
-                      ipv6.method auto
+                      ipv6.method auto \
+                      || echo "Wi-Fi connection could not be created; check $WIFI_CONFIG settings"
                   nmcli connection up "cupcake-wifi" 2>/dev/null || true
               fi
-              rm -f "$WIFI_CONFIG"
+              rm -f "$WIFI_CONFIG" "${CERT_FILES[@]}"
           fi
 
           TAILSCALE_CONFIG=/boot/firmware/cupcake-tailscale.txt
