@@ -899,13 +899,28 @@ jobs:
           echo "X86_WORK=$WORK" >> "$GITHUB_ENV"
           df -h "$WORK"
 
+          find_partition() {
+            local partition
+            for partition in "$1"p*; do
+              if [ "$(sudo blkid -o value -s TYPE "$partition")" = "$2" ]; then
+                echo "$partition"
+                return
+              fi
+            done
+          }
+
           IMG="$WORK/cupcake-x86_64.img"
           qemu-img convert -O raw vm-disk.qcow2 "$IMG"
           LOOP=$(sudo losetup -fP --show "$IMG")
-          ROOT=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "ext4" { print $1; exit }')
-          ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+          sudo udevadm settle || true
+          ROOT=$(find_partition "$LOOP" ext4)
+          ESP=$(find_partition "$LOOP" vfat)
           echo "root=$ROOT efi=$ESP"
-          [ -n "$ROOT" ] && [ -n "$ESP" ]
+          sudo blkid "$LOOP"p* || true
+          if [ -z "$ROOT" ] || [ -z "$ESP" ]; then
+            echo "Could not find the root (ext4) and EFI (vfat) partitions in the VM disk"
+            exit 1
+          fi
 
           R="$WORK/root"
           mkdir -p "$R"
@@ -949,6 +964,15 @@ jobs:
         timeout-minutes: 75
         run: |
           IMG="$X86_WORK/cupcake-x86_64.img"
+          find_esp() {
+            local partition
+            for partition in "$1"p*; do
+              if [ "$(sudo blkid -o value -s TYPE "$partition")" = vfat ]; then
+                echo "$partition"
+                return
+              fi
+            done
+          }
           for mode in uefi-secure-boot bios; do
             echo "::group::$mode"
             TEST="$X86_WORK/test-$mode.img"
@@ -956,7 +980,8 @@ jobs:
             truncate -s +4G "$TEST"
             sgdisk -e "$TEST" >/dev/null
             LOOP=$(sudo losetup -fP --show "$TEST")
-            ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+            ESP=$(find_esp "$LOOP")
+            [ -n "$ESP" ] || { echo "No EFI partition found in the test image"; exit 1; }
             mkdir -p "$X86_WORK/esp"
             sudo mount "$ESP" "$X86_WORK/esp"
             sudo touch "$X86_WORK/esp/cupcake-selftest.txt"
@@ -989,7 +1014,8 @@ jobs:
             wait "$QEMU_PID" 2>/dev/null || true
 
             LOOP=$(sudo losetup -fP --show "$TEST")
-            ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+            ESP=$(find_esp "$LOOP")
+            [ -n "$ESP" ] || { echo "No EFI partition found in the test image"; exit 1; }
             sudo mount "$ESP" "$X86_WORK/esp"
             sudo cat "$X86_WORK/esp/cupcake-selftest-report.txt"
             sudo cp "$X86_WORK/esp/cupcake-selftest-report.json" "$X86_WORK/report-$mode.json"
