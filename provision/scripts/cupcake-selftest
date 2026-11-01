@@ -1,10 +1,11 @@
 #!/bin/bash
 # Hardware self-test for the Cupcake Raspberry Pi appliance.
 #
-# First-boot starts it when cupcake-selftest.txt is on the boot partition. It checks the first-boot
+# First-boot starts it when cupcake-selftest.txt is on the boot partition (Raspberry Pi), the EFI
+# partition or a USB stick labelled CUPCAKECFG (x86). It checks the first-boot
 # work, service health and transcription and, with a USB stick labelled CUPCAKEDATA attached, configures that stick
 # as storage, backs up onto it and reboots to confirm the storage survives. The report is written
-# to the boot partition as cupcake-selftest-report.json and .txt, readable on any computer.
+# next to the request file as cupcake-selftest-report.json and .txt, readable on any computer.
 #
 # The activity LED shows the outcome until the next reboot: a heartbeat for pass, a fast blink
 # for failure.
@@ -13,7 +14,8 @@ set -u
 STATE_DIR=/var/lib/cupcake-selftest
 STAGE_FILE="$STATE_DIR/stage"
 RESULTS="$STATE_DIR/results.txt"
-REPORT_DIR=/boot/firmware
+REPORT_LOCATION_FILE="$STATE_DIR/report-location"
+CONFIG_STICK_MOUNT=/run/cupcake-config
 STORAGE_TEST=/usr/local/sbin/cupcake-test-storage
 REPORT=/usr/local/sbin/cupcake-selftest-report
 USB_LABELS=(CUPCAKEDATA CUPCAKE-DATA)
@@ -55,6 +57,43 @@ first_boot_checks() {
     check "network manager socket active" systemctl is-active cupcake-network-manager.socket
 }
 
+# Point REPORT_DIR at where the request came from, mounting the config stick when needed.
+open_report_dir() {
+    local location
+    location=$(cat "$REPORT_LOCATION_FILE" 2>/dev/null || true)
+    case "$location" in
+        "")
+            REPORT_DIR=/boot/firmware
+            ;;
+        label:*)
+            REPORT_DIR="$STATE_DIR"
+            local device
+            device=$(blkid -L "${location#label:}" 2>/dev/null || true)
+            if [ -n "$device" ]; then
+                mkdir -p "$CONFIG_STICK_MOUNT"
+                if mountpoint -q "$CONFIG_STICK_MOUNT" || mount "$device" "$CONFIG_STICK_MOUNT"; then
+                    REPORT_DIR="$CONFIG_STICK_MOUNT"
+                fi
+            fi
+            ;;
+        *)
+            REPORT_DIR="$location"
+            ;;
+    esac
+}
+
+close_report_dir() {
+    if [ "$REPORT_DIR" = "$CONFIG_STICK_MOUNT" ]; then
+        umount "$CONFIG_STICK_MOUNT" 2>/dev/null || true
+    fi
+}
+
+write_report() {
+    open_report_dir
+    "$REPORT" write "$STATE_DIR" "$REPORT_DIR" "$1"
+    close_report_dir
+}
+
 show_result() {
     local led
     led=$(ls -d /sys/class/leds/ACT /sys/class/leds/led0 2>/dev/null | head -1)
@@ -70,8 +109,8 @@ show_result() {
 
 finish() {
     local result
-    result=$("$REPORT" write "$STATE_DIR" "$REPORT_DIR" complete)
-    rm -f "$STAGE_FILE"
+    result=$(write_report complete)
+    rm -f "$STAGE_FILE" "$REPORT_LOCATION_FILE"
     show_result "$result"
     echo "Self-test finished: $result"
 }
@@ -101,7 +140,7 @@ case "$STAGE" in
             storage_phase "USB storage" usb-apply
             storage_phase "Backup onto USB storage" backup-check
             echo after-reboot > "$STAGE_FILE"
-            "$REPORT" write "$STATE_DIR" "$REPORT_DIR" incomplete >/dev/null
+            write_report incomplete >/dev/null
             echo "Self-test rebooting to check that storage survives a restart"
             systemctl --no-block reboot
             exit 0

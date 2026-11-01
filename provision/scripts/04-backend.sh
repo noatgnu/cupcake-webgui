@@ -72,6 +72,35 @@ cat > /opt/cupcake/first-boot.sh << 'FBEOF'
 #!/bin/bash
 set -e
 ENV_FILE=/opt/cupcake/.env
+CONFIG_STICK_MOUNT=/run/cupcake-config
+
+# Drop-in files can be placed on the EFI partition or on a USB stick labelled CUPCAKECFG, which
+# any computer can write. They are moved to the locations read below.
+CONFIG_DIRS=()
+[ -d /boot/efi ] && CONFIG_DIRS+=(/boot/efi)
+CONFIG_STICK=$(blkid -L CUPCAKECFG 2>/dev/null || true)
+if [ -n "$CONFIG_STICK" ]; then
+    mkdir -p "$CONFIG_STICK_MOUNT"
+    mount "$CONFIG_STICK" "$CONFIG_STICK_MOUNT" && CONFIG_DIRS+=("$CONFIG_STICK_MOUNT")
+fi
+for dir in "${CONFIG_DIRS[@]}"; do
+    for pair in storage:storage-config tailscale:tailscale-auth cloudflared:cloudflared-token; do
+        if [ -f "$dir/cupcake-${pair%%:*}.txt" ]; then
+            mv "$dir/cupcake-${pair%%:*}.txt" "/opt/cupcake/${pair##*:}.txt"
+        fi
+    done
+    if [ -f "$dir/cupcake-selftest.txt" ]; then
+        mkdir -p /var/lib/cupcake-selftest
+        echo requested > /var/lib/cupcake-selftest/stage
+        if [ "$dir" = "$CONFIG_STICK_MOUNT" ]; then
+            echo label:CUPCAKECFG > /var/lib/cupcake-selftest/report-location
+        else
+            echo "$dir" > /var/lib/cupcake-selftest/report-location
+        fi
+        rm -f "$dir/cupcake-selftest.txt" "$dir/cupcake-selftest-report.json" "$dir/cupcake-selftest-report.txt"
+        echo "Self-test requested; the report will be written next to the request file"
+    fi
+done
 
 MACHINE_ID=$(cat /etc/machine-id 2>/dev/null || true)
 SECRETS_MARKER=/opt/cupcake/.secrets-machine-id
@@ -137,10 +166,14 @@ fi
 
 WIFI_CONFIG=""
 WIFI_CONFIG_DIR=""
-if [ -f /boot/firmware/cupcake-wifi.txt ]; then
-    WIFI_CONFIG=/boot/firmware/cupcake-wifi.txt
-    WIFI_CONFIG_DIR=/boot/firmware
-elif [ -f /opt/cupcake/wifi-config.txt ]; then
+for dir in /boot/firmware "${CONFIG_DIRS[@]}"; do
+    if [ -f "$dir/cupcake-wifi.txt" ]; then
+        WIFI_CONFIG="$dir/cupcake-wifi.txt"
+        WIFI_CONFIG_DIR="$dir"
+        break
+    fi
+done
+if [ -z "$WIFI_CONFIG" ] && [ -f /opt/cupcake/wifi-config.txt ]; then
     WIFI_CONFIG=/opt/cupcake/wifi-config.txt
     WIFI_CONFIG_DIR=/opt/cupcake
 fi
@@ -230,6 +263,10 @@ print(json.dumps(cfg, indent=2))
     fi
 
     rm -f "$WIFI_CONFIG"
+fi
+
+if mountpoint -q "$CONFIG_STICK_MOUNT"; then
+    umount "$CONFIG_STICK_MOUNT"
 fi
 FBEOF
 chmod +x /opt/cupcake/first-boot.sh

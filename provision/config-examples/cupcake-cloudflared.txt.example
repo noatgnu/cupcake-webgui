@@ -2,6 +2,8 @@
 #
 # RPi : copy as  /boot/firmware/cupcake-cloudflared.txt  before first boot
 # VM  : copy as  /opt/cupcake/cloudflared-token.txt       before first boot
+# x86 : copy as  cupcake-cloudflared.txt  onto a USB stick labelled CUPCAKECFG, or onto
+#       the EFI partition, before boot
 #
 # The file is read on every boot but only acted on when present.
 # It is deleted after the tunnel is installed.

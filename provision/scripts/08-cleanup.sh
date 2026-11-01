@@ -114,6 +114,12 @@ cp "$(dirname "$0")/restore-backup.sh" /opt/cupcake/restore-backup.sh
 chmod +x /opt/cupcake/restore-backup.sh
 chown root:root /opt/cupcake/restore-backup.sh
 
+install -m 755 "$(dirname "$0")/cupcake-selftest" "$(dirname "$0")/cupcake-selftest-report" /usr/local/sbin/
+install -m 755 "$(dirname "$0")/test-storage.sh" /usr/local/sbin/cupcake-test-storage
+install -m 644 "$(dirname "$0")/cupcake-selftest.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable cupcake-selftest.service
+
 mkdir -p /opt/cupcake/examples
 EXAMPLES_DIR="$(dirname "$0")/../config-examples"
 if [ ! -d "$EXAMPLES_DIR" ]; then

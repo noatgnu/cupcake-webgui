@@ -8,6 +8,7 @@ ConditionPathExists=/var/lib/cupcake-selftest/stage
 Type=oneshot
 ExecStart=/usr/local/sbin/cupcake-selftest
 TimeoutStartSec=30min
+StandardOutput=journal+console
 
 [Install]
 WantedBy=multi-user.target

@@ -1,6 +1,8 @@
 # Cupcake Hardware Self-Test
 #
 # RPi : copy as  /boot/firmware/cupcake-selftest.txt
+# x86 : copy as  cupcake-selftest.txt  onto a USB stick labelled CUPCAKECFG, or onto
+#       the EFI partition, before boot
 #
 # The file only needs to exist; its contents are ignored. It is read on every
 # boot and deleted once the self-test has been queued, so each copy runs the

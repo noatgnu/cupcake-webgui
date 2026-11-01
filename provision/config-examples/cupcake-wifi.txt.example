@@ -3,6 +3,9 @@
 # RPi     : copy as  /boot/firmware/cupcake-wifi.txt  onto the SD card boot
 #           partition before inserting it into the device.
 #
+# x86 PC  : copy as  cupcake-wifi.txt  onto a USB stick labelled CUPCAKECFG, or
+#           onto the EFI partition, together with any certificate files it names.
+#
 # x86 VM  : WiFi is rarely needed on VMs (they use virtual NICs).
 #           Preferred: use the admin UI at /admin/wifi after first boot.
 #           Alternative: SSH in, write /opt/cupcake/wifi-config.txt, then

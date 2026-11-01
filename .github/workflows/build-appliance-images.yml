@@ -591,6 +591,10 @@ jobs:
             provision/scripts/configure-cloudflared.sh \
             provision/scripts/configure-storage.sh \
             provision/scripts/restore-backup.sh \
+            provision/scripts/cupcake-selftest \
+            provision/scripts/cupcake-selftest-report \
+            provision/scripts/cupcake-selftest.service \
+            provision/scripts/test-storage.sh \
             cupcake@localhost:/tmp/
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 -r \
             provision/config-examples \
@@ -877,6 +881,154 @@ jobs:
         with:
           name: cupcake-vm-amd64-${{ matrix.distro }}
           path: cupcake-vm-amd64-${{ matrix.distro }}.qcow2.xz
+          retention-days: 7
+          compression-level: 0
+
+      - name: Flashable x86 image — build from the Debian VM
+        if: matrix.distro == 'debian'
+        timeout-minutes: 45
+        run: |
+          sudo apt-get install -y ovmf gdisk
+          rm -f cupcake-vm-amd64-debian.qcow2.xz
+          WORK=/mnt/x86-image
+          if ! sudo mkdir -p "$WORK" 2>/dev/null || [ "$(df --output=avail -BG /mnt | tail -1 | tr -dc 0-9)" -lt 40 ]; then
+            WORK="$RUNNER_TEMP/x86-image"
+            mkdir -p "$WORK"
+          fi
+          sudo chown "$(id -u):$(id -g)" "$WORK"
+          echo "X86_WORK=$WORK" >> "$GITHUB_ENV"
+          df -h "$WORK"
+
+          IMG="$WORK/cupcake-x86_64.img"
+          qemu-img convert -O raw vm-disk.qcow2 "$IMG"
+          LOOP=$(sudo losetup -fP --show "$IMG")
+          ROOT=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "ext4" { print $1; exit }')
+          ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+          echo "root=$ROOT efi=$ESP"
+          [ -n "$ROOT" ] && [ -n "$ESP" ]
+
+          R="$WORK/root"
+          mkdir -p "$R"
+          sudo mount "$ROOT" "$R"
+          sudo mount "$ESP" "$R/boot/efi"
+          for d in dev dev/pts proc sys; do sudo mount --bind "/$d" "$R/$d"; done
+          sudo mv "$R/etc/resolv.conf" "$R/etc/resolv.conf.cupcake-build"
+          sudo cp -L /run/systemd/resolve/resolv.conf "$R/etc/resolv.conf"
+          sudo install -m 755 provision/scripts/20-baremetal.sh "$R/tmp/20-baremetal.sh"
+          sudo chroot "$R" /tmp/20-baremetal.sh
+          sudo rm -f "$R/tmp/20-baremetal.sh" "$R/etc/resolv.conf"
+          sudo mv "$R/etc/resolv.conf.cupcake-build" "$R/etc/resolv.conf"
+          sudo umount -R "$R"
+
+          sudo e2fsck -fy "$ROOT" || [ $? -lt 4 ]
+          sudo resize2fs -M "$ROOT"
+          BLOCKS=$(sudo dumpe2fs -h "$ROOT" 2>/dev/null | awk -F: '/^Block count/ { gsub(/ /, "", $2); print $2 }')
+          BLOCK_SIZE=$(sudo dumpe2fs -h "$ROOT" 2>/dev/null | awk -F: '/^Block size/ { gsub(/ /, "", $2); print $2 }')
+          PART=$(basename "$ROOT")
+          NUMBER=$(cat "/sys/class/block/$PART/partition")
+          START=$(cat "/sys/class/block/$PART/start")
+          OLD_END=$(( START + $(cat "/sys/class/block/$PART/size") ))
+          for p in /sys/class/block/"$(basename "$LOOP")"p*; do
+            END=$(( $(cat "$p/start") + $(cat "$p/size") ))
+            [ "$END" -le "$OLD_END" ] || { echo "Root is not the last partition; cannot shrink"; exit 1; }
+          done
+          SECTORS=$(( (BLOCKS * BLOCK_SIZE + 256 * 1024 * 1024) / 512 ))
+          echo ",$SECTORS" | sudo sfdisk --no-reread --no-tell-kernel -N "$NUMBER" "$LOOP"
+          sudo losetup -d "$LOOP"
+          truncate -s $(( (START + SECTORS) * 512 + 1024 * 1024 )) "$IMG"
+          sgdisk -e "$IMG"
+          sgdisk -v "$IMG"
+          LOOP=$(sudo losetup -fP --show "$IMG")
+          sudo resize2fs "${LOOP}p${NUMBER}"
+          sudo e2fsck -fy "${LOOP}p${NUMBER}" || [ $? -lt 4 ]
+          sudo losetup -d "$LOOP"
+          ls -lh "$IMG"
+
+      - name: Flashable x86 image — boot test with UEFI Secure Boot and with BIOS
+        if: matrix.distro == 'debian'
+        timeout-minutes: 75
+        run: |
+          IMG="$X86_WORK/cupcake-x86_64.img"
+          for mode in uefi-secure-boot bios; do
+            echo "::group::$mode"
+            TEST="$X86_WORK/test-$mode.img"
+            cp --sparse=always "$IMG" "$TEST"
+            truncate -s +4G "$TEST"
+            sgdisk -e "$TEST" >/dev/null
+            LOOP=$(sudo losetup -fP --show "$TEST")
+            ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+            mkdir -p "$X86_WORK/esp"
+            sudo mount "$ESP" "$X86_WORK/esp"
+            sudo touch "$X86_WORK/esp/cupcake-selftest.txt"
+            sudo umount "$X86_WORK/esp"
+            sudo losetup -d "$LOOP"
+
+            if [ "$mode" = uefi-secure-boot ]; then
+              cp /usr/share/OVMF/OVMF_VARS_4M.ms.fd "$X86_WORK/vars.fd"
+              FIRMWARE=(-machine q35,smm=on,accel=kvm
+                -global driver=cfi.pflash01,property=secure,value=on
+                -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd
+                -drive "if=pflash,format=raw,file=$X86_WORK/vars.fd")
+            else
+              FIRMWARE=(-machine pc,accel=kvm)
+            fi
+            SERIAL="$X86_WORK/serial-$mode.log"
+            qemu-system-x86_64 "${FIRMWARE[@]}" -cpu host -m 4096 -smp 2 \
+              -drive "file=$TEST,format=raw,if=virtio" \
+              -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+              -display none -serial "file:$SERIAL" &
+            QEMU_PID=$!
+            for i in $(seq 1 340); do
+              grep -q "Self-test finished" "$SERIAL" 2>/dev/null && break
+              kill -0 "$QEMU_PID" 2>/dev/null || break
+              sleep 5
+            done
+            grep "Self-test finished" "$SERIAL" || { echo "FAIL: self-test did not finish under $mode"; tail -60 "$SERIAL"; exit 1; }
+            sleep 10
+            kill "$QEMU_PID" 2>/dev/null || true
+            wait "$QEMU_PID" 2>/dev/null || true
+
+            LOOP=$(sudo losetup -fP --show "$TEST")
+            ESP=$(lsblk -lnpo NAME,FSTYPE "$LOOP" | awk '$2 == "vfat" { print $1; exit }')
+            sudo mount "$ESP" "$X86_WORK/esp"
+            sudo cat "$X86_WORK/esp/cupcake-selftest-report.txt"
+            sudo cp "$X86_WORK/esp/cupcake-selftest-report.json" "$X86_WORK/report-$mode.json"
+            sudo umount "$X86_WORK/esp"
+            sudo losetup -d "$LOOP"
+            rm -f "$TEST"
+
+            python3 - "$X86_WORK/report-$mode.json" << 'PYEOF'
+          import json, sys
+          report = json.load(open(sys.argv[1]))
+          failed = [f"{s['name']}: {c['name']}" for s in report["sections"] for c in s["checks"] if not c["passed"]]
+          names = [s["name"] for s in report["sections"]]
+          missing = [n for n in ("First boot", "Services", "Transcription") if n not in names]
+          final = report["hardware"]["final"]
+          problems = []
+          if report["result"] != "pass" or failed or missing:
+              problems.append(f"result {report['result']}, failed {failed}, missing {missing}")
+          if not final["storage"].get("root_filesystem_grown"):
+              problems.append("root partition did not grow to fill the disk")
+          if not final["network"]["addresses"] or not final["network"]["default_route"]:
+              problems.append(f"no DHCP network: {final['network']}")
+          print("PASS" if not problems else "FAIL: " + "; ".join(problems))
+          sys.exit(1 if problems else 0)
+          PYEOF
+            echo "::endgroup::"
+          done
+
+      - name: Flashable x86 image — compress
+        if: matrix.distro == 'debian'
+        run: |
+          xz -T0 -6 "$X86_WORK/cupcake-x86_64.img"
+          ls -lh "$X86_WORK/cupcake-x86_64.img.xz"
+
+      - name: Flashable x86 image — upload
+        if: matrix.distro == 'debian'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-x86-amd64
+          path: ${{ env.X86_WORK }}/cupcake-x86_64.img.xz
           retention-days: 7
           compression-level: 0
 
@@ -2138,6 +2290,7 @@ jobs:
         run: |
           .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-ubuntu vm-assets
           .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-debian vm-assets
+          .github/scripts/download-artifact-verified.sh cupcake-x86-amd64 vm-assets
 
       - name: Publish to GitHub release
         uses: softprops/action-gh-release@v2
@@ -2179,9 +2332,9 @@ jobs:
           mkdir -p "$RELEASE_DIR"
           cp -l release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
           CONTENTS="Raspberry Pi image and reference databases"
-          if ls vm-assets/*.qcow2.xz >/dev/null 2>&1; then
-            cp -l vm-assets/*.qcow2.xz "$RELEASE_DIR/"
-            CONTENTS="Raspberry Pi and VM images, and reference databases"
+          if ls vm-assets/*.xz >/dev/null 2>&1; then
+            cp -l vm-assets/*.xz "$RELEASE_DIR/"
+            CONTENTS="Raspberry Pi, x86 and VM images, and reference databases"
           fi
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 

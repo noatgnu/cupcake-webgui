@@ -148,6 +148,16 @@ def boot_timing():
     return timing
 
 
+def network():
+    """Non-loopback addresses per interface and whether a default route exists."""
+    addresses = {}
+    for line in (run("ip", "-o", "addr", "show") or "").splitlines():
+        parts = line.split()
+        if len(parts) > 3 and parts[1] != "lo" and parts[2] in ("inet", "inet6"):
+            addresses.setdefault(parts[1], []).append(parts[3])
+    return {"addresses": addresses, "default_route": bool(run("ip", "route", "show", "default"))}
+
+
 def failed_units():
     output = run("systemctl", "--failed", "--no-legend", "--plain") or ""
     units = []
@@ -176,6 +186,7 @@ def facts():
         "temperature_c": temperature_c(),
         "throttling": throttling(),
         "storage": storage(),
+        "network": network(),
         "write_speed_mb_s": write_speed_mb_s(),
         "boot": {
             "timing": boot_timing(),
