@@ -17,6 +17,9 @@
 #
 # Use ONE of the two templates below: keep its lines, delete or comment out the
 # other.
+#
+# Write each value exactly as it is, after the "=": no quotes or brackets. Values
+# may contain "=", "#" and spaces, and files saved in Windows Notepad work too.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Two-letter country code, for the radio's legal channel set (RPi).

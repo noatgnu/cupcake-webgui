@@ -1389,6 +1389,7 @@ jobs:
           mkdir -p /var/log/cupcake
           exec > >(tee -a "$LOG") 2>&1
           echo "=== first-boot.sh started $(date -u) ==="
+          sed -i 's/\r$//' /boot/firmware/cupcake-*.txt 2>/dev/null || true
 
           ENV_FILE=/opt/cupcake/.env
 

@@ -88,6 +88,7 @@ if [ -n "$CONFIG_STICK" ]; then
     mount "$CONFIG_STICK" "$CONFIG_STICK_MOUNT" && CONFIG_DIRS+=("$CONFIG_STICK_MOUNT")
 fi
 for dir in "${CONFIG_DIRS[@]}"; do
+    sed -i 's/\r$//' "$dir"/cupcake-*.txt 2>/dev/null || true
     for pair in storage:storage-config tailscale:tailscale-auth cloudflared:cloudflared-token; do
         if [ -f "$dir/cupcake-${pair%%:*}.txt" ]; then
             mv "$dir/cupcake-${pair%%:*}.txt" "/opt/cupcake/${pair##*:}.txt"
@@ -105,6 +106,8 @@ for dir in "${CONFIG_DIRS[@]}"; do
         echo "Self-test requested; the report will be written next to the request file"
     fi
 done
+sed -i 's/\r$//' /opt/cupcake/storage-config.txt /opt/cupcake/tailscale-auth.txt \
+    /opt/cupcake/cloudflared-token.txt /opt/cupcake/wifi-config.txt 2>/dev/null || true
 
 MACHINE_ID=$(cat /etc/machine-id 2>/dev/null || true)
 SECRETS_MARKER=/opt/cupcake/.secrets-machine-id
