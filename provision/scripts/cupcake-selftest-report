@@ -158,6 +158,36 @@ def network():
     return {"addresses": addresses, "default_route": bool(run("ip", "route", "show", "default"))}
 
 
+def wifi():
+    """Radio block state, connection state and the log lines that explain a Wi-Fi failure."""
+    radios = []
+    for radio in sorted(Path("/sys/class/rfkill").glob("rfkill*")):
+        if read(radio / "type") == "wlan":
+            radios.append({
+                "name": read(radio / "name"),
+                "soft_blocked": read(radio / "soft") == "1",
+                "hard_blocked": read(radio / "hard") == "1",
+            })
+    devices = [
+        dict(zip(("device", "type", "state", "connection"), line.split(":", 3)))
+        for line in (run("nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device") or "").splitlines()
+    ]
+    first_boot = [
+        line for line in (read("/var/log/cupcake/first-boot.log") or "").splitlines()
+        if "wi-fi" in line.lower() or "wifi" in line.lower()
+    ]
+    journal = run("journalctl", "-b", "-u", "NetworkManager", "-u", "wpa_supplicant", "--no-pager",
+                  "--output=cat", "--lines=400") or ""
+    pattern = re.compile(r"cupcake-wifi|eap|802-1x|auth|assoc|ssid|supplicant|wlan", re.IGNORECASE)
+    return {
+        "radios": radios,
+        "devices": devices,
+        "connection_state": run("nmcli", "-g", "GENERAL.STATE", "connection", "show", "cupcake-wifi"),
+        "first_boot_log": first_boot[-10:],
+        "network_manager_log": [line for line in journal.splitlines() if pattern.search(line)][-30:],
+    }
+
+
 def failed_units():
     output = run("systemctl", "--failed", "--no-legend", "--plain") or ""
     units = []
@@ -187,6 +217,7 @@ def facts():
         "throttling": throttling(),
         "storage": storage(),
         "network": network(),
+        "wifi": wifi(),
         "write_speed_mb_s": write_speed_mb_s(),
         "boot": {
             "timing": boot_timing(),
@@ -247,6 +278,14 @@ def summary(report):
             f"  boot: userspace after {timing.get('userspace_started_s')} s, "
             f"self-test started {timing.get('selftest_started_s')} s after power-on",
         ]
+        wifi_facts = stage_facts.get("wifi") or {}
+        for radio in wifi_facts.get("radios", []):
+            blocked = "soft-blocked" if radio["soft_blocked"] else "hard-blocked" if radio["hard_blocked"] else "unblocked"
+            lines.append(f"  wi-fi radio {radio['name']}: {blocked}")
+        for device in wifi_facts.get("devices", []):
+            if device.get("type") in ("wifi", "ethernet"):
+                lines.append(f"  {device['device']} ({device['type']}): {device.get('state')} {device.get('connection') or ''}".rstrip())
+        lines.extend(f"  first-boot: {line}" for line in wifi_facts.get("first_boot_log", []))
         lines.extend(f"  failed unit: {unit['unit']}" for unit in stage_facts.get("failed_units", []))
     return "\n".join(lines) + "\n"
 

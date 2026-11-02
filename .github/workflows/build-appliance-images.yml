@@ -1468,8 +1468,11 @@ jobs:
               fi
 
               if [ -n "$SSID" ] && [ "${#WIFI_ARGS[@]}" -gt 0 ]; then
-                  printf 'REGDOMAIN=%s\n' "$COUNTRY" > /etc/default/crda
+                  if command -v raspi-config >/dev/null 2>&1; then
+                      raspi-config nonint do_wifi_country "$COUNTRY" || echo "Could not set Wi-Fi country $COUNTRY"
+                  fi
                   iw reg set "$COUNTRY" 2>/dev/null || true
+                  rfkill unblock wifi 2>/dev/null || true
                   nmcli connection delete "cupcake-wifi" 2>/dev/null || true
                   nmcli connection add \
                       type wifi \
@@ -1481,7 +1484,11 @@ jobs:
                       ipv4.method auto \
                       ipv6.method auto \
                       || echo "Wi-Fi connection could not be created; check $WIFI_CONFIG settings"
-                  nmcli connection up "cupcake-wifi" 2>/dev/null || true
+                  if nmcli --wait 60 connection up "cupcake-wifi"; then
+                      echo "Wi-Fi connected to $SSID"
+                  else
+                      echo "Wi-Fi did not connect to $SSID yet; it keeps retrying. Details: journalctl -u NetworkManager"
+                  fi
               fi
               rm -f "$WIFI_CONFIG" "${CERT_FILES[@]}"
           fi
