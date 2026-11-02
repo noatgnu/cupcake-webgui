@@ -1497,8 +1497,11 @@ jobs:
           if [ -f "$TAILSCALE_CONFIG" ]; then
               AUTHKEY=$(grep "^AUTHKEY=" "$TAILSCALE_CONFIG" | cut -d= -f2-)
               if [ -n "$AUTHKEY" ]; then
-                  tailscale up --authkey "$AUTHKEY" --ssh --timeout=90s \
-                      || echo "Tailscale did not connect; check the auth key and network"
+                  if tailscale up --authkey "$AUTHKEY" --ssh --timeout=90s; then
+                      echo "Tailscale connected"
+                  else
+                      echo "Tailscale did not connect; check the auth key and network"
+                  fi
               fi
               rm -f "$TAILSCALE_CONFIG"
           fi
