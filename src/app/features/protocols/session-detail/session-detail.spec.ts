@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Subject, of } from 'rxjs';
 import { provideRouter } from '@angular/router';
@@ -129,17 +129,29 @@ describe('SessionDetail', () => {
     expect(listed).toEqual([1, 2, 4]);
   });
 
-  it('reloads the session timers when a participant changes one of them', fakeAsync(() => {
+  it('reloads the session timers when a participant changes one of them', () => {
     component.session.set({ id: 3 } as any);
     const reload = spyOn(component, 'loadTimersFromBackend');
     component.setupTimerListeners();
 
     timerEvents.next({ type: 'timekeeper.started', timekeeperId: '1', sessionId: '3', startTime: '', timestamp: '' });
     timerEvents.next({ type: 'timekeeper.stopped', timekeeperId: '2', sessionId: '4', timestamp: '' });
-    tick(250);
 
-    expect(reload).toHaveBeenCalledTimes(1);
-  }));
+    expect(reload).toHaveBeenCalledOnceWith(true);
+  });
+
+  it('ignores the echo of its own timer change and applies others right away', () => {
+    component.session.set({ id: 3 } as any);
+    const reload = spyOn(component, 'loadTimersFromBackend');
+    component.timer.timeKeeper['5'] = { started: false, current: 590, previousStop: 590, duration: 600, startTime: 0 } as any;
+    component.setupTimerListeners();
+
+    timerEvents.next({ type: 'timekeeper.stopped', timekeeperId: '1', sessionId: '3', stepId: '5', duration: 590, timestamp: '' });
+    expect(reload).not.toHaveBeenCalled();
+
+    timerEvents.next({ type: 'timekeeper.started', timekeeperId: '1', sessionId: '3', stepId: '5', startTime: '', timestamp: '' });
+    expect(reload).toHaveBeenCalledOnceWith(true);
+  });
 
   it('shares annotation links through the session unique id', () => {
     const copy = spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());

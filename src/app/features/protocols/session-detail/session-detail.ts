@@ -5,7 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { HttpClient } from '@angular/common/http';
 import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService, TimeKeeperWebSocketService } from '@noatgnu/cupcake-red-velvet';
-import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
+import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TimeKeeperStartedEvent, TimeKeeperStoppedEvent, TimeKeeperUpdatedEvent, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
@@ -19,7 +19,7 @@ import { WebvttEditor } from '../webvtt-editor/webvtt-editor';
 import { SessionWebrtcPanel } from '../session-webrtc-panel/session-webrtc-panel';
 import { PeerRole } from '@noatgnu/cupcake-mint-chocolate';
 import { forkJoin, Subject } from 'rxjs';
-import { debounceTime, filter, takeUntil } from 'rxjs/operators';
+import { filter, takeUntil } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { AccessUtils } from '../../../shared/utils/access.utils';
 
@@ -63,6 +63,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   private themeService = inject(ThemeService);
   private notificationWs = inject(CCRVNotificationWebSocketService);
   private timeKeeperWs = inject(TimeKeeperWebSocketService);
+  private lastLocalTimerAction = 0;
   private ccvWsService = inject(CCVWebSocketService);
   public timer = inject(TimerService);
 
@@ -277,15 +278,34 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   setupTimerListeners(): void {
     this.timeKeeperWs.messages$
       .pipe(
-        filter(event =>
+        filter((event): event is TimeKeeperStartedEvent | TimeKeeperStoppedEvent | TimeKeeperUpdatedEvent =>
           (event.type === 'timekeeper.started' || event.type === 'timekeeper.stopped' || event.type === 'timekeeper.updated')
           && !!this.session()
           && String(event.sessionId) === String(this.session()!.id)
         ),
-        debounceTime(200),
+        filter(event => !this.timerAlreadyShows(event)),
         takeUntil(this.destroy$)
       )
-      .subscribe(() => this.loadTimersFromBackend());
+      .subscribe(() => this.loadTimersFromBackend(true));
+  }
+
+  /**
+   * Whether this page's timer for the event's step already shows the state the event reports.
+   */
+  timerAlreadyShows(event: TimeKeeperStartedEvent | TimeKeeperStoppedEvent | TimeKeeperUpdatedEvent): boolean {
+    const local = event.stepId ? this.timer.timeKeeper[String(event.stepId)] : undefined;
+    if (!local) {
+      return false;
+    }
+    if (event.type === 'timekeeper.started') {
+      return local.started;
+    }
+    if (event.type === 'timekeeper.stopped') {
+      return !local.started;
+    }
+    const sameState = event.started === undefined || event.started === local.started;
+    const sameDuration = event.duration === undefined || local.started || Math.abs(local.current - event.duration) <= 1;
+    return sameState && sameDuration;
   }
 
   setupTranscriptionListeners(): void {
@@ -942,12 +962,16 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  loadTimersFromBackend(): void {
+  loadTimersFromBackend(liveUpdate = false): void {
     const currentSession = this.session();
     if (!currentSession) return;
 
+    const requestedAt = Date.now();
     this.timeKeeperService.getTimeKeepersBySession(currentSession.id).subscribe({
       next: (response) => {
+        if (liveUpdate && this.lastLocalTimerAction > requestedAt) {
+          return;
+        }
         response.results.forEach(tk => {
           if (tk.step) {
             const stepKey = tk.step.toString();
@@ -981,7 +1005,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
               } else {
                 this.timer.timeKeeper[stepKey].started = false;
                 this.timer.currentTrackingStep = this.timer.currentTrackingStep.filter(id => id !== tk.step);
-                if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
+                const drift = Math.abs(this.timer.timeKeeper[stepKey].current - (tk.currentDuration ?? 0));
+                if (tk.currentDuration !== undefined && tk.currentDuration !== null && (!liveUpdate || drift > 1)) {
                   this.timer.timeKeeper[stepKey].current = tk.currentDuration;
                   this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
                 }
@@ -996,6 +1021,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   }
 
   startTimer(stepId: number): void {
+    this.lastLocalTimerAction = Date.now();
     const currentSession = this.session();
     if (!currentSession) return;
 
@@ -1079,6 +1105,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   }
 
   pauseTimer(stepId: number): void {
+    this.lastLocalTimerAction = Date.now();
     this.timer.timeKeeper[stepId.toString()].started = false;
     this.timer.timeKeeper[stepId.toString()].previousStop = this.timer.timeKeeper[stepId.toString()].current;
 
@@ -1096,6 +1123,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   }
 
   resetTimer(stepId: number): void {
+    this.lastLocalTimerAction = Date.now();
     const step = this.allSteps().find(s => s.id === stepId);
     if (!step || !step.stepDuration) return;
 
