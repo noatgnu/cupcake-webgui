@@ -5,6 +5,7 @@ const { chromium } = require('playwright');
 const TIMEOUT = parseInt(process.env.UI_TIMEOUT || '30000');
 const LOGIN_TIMEOUT = parseInt(process.env.LOGIN_TIMEOUT || '60000');
 const HOST_RESOLVER_RULES = process.env.HOST_RESOLVER_RULES || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'cupcake';
 let passed = 0;
 let failed = 0;
 
@@ -34,7 +35,7 @@ async function testFrontend(name, url, postLoginCheck) {
     console.log('PASS: login form visible');
 
     await page.fill('#username', 'admin');
-    await page.fill('#password', 'cupcake');
+    await page.fill('#password', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     console.log('PASS: credentials submitted');
 

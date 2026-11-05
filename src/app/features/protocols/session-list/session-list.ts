@@ -6,7 +6,8 @@ import { forkJoin } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel } from '@noatgnu/cupcake-red-velvet';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AccessUtils } from '../../../shared/utils/access.utils';
 import { SessionEditModal } from '../session-edit-modal/session-edit-modal';
 
 @Component({
@@ -22,6 +23,7 @@ export class SessionList implements OnInit {
   private router = inject(Router);
   private toastService = inject(ToastService);
   private modalService = inject(NgbModal);
+  private authService = inject(AuthService);
 
   sessions = signal<Session[]>([]);
   loading = signal(false);
@@ -40,6 +42,8 @@ export class SessionList implements OnInit {
     const sessionsList = this.sessions();
     return index !== null && index >= 0 && index < sessionsList.length ? sessionsList[index] : null;
   });
+  canEditSelected = computed(() => AccessUtils.canChange(this.selectedSession(), this.authService.currentUser()));
+  readonly denied = AccessUtils.OWNER_OR_EDITOR_ONLY;
 
   selectedSessionProtocols = computed(() => {
     const session = this.selectedSession();

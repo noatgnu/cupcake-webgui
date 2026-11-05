@@ -31,7 +31,8 @@
           <button
             class="btn btn-success btn-sm"
             (click)="saveProtocol()"
-            [disabled]="saving() || !protocolForm.valid">
+            [disabled]="saving() || !protocolForm.valid || !canEdit()"
+            [title]="canEdit() ? '' : denied">
             @if (saving()) {
               <span class="spinner-border spinner-border-sm me-1"></span>
             }
@@ -59,6 +60,7 @@
             </div>
             <div class="card-body">
               <form [formGroup]="protocolForm">
+                <fieldset [disabled]="!canEdit()">
                 <div class="mb-3">
                   <label for="protocolTitle" class="form-label">Title <span class="text-danger">*</span></label>
                   <input
@@ -89,6 +91,7 @@
                     Enable for public view
                   </label>
                 </div>
+                </fieldset>
               </form>
             </div>
           </div>
@@ -100,7 +103,8 @@
                 <button
                   class="btn btn-sm btn-primary"
                   (click)="createSection()"
-                  title="Add Section">
+                  [disabled]="!canEdit()"
+                  [title]="canEdit() ? 'Add Section' : denied">
                   <i class="bi bi-plus-lg"></i>
                 </button>
               </div>
@@ -140,6 +144,7 @@
             @if (selectedSection()) {
               <div class="card-footer flex-shrink-0">
                 <form [formGroup]="sectionForm">
+                  <fieldset [disabled]="!canEdit()" [title]="canEdit() ? '' : denied">
                   <div class="mb-2">
                     <label for="sectionDescription" class="form-label small">Section Title</label>
                     <input
@@ -163,6 +168,7 @@
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
+                  </fieldset>
                 </form>
               </div>
             }
@@ -182,7 +188,7 @@
                   }
                 </h6>
                 @if (selectedSection()) {
-                  <button class="btn btn-sm btn-primary" (click)="addStep()">
+                  <button class="btn btn-sm btn-primary" (click)="addStep()" [disabled]="!canEdit()" [title]="canEdit() ? '' : denied">
                     <i class="bi bi-plus-lg me-1"></i>
                     Add Step
                   </button>
@@ -202,7 +208,7 @@
                   <i class="bi bi-list-check fs-1 mb-3 d-block"></i>
                   <h5>No Steps</h5>
                   <p class="mb-3">Add your first step to get started</p>
-                  <button class="btn btn-primary" (click)="addStep()">
+                  <button class="btn btn-primary" (click)="addStep()" [disabled]="!canEdit()" [title]="canEdit() ? '' : denied">
                     <i class="bi bi-plus-lg me-1"></i>
                     Add Step
                   </button>
@@ -219,27 +225,29 @@
                           <button
                             class="btn btn-outline-secondary"
                             (click)="moveStepUp(step, i)"
-                            [disabled]="i === 0"
-                            title="Move Up">
+                            [disabled]="i === 0 || !canEdit()"
+                            [title]="canEdit() ? 'Move Up' : denied">
                             <i class="bi bi-arrow-up"></i>
                           </button>
                           <button
                             class="btn btn-outline-secondary"
                             (click)="moveStepDown(step, i)"
-                            [disabled]="i === selectedSectionSteps().length - 1"
-                            title="Move Down">
+                            [disabled]="i === selectedSectionSteps().length - 1 || !canEdit()"
+                            [title]="canEdit() ? 'Move Down' : denied">
                             <i class="bi bi-arrow-down"></i>
                           </button>
                           <button
                             class="btn btn-outline-primary"
                             (click)="editStep(step)"
-                            title="Edit Step">
+                            [disabled]="!canEdit()"
+                            [title]="canEdit() ? 'Edit Step' : denied">
                             <i class="bi bi-pencil"></i>
                           </button>
                           <button
                             class="btn btn-outline-danger"
                             (click)="deleteStep(step.id)"
-                            title="Delete Step">
+                            [disabled]="!canEdit()"
+                            [title]="canEdit() ? 'Delete Step' : denied">
                             <i class="bi bi-trash"></i>
                           </button>
                         </div>
@@ -267,7 +275,8 @@
                           <button
                             class="btn btn-sm btn-outline-primary"
                             (click)="addStepReagent(step)"
-                            title="Add Reagent">
+                            [disabled]="!canEdit()"
+                            [title]="canEdit() ? 'Add Reagent' : denied">
                             <i class="bi bi-plus-lg"></i>
                           </button>
                         </div>
@@ -341,13 +350,15 @@
                                   <button
                                     class="btn btn-outline-primary btn-sm"
                                     (click)="editStepReagent(step.id, reagent)"
-                                    title="Edit Reagent">
+                                    [disabled]="!canEdit()"
+                                    [title]="canEdit() ? 'Edit Reagent' : denied">
                                     <i class="bi bi-pencil"></i>
                                   </button>
                                   <button
                                     class="btn btn-outline-danger btn-sm"
                                     (click)="deleteStepReagent(step.id, reagent.id)"
-                                    title="Remove Reagent">
+                                    [disabled]="!canEdit()"
+                                    [title]="canEdit() ? 'Remove Reagent' : denied">
                                     <i class="bi bi-trash"></i>
                                   </button>
                                 </div>

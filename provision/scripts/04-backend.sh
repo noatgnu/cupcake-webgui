@@ -275,6 +275,9 @@ print(json.dumps(cfg, indent=2))
     rm -f "$WIFI_CONFIG"
 fi
 
+/usr/local/sbin/cupcake-credentials "${CONFIG_DIRS[@]}" \
+    || echo "Could not set this appliance's passwords yet; retrying on the next boot"
+
 if mountpoint -q "$CONFIG_STICK_MOUNT"; then
     umount "$CONFIG_STICK_MOUNT"
 fi

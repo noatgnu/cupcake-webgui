@@ -121,6 +121,15 @@ describe('BillingRecords', () => {
     expect(component.isAdmin()).toBeTrue();
   });
 
+  it('loadBillingRecords() should send the date range as startDate and endDate', () => {
+    component.startDate.set('2024-01-01');
+    component.endDate.set('2024-01-31');
+    component.loadBillingRecords();
+    expect(mockBillingRecordService.getBillingRecords).toHaveBeenCalledWith(
+      jasmine.objectContaining({ startDate: '2024-01-01', endDate: '2024-01-31' })
+    );
+  });
+
   it('clearFilters() should reset all filter signals and page', () => {
     component.searchQuery.set('test');
     component.statusFilter.set(BillingStatus.PENDING);

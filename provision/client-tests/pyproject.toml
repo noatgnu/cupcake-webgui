@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "cupcake-appliance-client-tests"
+version = "0.1.0"
+description = "Tests a running Cupcake appliance over the network, as a client would"
+authors = ["Toan Phung"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.32"
+websockets = "^14.0"
+pytest = "^8.3"
+
+[tool.pytest.ini_options]
+markers = [
+    "login: needs CUPCAKE_PASSWORD",
+    "writes: creates and deletes test data on the appliance; needs CUPCAKE_ALLOW_WRITES=1",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

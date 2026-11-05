@@ -1,0 +1,21 @@
+<div class="d-flex align-items-end gap-2 small">
+  <div>
+    <label class="text-muted d-block" for="ratingComplexity">Complexity</label>
+    <select id="ratingComplexity" class="form-select form-select-sm" [ngModel]="complexity()" (ngModelChange)="complexity.set(+$event)">
+      @for (value of scale; track value) {
+        <option [ngValue]="value">{{ value }}</option>
+      }
+    </select>
+  </div>
+  <div>
+    <label class="text-muted d-block" for="ratingDuration">Duration</label>
+    <select id="ratingDuration" class="form-select form-select-sm" [ngModel]="duration()" (ngModelChange)="duration.set(+$event)">
+      @for (value of scale; track value) {
+        <option [ngValue]="value">{{ value }}</option>
+      }
+    </select>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="saving()" (click)="save()">
+    {{ rating() ? 'Update' : 'Rate' }}
+  </button>
+</div>

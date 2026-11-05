@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Subject, of } from 'rxjs';
 import { provideRouter } from '@angular/router';
@@ -9,15 +9,17 @@ import { CUPCAKE_CORE_CONFIG, ToastService, AuthService, SiteConfigService, Them
 import {
   SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService,
   StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService,
-  CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService
+  CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService, TimeKeeperWebSocketService
 } from '@noatgnu/cupcake-red-velvet';
-import { InstrumentUsageService, ReagentActionService, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
+import { InstrumentUsageService, ReagentActionService, InstrumentService, ReagentService, ActionType } from '@noatgnu/cupcake-macaron';
+import type { ReagentAction } from '@noatgnu/cupcake-macaron';
 import { Websocket } from '@noatgnu/cupcake-vanilla';
 import { SessionDetail } from './session-detail';
 
 describe('SessionDetail', () => {
   let component: SessionDetail;
   let fixture: ComponentFixture<SessionDetail>;
+  let timerEvents: Subject<any>;
 
   beforeEach(async () => {
     const mockSessionService = jasmine.createSpyObj('SessionService', ['getSession', 'getSessions']);
@@ -55,6 +57,11 @@ describe('SessionDetail', () => {
       transcriptionFailed$: new Subject<any>().asObservable()
     });
 
+    timerEvents = new Subject<any>();
+    const mockTimeKeeperWs = jasmine.createSpyObj('TimeKeeperWebSocketService', ['connect', 'disconnect'], {
+      messages$: timerEvents.asObservable()
+    });
+
     const mockCCVWsService = jasmine.createSpyObj('Websocket', ['connect', 'disconnect', 'filterMessages']);
     mockCCVWsService.filterMessages.and.returnValue(new Subject<any>().asObservable());
 
@@ -84,6 +91,7 @@ describe('SessionDetail', () => {
         { provide: SiteConfigService, useValue: mockSiteConfigService },
         { provide: ThemeService, useValue: mockThemeService },
         { provide: CCRVNotificationWebSocketService, useValue: mockNotificationWs },
+        { provide: TimeKeeperWebSocketService, useValue: mockTimeKeeperWs },
         { provide: Websocket, useValue: mockCCVWsService }
       ]
     }).compileComponents();
@@ -107,5 +115,38 @@ describe('SessionDetail', () => {
 
   it('loading signal starts as false', () => {
     expect(component.loading()).toBeFalse();
+  });
+
+  it('lists bookings under the step reagent they were made for, including alternatives', () => {
+    spyOn(component as any, 'currentStep').and.returnValue({ id: 6 });
+    const action = (id: number, reagent: number, stepReagent?: number) =>
+      ({ id, reagent, quantity: 1, actionType: ActionType.RESERVE, stepReagent }) as ReagentAction;
+    component.reagentActions.set(new Map([[6, [action(1, 100, 9), action(2, 200, 9), action(3, 100, 8), action(4, 100)]]]));
+    component.storedReagentCache.set(new Map([[100, { reagent: 50 }], [200, { reagent: 70 }]]));
+
+    const listed = component.getActionsForStepReagent({ id: 9, reagentId: 50 }).map(a => a.id);
+
+    expect(listed).toEqual([1, 2, 4]);
+  });
+
+  it('reloads the session timers when a participant changes one of them', fakeAsync(() => {
+    component.session.set({ id: 3 } as any);
+    const reload = spyOn(component, 'loadTimersFromBackend');
+    component.setupTimerListeners();
+
+    timerEvents.next({ type: 'timekeeper.started', timekeeperId: '1', sessionId: '3', startTime: '', timestamp: '' });
+    timerEvents.next({ type: 'timekeeper.stopped', timekeeperId: '2', sessionId: '4', timestamp: '' });
+    tick(250);
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  }));
+
+  it('shares annotation links through the session unique id', () => {
+    const copy = spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    component.session.set({ id: 3, uniqueId: 'a1b2c3d4-0000-4000-8000-000000000000' } as any);
+
+    component.shareAnnotation({ id: 7 } as any);
+
+    expect(copy.calls.mostRecent().args[0]).toContain('/protocols/sessions/a1b2c3d4-0000-4000-8000-000000000000?annotationId=7');
   });
 });

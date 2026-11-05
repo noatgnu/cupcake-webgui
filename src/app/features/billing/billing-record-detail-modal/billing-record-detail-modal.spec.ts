@@ -114,13 +114,16 @@ describe('BillingRecordDetailModal', () => {
 
   it('approveRecord() calls service when confirmed', () => {
     spyOn(window, 'confirm').and.returnValue(true);
-    const updated = { ...mockRecord, status: BillingStatus.APPROVED };
-    mockBillingRecordService.approveBillingRecord.and.returnValue(of(updated as BillingRecord));
+    const updated = { ...mockRecord, status: BillingStatus.APPROVED } as BillingRecord;
+    mockBillingRecordService.approveBillingRecord.and.returnValue(
+      of({ message: 'Billing record approved successfully', billingRecord: updated })
+    );
     component.record.set(mockRecord);
     component.approveRecord();
     expect(mockBillingRecordService.approveBillingRecord).toHaveBeenCalledWith('rec-1', {});
     expect(mockToastService.success).toHaveBeenCalledWith('Billing record approved successfully');
-    expect(mockActiveModal.close).toHaveBeenCalled();
+    expect(component.record()).toEqual(updated);
+    expect(mockActiveModal.close).toHaveBeenCalledWith(updated);
   });
 
   it('approveRecord() does nothing when no record set', () => {

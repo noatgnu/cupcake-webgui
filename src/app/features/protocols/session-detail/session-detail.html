@@ -34,7 +34,8 @@
             <button
               class="btn btn-sm btn-outline-secondary"
               (click)="editSessionDates()"
-              title="Edit session dates">
+              [disabled]="!canEditSession()"
+              [title]="canEditSession() ? 'Edit session dates' : denied">
               <i class="bi bi-pencil"></i>
             </button>
           }
@@ -220,15 +221,15 @@
                             </span>
                             <div class="btn-group btn-group-sm" role="group">
                               @if (timer.timeKeeper[currentStep()!.id.toString()].started) {
-                                <button class="btn btn-warning btn-sm" (click)="pauseTimer(currentStep()!.id)" title="Pause Timer">
+                                <button class="btn btn-warning btn-sm" (click)="pauseTimer(currentStep()!.id)" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Pause Timer' : denied">
                                   <i class="bi bi-pause-fill"></i>
                                 </button>
                               } @else {
-                                <button class="btn btn-success btn-sm" (click)="startTimer(currentStep()!.id)" title="Start Timer">
+                                <button class="btn btn-success btn-sm" (click)="startTimer(currentStep()!.id)" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Start Timer' : denied">
                                   <i class="bi bi-play-fill"></i>
                                 </button>
                               }
-                              <button class="btn btn-outline-secondary btn-sm" (click)="resetTimer(currentStep()!.id)" title="Reset Timer">
+                              <button class="btn btn-outline-secondary btn-sm" (click)="resetTimer(currentStep()!.id)" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Reset Timer' : denied">
                                 <i class="bi bi-arrow-counterclockwise"></i>
                               </button>
                             </div>
@@ -294,18 +295,30 @@
                                 }
                                 @if (getActionsForStepReagent(reagent); as actions) {
                                   @if (actions.length > 0) {
-                                    <div class="mt-2">
-                                      <div class="small text-muted">
-                                        Booked:
-                                        @for (action of actions; track action.id; let isLast = $last) {
+                                    <div class="mt-2 small">
+                                      <div class="text-muted">Booked:</div>
+                                      @for (action of actions; track action.id) {
+                                        <div class="d-flex align-items-center gap-1 text-muted">
                                           <a [routerLink]="['/storage']" [queryParams]="{reagentId: action.reagent}" class="text-decoration-none">
-                                            {{ action.quantity }} {{ reagent.reagentUnit || '' }}
+                                            {{ action.quantity }} {{ storedReagentCache().get(action.reagent)?.reagentUnit || reagent.reagentUnit || '' }}
+                                            @if (action.reagentName && action.reagentName !== reagent.reagentName) {
+                                              ({{ action.reagentName }})
+                                            }
                                           </a>
-                                          @if (!isLast) {
-                                            ,
+                                          @if (storedReagentCache().get(action.reagent)?.storageObjectName; as location) {
+                                            <span>· {{ location }}</span>
                                           }
-                                        }
-                                      </div>
+                                          @if (action.userUsername) {
+                                            <span>· {{ action.userUsername }}</span>
+                                          }
+                                          <span>· {{ action.createdAt | date: 'short' }}</span>
+                                          @if (action.isDeletable) {
+                                            <button type="button" class="btn btn-link btn-sm p-0 text-danger" (click)="deleteReagentAction(action)" title="Delete booking (within the deletion window)">
+                                              <i class="bi bi-x-circle"></i>
+                                            </button>
+                                          }
+                                        </div>
+                                      }
                                     </div>
                                   }
                                 }
@@ -364,7 +377,7 @@
                             </button>
                           </div>
                         </div>
-                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading()">
+                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading() || !canEditSession()" [title]="canEditSession() ? '' : denied">
                           <i class="bi bi-plus-circle me-1"></i>
                           Add
                         </button>
@@ -526,8 +539,9 @@
                                         </small>
                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                 (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [disabled]="!canEditSession()"
                                                 [class.active]="entry.scratched"
-                                                title="Scratch calculation">
+                                                [title]="canEditSession() ? 'Scratch calculation' : denied">
                                           <i class="bi bi-eraser"></i>
                                         </button>
                                       </div>
@@ -549,8 +563,9 @@
                                         </small>
                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                 (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [disabled]="!canEditSession()"
                                                 [class.active]="entry.scratched"
-                                                title="Scratch calculation">
+                                                [title]="canEditSession() ? 'Scratch calculation' : denied">
                                           <i class="bi bi-eraser"></i>
                                         </button>
                                       </div>
@@ -650,7 +665,7 @@
                                   <app-webvtt-editor
                                     [vttContent]="annotation.transcription"
                                     [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
-                                    [editable]="true"
+                                    [editable]="canEditSession()"
                                     (contentChanged)="onTranscriptionContentChanged($event)">
                                   </app-webvtt-editor>
                                 </div>
@@ -664,7 +679,7 @@
                                   <app-webvtt-editor
                                     [vttContent]="annotation.translation"
                                     [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
-                                    [editable]="true"
+                                    [editable]="canEditSession()"
                                     (contentChanged)="onTranslationContentChanged($event)">
                                   </app-webvtt-editor>
                                 </div>
@@ -672,17 +687,15 @@
                             </div>
                             <div class="mt-3">
                               <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" title="Scratch off">
+                                <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Scratch off' : denied">
                                   <i class="bi bi-eraser"></i>
                                 </button>
                                 <button type="button" class="btn btn-outline-info" (click)="shareAnnotation(annotation)" title="Share link">
                                   <i class="bi bi-share"></i>
                                 </button>
-                                @if (canDeleteAnnotations()) {
-                                  <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" title="Delete annotation">
-                                    <i class="bi bi-trash"></i>
-                                  </button>
-                                }
+                                <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Delete annotation' : denied">
+                                  <i class="bi bi-trash"></i>
+                                </button>
                               </div>
                             </div>
                             <div class="small text-muted mt-3">
@@ -808,8 +821,9 @@
                                       </small>
                                       <button type="button" class="btn btn-sm btn-outline-secondary"
                                               (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [disabled]="!canEditSession()"
                                               [class.active]="entry.scratched"
-                                              title="Scratch calculation">
+                                              [title]="canEditSession() ? 'Scratch calculation' : denied">
                                         <i class="bi bi-eraser"></i>
                                       </button>
                                     </div>
@@ -831,8 +845,9 @@
                                       </small>
                                       <button type="button" class="btn btn-sm btn-outline-secondary"
                                               (click)="toggleHistoryEntryScratched(annotation, entry.id)"
+                                                [disabled]="!canEditSession()"
                                               [class.active]="entry.scratched"
-                                              title="Scratch calculation">
+                                              [title]="canEditSession() ? 'Scratch calculation' : denied">
                                         <i class="bi bi-eraser"></i>
                                       </button>
                                     </div>
@@ -932,7 +947,7 @@
                                 <app-webvtt-editor
                                   [vttContent]="annotation.transcription"
                                   [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
-                                  [editable]="true"
+                                  [editable]="canEditSession()"
                                   (contentChanged)="onTranscriptionContentChanged($event)">
                                 </app-webvtt-editor>
                               </div>
@@ -946,7 +961,7 @@
                                 <app-webvtt-editor
                                   [vttContent]="annotation.translation"
                                   [externalCurrentTime]="getMediaCurrentTime(annotation.id)"
-                                  [editable]="true"
+                                  [editable]="canEditSession()"
                                   (contentChanged)="onTranslationContentChanged($event)">
                                 </app-webvtt-editor>
                               </div>
@@ -954,17 +969,15 @@
                           </div>
                           <div class="mt-3">
                             <div class="btn-group btn-group-sm">
-                              <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" title="Scratch off">
+                              <button type="button" class="btn btn-outline-secondary" (click)="toggleAnnotationScratch(annotation)" [class.active]="annotation.scratched" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Scratch off' : denied">
                                 <i class="bi bi-eraser"></i>
                               </button>
                               <button type="button" class="btn btn-outline-info" (click)="shareAnnotation(annotation)" title="Share link">
                                 <i class="bi bi-share"></i>
                               </button>
-                              @if (canDeleteAnnotations()) {
-                                <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" title="Delete annotation">
-                                  <i class="bi bi-trash"></i>
-                                </button>
-                              }
+                              <button type="button" class="btn btn-outline-danger" (click)="deleteAnnotation(annotation)" [disabled]="!canEditSession()" [title]="canEditSession() ? 'Delete annotation' : denied">
+                                <i class="bi bi-trash"></i>
+                              </button>
                             </div>
                           </div>
                           <div class="small text-muted mt-3">
@@ -1021,7 +1034,7 @@
                             </button>
                           </div>
                         </div>
-                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading()">
+                        <button class="btn btn-primary btn-sm" (click)="openAnnotationModal()" [disabled]="uploading() || !canEditSession()" [title]="canEditSession() ? '' : denied">
                           <i class="bi bi-plus-circle me-1"></i>
                           Add
                         </button>
@@ -1046,7 +1059,7 @@
                         <i class="bi bi-paperclip fs-1 mb-3 d-block"></i>
                         <h5>No Annotations</h5>
                         <p class="mb-3">Add files, recordings, or other annotations to this step</p>
-                        <button class="btn btn-primary" (click)="openAnnotationModal()" [disabled]="uploading()">
+                        <button class="btn btn-primary" (click)="openAnnotationModal()" [disabled]="uploading() || !canEditSession()" [title]="canEditSession() ? '' : denied">
                           <i class="bi bi-paperclip me-2"></i>
                           Add Annotation
                         </button>

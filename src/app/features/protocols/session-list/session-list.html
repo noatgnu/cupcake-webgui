@@ -135,13 +135,15 @@
                     <button
                       class="btn btn-outline-primary"
                       (click)="editSession(selectedSession()!)"
-                      title="Edit Session">
+                      [disabled]="!canEditSelected()"
+                      [title]="canEditSelected() ? 'Edit Session' : denied">
                       <i class="bi bi-pencil"></i>
                     </button>
                     <button
                       class="btn btn-outline-danger"
                       (click)="deleteSession(selectedSession()!.id, $event)"
-                      title="Delete Session">
+                      [disabled]="!canEditSelected()"
+                      [title]="canEditSelected() ? 'Delete Session' : denied">
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
@@ -178,7 +180,8 @@
                         id="sessionPublicToggle"
                         [checked]="selectedSession()!.enabled"
                         (click)="toggleEnabled(selectedSession()!, $event)"
-                        title="Make session viewable to everyone">
+                        [disabled]="!canEditSelected()"
+                        [title]="canEditSelected() ? 'Make session viewable to everyone' : denied">
                       <label class="form-check-label" for="sessionPublicToggle">
                         Public (viewable to everyone)
                       </label>
@@ -272,7 +275,7 @@
                                     <span><i class="bi bi-list-check me-1"></i>{{ protocol.stepsCount }} steps</span>
                                   }
                                   @if (protocol.averageDuration !== undefined && protocol.averageDuration !== null) {
-                                    <span><i class="bi bi-clock me-1"></i>{{ protocol.averageDuration.toFixed(1) }}/5</span>
+                                    <span><i class="bi bi-clock me-1"></i>{{ protocol.averageDuration.toFixed(1) }}/10</span>
                                   }
                                 </div>
                               </div>

@@ -146,10 +146,10 @@
                         <td class="text-end">-{{ costBreakdown()!.currency }} {{ costBreakdown()!.bulkDiscount.toFixed(2) }}</td>
                       </tr>
                     }
-                    @if (costBreakdown()!.taxAmount > 0) {
+                    @if (costBreakdown()!.taxAmount && costBreakdown()!.taxAmount! > 0) {
                       <tr>
                         <td>Tax:</td>
-                        <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.taxAmount.toFixed(2) }}</td>
+                        <td class="text-end">{{ costBreakdown()!.currency }} {{ costBreakdown()!.taxAmount!.toFixed(2) }}</td>
                       </tr>
                     }
                     <tr class="fw-bold border-top">

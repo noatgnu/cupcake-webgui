@@ -261,7 +261,7 @@ export class QuoteRequestModal implements OnInit {
     if (breakdown.bulkDiscount > 0) {
       quote += `Bulk Discount: -${breakdown.currency} ${breakdown.bulkDiscount.toFixed(2)}\n`;
     }
-    if (breakdown.taxAmount > 0) {
+    if (breakdown.taxAmount && breakdown.taxAmount > 0) {
       quote += `Tax: ${breakdown.currency} ${breakdown.taxAmount.toFixed(2)}\n`;
     }
     quote += `------------------\n`;

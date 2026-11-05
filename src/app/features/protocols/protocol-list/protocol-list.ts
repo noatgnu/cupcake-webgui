@@ -1,17 +1,19 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import type { ProtocolModel } from '@noatgnu/cupcake-red-velvet';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AccessUtils } from '../../../shared/utils/access.utils';
 import { ProtocolCreateModal } from '../protocol-create-modal/protocol-create-modal';
 import { SessionCreateModal } from '../session-create-modal/session-create-modal';
+import { ProtocolRating } from '../protocol-rating/protocol-rating';
 
 @Component({
   selector: 'app-protocol-list',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProtocolRating],
   templateUrl: './protocol-list.html',
   styleUrl: './protocol-list.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -21,9 +23,12 @@ export class ProtocolList implements OnInit {
   private router = inject(Router);
   private toastService = inject(ToastService);
   private modalService = inject(NgbModal);
+  private authService = inject(AuthService);
 
   protocols = signal<ProtocolModel[]>([]);
   selectedProtocol = signal<ProtocolModel | null>(null);
+  canEditSelected = computed(() => AccessUtils.canChange(this.selectedProtocol(), this.authService.currentUser()));
+  readonly denied = AccessUtils.OWNER_OR_EDITOR_ONLY;
   loading = signal(false);
   searchTerm = '';
   accessTypeFilter = signal<'all' | 'owned' | 'shared' | 'public'>('all');
@@ -100,6 +105,23 @@ export class ProtocolList implements OnInit {
 
   selectProtocol(protocol: ProtocolModel): void {
     this.selectedProtocol.set(protocol);
+  }
+
+  /**
+   * Reload the selected protocol to pick up its new rating averages.
+   */
+  refreshSelectedProtocol(): void {
+    const protocol = this.selectedProtocol();
+    if (!protocol) {
+      return;
+    }
+    this.protocolService.getProtocol(protocol.id).subscribe({
+      next: (updated) => {
+        this.selectedProtocol.set(updated);
+        this.protocols.update(list => list.map(p => (p.id === updated.id ? updated : p)));
+      },
+      error: () => this.toastService.error('Failed to refresh protocol')
+    });
   }
 
   deselectProtocol(): void {

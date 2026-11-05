@@ -170,7 +170,8 @@ export class ProtocolsIoSessionExport implements OnInit {
     if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
       return null;
     }
-    const path = this.router.serializeUrl(this.router.createUrlTree(['/protocols/sessions', id]));
+    const linkId = this.session()?.uniqueId ?? id;
+    const path = this.router.serializeUrl(this.router.createUrlTree(['/protocols/sessions', linkId]));
     return `${origin}${window.location.pathname}#${path}`;
   }
 }

@@ -77,8 +77,8 @@ export class JobEditModal implements OnInit {
       next: (data: any) => {
         this.autocompleteData.set({
           funders: data.funders || [],
-          cost_centers: data.cost_centers || [],
-          search_engines: data.search_engines || {}
+          cost_centers: data.costCenters || [],
+          search_engines: data.searchEngines || {}
         });
         this.loadingAutocomplete.set(false);
       },

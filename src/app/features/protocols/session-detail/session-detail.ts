@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { HttpClient } from '@angular/common/http';
-import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService } from '@noatgnu/cupcake-red-velvet';
+import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService, TimeKeeperWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
 import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
@@ -14,12 +14,14 @@ import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
 import { TimerService } from '../../../shared/services/timer';
 import { AnnotationModal } from '../annotation-modal/annotation-modal';
 import { SessionDateEditModal } from '../session-date-edit-modal/session-date-edit-modal';
+import { ReagentBookingModal } from '../reagent-booking-modal/reagent-booking-modal';
 import { WebvttEditor } from '../webvtt-editor/webvtt-editor';
 import { SessionWebrtcPanel } from '../session-webrtc-panel/session-webrtc-panel';
 import { PeerRole } from '@noatgnu/cupcake-mint-chocolate';
 import { forkJoin, Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { debounceTime, filter, takeUntil } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
+import { AccessUtils } from '../../../shared/utils/access.utils';
 
 interface CalculatorHistoryData {
   history: any[];
@@ -60,6 +62,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   private siteConfigService = inject(SiteConfigService);
   private themeService = inject(ThemeService);
   private notificationWs = inject(CCRVNotificationWebSocketService);
+  private timeKeeperWs = inject(TimeKeeperWebSocketService);
   private ccvWsService = inject(CCVWebSocketService);
   public timer = inject(TimerService);
 
@@ -221,20 +224,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     return this.currentAnnotation();
   });
 
-  canDeleteAnnotations = computed(() => {
-    const currentSession = this.session();
-    const currentUser = this.authService.currentUser();
-
-    if (!currentUser || !currentSession) return false;
-
-    if (currentUser.isSuperuser) return true;
-
-    if (currentSession.owner === currentUser.id) return true;
-
-    if (currentSession.editors?.includes(currentUser.id)) return true;
-
-    return false;
-  });
+  canEditSession = computed(() => AccessUtils.canChange(this.session(), this.authService.currentUser()));
+  readonly denied = AccessUtils.OWNER_OR_EDITOR_ONLY;
 
   currentTranscriptionStatus = computed(() => {
     const ann = this.currentAnnotation();
@@ -261,6 +252,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
 
     this.connectToNotificationWebSocket();
     this.setupTranscriptionListeners();
+    this.setupTimerListeners();
 
     const annotationId = this.route.snapshot.queryParamMap.get('annotationId');
     if (annotationId) {
@@ -275,7 +267,25 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     const token = this.authService.getAccessToken();
     if (token && environment.websocketUrl) {
       this.notificationWs.connect(environment.websocketUrl, token);
+      this.timeKeeperWs.connect(environment.websocketUrl, token);
     }
+  }
+
+  /**
+   * Reload this session's timers when a participant starts, stops or changes one of them.
+   */
+  setupTimerListeners(): void {
+    this.timeKeeperWs.messages$
+      .pipe(
+        filter(event =>
+          (event.type === 'timekeeper.started' || event.type === 'timekeeper.stopped' || event.type === 'timekeeper.updated')
+          && !!this.session()
+          && String(event.sessionId) === String(this.session()!.id)
+        ),
+        debounceTime(200),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => this.loadTimersFromBackend());
   }
 
   setupTranscriptionListeners(): void {
@@ -613,27 +623,28 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  async openReagentBookingModal(stepReagent: StepReagent): Promise<void> {
+  openReagentBookingModal(stepReagent: StepReagent): void {
     const currentSession = this.session();
     const step = this.currentStep();
     if (!currentSession || !step) return;
-
-    const { ReagentBookingModal } = await import('../reagent-booking-modal/reagent-booking-modal');
 
     const modalRef = this.modalService.open(ReagentBookingModal, {
       size: 'lg',
       backdrop: 'static'
     });
 
+    const reagentTemplateId = stepReagent.reagent?.id ?? stepReagent.reagentId;
+    const booked = this.getActionsForStepReagent(stepReagent);
+    const sameReagent = booked.filter(action => this.storedReagentCache().get(action.reagent)?.reagent === reagentTemplateId);
+
     modalRef.componentInstance.stepReagent = stepReagent;
     modalRef.componentInstance.sessionId = currentSession.id;
     modalRef.componentInstance.stepId = step.id;
+    modalRef.componentInstance.alreadyBooked = sameReagent.reduce((total, action) => total + action.quantity, 0);
+    modalRef.componentInstance.alternativeBookings = booked.length - sameReagent.length;
 
     modalRef.result.then(
-      (action: ReagentAction) => {
-        this.loadReagentActions(step.id);
-        this.toastService.success('Reagent booked successfully');
-      },
+      () => this.loadReagentActions(step.id),
       () => {}
     );
   }
@@ -766,40 +777,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       },
       () => {}
     );
-  }
-
-  startSession(): void {
-    const currentSession = this.session();
-    if (!currentSession) return;
-
-    this.sessionService.startSession(currentSession.id).subscribe({
-      next: (updated) => {
-        this.session.set(updated);
-        this.toastService.success('Session started successfully');
-      },
-      error: (err) => {
-        this.toastService.error('Failed to start session');
-      }
-    });
-  }
-
-  endSession(): void {
-    const currentSession = this.session();
-    if (!currentSession) return;
-
-    if (!confirm('Are you sure you want to end this session? This action marks the session as completed.')) {
-      return;
-    }
-
-    this.sessionService.endSession(currentSession.id).subscribe({
-      next: (updated) => {
-        this.session.set(updated);
-        this.toastService.success('Session ended successfully');
-      },
-      error: (err) => {
-        this.toastService.error('Failed to end session');
-      }
-    });
   }
 
   loadStepAnnotations(): void {
@@ -1002,6 +979,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
                   }
                 }
               } else {
+                this.timer.timeKeeper[stepKey].started = false;
+                this.timer.currentTrackingStep = this.timer.currentTrackingStep.filter(id => id !== tk.step);
                 if (tk.currentDuration !== undefined && tk.currentDuration !== null) {
                   this.timer.timeKeeper[stepKey].current = tk.currentDuration;
                   this.timer.timeKeeper[stepKey].previousStop = tk.currentDuration;
@@ -1592,11 +1571,12 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     const stepActions = this.reagentActions().get(step.id) || [];
     const reagentTemplateId = stepReagent.reagent?.id || stepReagent.reagentId;
 
-    if (!reagentTemplateId) return [];
-
     return stepActions.filter(action => {
+      if (action.stepReagent) {
+        return action.stepReagent === stepReagent.id;
+      }
       const storedReagent = this.storedReagentCache().get(action.reagent);
-      return storedReagent && storedReagent.reagent === reagentTemplateId;
+      return !!reagentTemplateId && !!storedReagent && storedReagent.reagent === reagentTemplateId;
     });
   }
 
@@ -1676,7 +1656,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     if (!currentSession) return;
 
     const baseUrl = window.location.origin;
-    const url = `${baseUrl}/#/protocols/sessions/${currentSession.id}?annotationId=${annotation.id}`;
+    const url = `${baseUrl}/#/protocols/sessions/${currentSession.uniqueId}?annotationId=${annotation.id}`;
 
     navigator.clipboard.writeText(url).then(() => {
       this.toastService.success('Annotation link copied to clipboard');
@@ -1686,8 +1666,8 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   }
 
   deleteAnnotation(annotation: StepAnnotation): void {
-    if (!this.canDeleteAnnotations()) {
-      this.toastService.error('You do not have permission to delete annotations');
+    if (!this.canEditSession()) {
+      this.toastService.error(this.denied);
       return;
     }
 
@@ -2007,5 +1987,6 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     this.destroy$.next();
     this.destroy$.complete();
     this.notificationWs.disconnect();
+    this.timeKeeperWs.disconnect();
   }
 }

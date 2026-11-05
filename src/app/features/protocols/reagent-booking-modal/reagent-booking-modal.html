@@ -8,26 +8,41 @@
 
 <div class="modal-body">
   <div class="mb-4">
-    <div class="alert alert-info">
-      <strong>Required:</strong> {{ stepReagent.scaledQuantity || stepReagent.quantity }}
-      @if (stepReagent.reagentUnit) {
-        {{ stepReagent.reagentUnit }}
-      }
+    <div class="alert alert-info py-2">
+      <strong>Required:</strong> {{ required() }} {{ stepReagent.reagentUnit || '' }}
       @if (stepReagent.scalable && stepReagent.scaledQuantity !== undefined) {
         <span class="ms-2">(Original: {{ stepReagent.quantity }} {{ stepReagent.reagentUnit }})</span>
       }
+      <div class="small">
+        Booked: {{ alreadyBooked }} {{ stepReagent.reagentUnit || '' }}
+        · Still needed: <strong>{{ stillNeeded() }} {{ stepReagent.reagentUnit || '' }}</strong>
+        @if (alternativeBookings > 0) {
+          · {{ alternativeBookings }} alternative booking{{ alternativeBookings === 1 ? '' : 's' }}
+        }
+      </div>
     </div>
   </div>
 
   <div class="mb-3">
-    <label for="search" class="form-label">Search Available Stored Reagents</label>
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label for="search" class="form-label mb-0">Search Available Stored Reagents</label>
+      <div class="form-check form-switch mb-0 small">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="matchingOnly"
+          [checked]="matchingOnly()"
+          (change)="setMatchingOnly($any($event.target).checked)">
+        <label class="form-check-label" for="matchingOnly">Only {{ stepReagent.reagentName }}</label>
+      </div>
+    </div>
     <input
       type="text"
       class="form-control"
       id="search"
       [value]="searchTerm()"
       (input)="onSearchChange($any($event.target).value)"
-      placeholder="Search by storage location, barcode, or notes...">
+      [placeholder]="matchingOnly() ? 'Search by storage location, barcode, or notes...' : 'Search all accessible storage by reagent name, location, barcode, or notes...'">
   </div>
 
   @if (loading()) {
@@ -53,6 +68,9 @@
             (click)="selectReagent(reagent)">
             <div class="d-flex justify-content-between align-items-start">
               <div class="flex-grow-1">
+                @if (!matchingOnly()) {
+                  <div class="small fw-semibold">{{ reagent.reagentName }}</div>
+                }
                 <div class="fw-semibold">
                   @if (reagent.storageObjectName) {
                     <i class="bi bi-box-seam me-1"></i>

@@ -594,6 +594,7 @@ jobs:
             provision/scripts/cupcake-selftest \
             provision/scripts/cupcake-selftest-report \
             provision/scripts/cupcake-selftest.service \
+            provision/scripts/cupcake-credentials \
             provision/scripts/test-storage.sh \
             cupcake@localhost:/tmp/
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 -r \
@@ -703,7 +704,8 @@ jobs:
           npx playwright install chromium --with-deps
 
           cp "$GITHUB_WORKSPACE/.github/scripts/ui-test.js" .
-          node ui-test.js
+          ADMIN_PASSWORD=$(ssh -o StrictHostKeyChecking=no -i "$GITHUB_WORKSPACE/cupckey" -p 2222 cupcake@localhost \
+            "sudo cat /opt/cupcake/.admin-password 2>/dev/null || echo cupcake") node ui-test.js
 
       - name: Upload UI test screenshots
         if: failure()
@@ -719,7 +721,7 @@ jobs:
             "sudo grep '^SECRET_KEY=' /opt/cupcake/.env | sha256sum | cut -d' ' -f1")
           echo "CI_SECRET_HASH=$CI_SECRET_HASH" >> $GITHUB_ENV
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
-            "sudo truncate -s 0 /etc/machine-id && sudo rm -f /var/lib/dbus/machine-id /opt/cupcake/.secrets-machine-id && sudo rm -f /home/cupcake/.ssh/authorized_keys"
+            "sudo truncate -s 0 /etc/machine-id && sudo rm -f /var/lib/dbus/machine-id /opt/cupcake/.secrets-machine-id && sudo rm -f /opt/cupcake/.credentials-machine-id /opt/cupcake/.admin-password /root/cupcake-credentials.txt /etc/issue.d/cupcake-credentials.issue /boot/efi/cupcake-credentials.txt && sudo rm -f /home/cupcake/.ssh/authorized_keys"
 
       - name: Shutdown VM
         run: |
@@ -1188,7 +1190,8 @@ jobs:
               "${GITHUB_WORKSPACE}/provision/scripts/${helper}.service" "${ROOTFS_DIR}/etc/systemd/system/"
           done
           install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest" \
-            "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest-report" "${ROOTFS_DIR}/usr/local/sbin/"
+            "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest-report" \
+            "${GITHUB_WORKSPACE}/provision/scripts/cupcake-credentials" "${ROOTFS_DIR}/usr/local/sbin/"
           install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/test-storage.sh" \
             "${ROOTFS_DIR}/usr/local/sbin/cupcake-test-storage"
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
@@ -1548,6 +1551,9 @@ jobs:
               rm -f "$SELFTEST_CONFIG" /boot/firmware/cupcake-selftest-report.json /boot/firmware/cupcake-selftest-report.txt
               echo "Self-test requested; the report will be written to the boot partition"
           fi
+
+          /usr/local/sbin/cupcake-credentials /boot/firmware \
+              || echo "Could not set this appliance's passwords yet; retrying on the next boot"
           echo "=== first-boot.sh completed $(date -u) ==="
           FBEOF
           chmod +x /opt/cupcake/first-boot.sh

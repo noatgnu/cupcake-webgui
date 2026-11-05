@@ -58,10 +58,15 @@ wait_for_api() {
     return 1
 }
 
+admin_password() {
+    cat /opt/cupcake/.admin-password 2>/dev/null || echo cupcake
+}
+
 token() {
     curl -sf -X POST "$API/auth/token/" \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"cupcake"}' | jq -r '.access // empty'
+        -d "$(jq -n --arg password "$(admin_password)" '{username: "admin", password: $password}')" \
+        | jq -r '.access // empty'
 }
 
 api() {

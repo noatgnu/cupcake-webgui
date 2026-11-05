@@ -25,8 +25,11 @@ export class ReagentBookingModal implements OnInit {
   stepReagent!: StepReagent;
   sessionId!: number;
   stepId!: number;
+  alreadyBooked = 0;
+  alternativeBookings = 0;
 
   searchTerm = signal('');
+  matchingOnly = signal(true);
   storedReagents = signal<StoredReagent[]>([]);
   loading = signal(false);
   saving = signal(false);
@@ -42,6 +45,20 @@ export class ReagentBookingModal implements OnInit {
     return reagent ? reagent.currentQuantity : 0;
   });
 
+  /**
+   * Amount the step needs, scaled when the step reagent is scalable.
+   */
+  required(): number {
+    return this.stepReagent.scaledQuantity || this.stepReagent.quantity;
+  }
+
+  /**
+   * Amount of the step reagent itself still to book for the step.
+   */
+  stillNeeded(): number {
+    return Math.max(this.required() - this.alreadyBooked, 0);
+  }
+
   isValidQuantity = computed(() => {
     const qty = this.quantity();
     const available = this.availableQuantity();
@@ -50,7 +67,7 @@ export class ReagentBookingModal implements OnInit {
 
   ngOnInit(): void {
     if (this.stepReagent) {
-      this.quantity.set(this.stepReagent.scaledQuantity || this.stepReagent.quantity);
+      this.quantity.set(this.stillNeeded() || this.required());
     }
 
     this.searchSubject.pipe(
@@ -72,13 +89,24 @@ export class ReagentBookingModal implements OnInit {
     this.loadStoredReagents(term);
   }
 
+  /**
+   * Switch between stored reagents of the step reagent and every stored reagent the user can access.
+   */
+  setMatchingOnly(matchingOnly: boolean): void {
+    this.matchingOnly.set(matchingOnly);
+    this.selectedReagent.set(null);
+    this.loadStoredReagents(this.searchTerm());
+  }
+
   loadStoredReagents(search?: string): void {
     this.loading.set(true);
     const params: StoredReagentQueryParams = {
-      reagent: this.stepReagent.reagentId,
       limit: 10,
       ordering: '-currentQuantity'
     };
+    if (this.matchingOnly()) {
+      params.reagent = this.stepReagent.reagent?.id ?? this.stepReagent.reagentId;
+    }
 
     if (search) {
       params.search = search;
@@ -127,6 +155,7 @@ export class ReagentBookingModal implements OnInit {
       quantity: this.quantity(),
       session: this.sessionId,
       step: this.stepId,
+      stepReagent: this.stepReagent.id,
       notes: this.notes() || undefined
     };
 

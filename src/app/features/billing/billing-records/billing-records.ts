@@ -66,11 +66,11 @@ export class BillingRecords implements OnInit {
     }
 
     if (this.startDate()) {
-      params.dateFrom = this.startDate();
+      params.startDate = this.startDate();
     }
 
     if (this.endDate()) {
-      params.dateTo = this.endDate();
+      params.endDate = this.endDate();
     }
 
     this.billingRecordService.getBillingRecords(params).subscribe({

@@ -53,4 +53,44 @@ describe('ReagentBookingModal', () => {
   it('should call getStoredReagents on init via loadStoredReagents', () => {
     expect(mockReagentService.getStoredReagents).toHaveBeenCalled();
   });
+
+  it('looks up the step reagent from its nested reagent', () => {
+    component.stepReagent = { id: 1, reagent: { id: 44 }, quantity: 5 } as any;
+    component.setMatchingOnly(true);
+    expect(mockReagentService.getStoredReagents.calls.mostRecent().args[0]).toEqual(
+      jasmine.objectContaining({ reagent: 44 })
+    );
+  });
+
+  it('starts the quantity at what is still needed', () => {
+    component.alreadyBooked = 2;
+    component.ngOnInit();
+    expect(component.stillNeeded()).toBe(3);
+    expect(component.quantity()).toBe(3);
+  });
+
+  it('looks up the step reagent first', () => {
+    expect(mockReagentService.getStoredReagents.calls.mostRecent().args[0]).toEqual(
+      jasmine.objectContaining({ reagent: 10 })
+    );
+  });
+
+  it('searches every accessible stored reagent when matching only is turned off', () => {
+    component.setMatchingOnly(false);
+    const params = mockReagentService.getStoredReagents.calls.mostRecent().args[0]!;
+    expect(params.reagent).toBeUndefined();
+    expect(component.selectedReagent()).toBeNull();
+  });
+
+  it('books the selected stored reagent for the step reagent', () => {
+    mockReagentActionService.createReagentAction.and.returnValue(of({ id: 5 } as any));
+    component.selectReagent({ id: 30, currentQuantity: 100 } as any);
+    component.updateQuantity('5');
+
+    component.bookReagent();
+
+    expect(mockReagentActionService.createReagentAction).toHaveBeenCalledWith(
+      jasmine.objectContaining({ reagent: 30, quantity: 5, session: 1, step: 1, stepReagent: 1 })
+    );
+  });
 });

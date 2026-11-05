@@ -61,11 +61,11 @@ export class BillingRecordDetailModal {
 
     this.approving.set(true);
     this.billingRecordService.approveBillingRecord(rec.id, {}).subscribe({
-      next: (updated) => {
-        this.record.set(updated);
+      next: (response) => {
+        this.record.set(response.billingRecord);
         this.toastService.success('Billing record approved successfully');
         this.approving.set(false);
-        this.activeModal.close(updated);
+        this.activeModal.close(response.billingRecord);
       },
       error: () => {
         this.toastService.error('Failed to approve billing record');

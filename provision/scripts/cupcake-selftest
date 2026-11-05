@@ -53,6 +53,8 @@ first_boot_checks() {
         'grep -qE "^SECRET_KEY=.{20,}" /opt/cupcake/.env && ! grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" /opt/cupcake/.env'
     check "secrets tied to this machine" \
         bash -c '[ "$(cat /opt/cupcake/.secrets-machine-id)" = "$(cat /etc/machine-id)" ]'
+    check "passwords generated for this machine" \
+        bash -c '[ "$(cat /opt/cupcake/.credentials-machine-id)" = "$(cat /etc/machine-id)" ]'
     check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
     check "network manager socket active" systemctl is-active cupcake-network-manager.socket
 }

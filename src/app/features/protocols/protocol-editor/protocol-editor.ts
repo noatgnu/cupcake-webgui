@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgbModal, NgbDropdown, NgbDropdownToggle, NgbDropdownMenu } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AccessUtils } from '../../../shared/utils/access.utils';
 import { ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
 import type { ProtocolModel, ProtocolSection, ProtocolStep, StepReagent } from '@noatgnu/cupcake-red-velvet';
 import { DurationInput } from '../../../shared/components/duration-input/duration-input';
@@ -40,8 +41,11 @@ export class ProtocolEditor implements OnInit {
   private stepReagentService = inject(StepReagentService);
   private toastService = inject(ToastService);
   private modalService = inject(NgbModal);
+  private authService = inject(AuthService);
 
   protocol = signal<ProtocolModel | null>(null);
+  canEdit = computed(() => AccessUtils.canChange(this.protocol(), this.authService.currentUser()));
+  readonly denied = AccessUtils.OWNER_OR_EDITOR_ONLY;
   sections = signal<ProtocolSection[]>([]);
   selectedSectionIndex = signal(0);
   steps = signal<Map<number, ProtocolStep[]>>(new Map());

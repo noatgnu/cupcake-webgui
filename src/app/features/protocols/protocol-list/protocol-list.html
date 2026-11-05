@@ -208,6 +208,8 @@
                           class="form-check-input"
                           type="checkbox"
                           [checked]="selectedProtocol()!.enabled"
+                          [disabled]="!canEditSelected()"
+                          [title]="canEditSelected() ? '' : denied"
                           (change)="toggleEnabled(selectedProtocol()!, $event)"
                           id="enableSwitch">
                         <label class="form-check-label small" for="enableSwitch">
@@ -236,16 +238,18 @@
                       @if (selectedProtocol()!.averageComplexity !== undefined && selectedProtocol()!.averageComplexity !== null) {
                         <div class="col-6 mb-2">
                           <small class="text-muted">Avg. Complexity</small>
-                          <div>{{ selectedProtocol()!.averageComplexity!.toFixed(1) }}/5</div>
+                          <div>{{ selectedProtocol()!.averageComplexity!.toFixed(1) }}/10</div>
                         </div>
                       }
                       @if (selectedProtocol()!.averageDuration !== undefined && selectedProtocol()!.averageDuration !== null) {
                         <div class="col-6 mb-2">
                           <small class="text-muted">Avg. Duration</small>
-                          <div>{{ selectedProtocol()!.averageDuration!.toFixed(1) }}/5</div>
+                          <div>{{ selectedProtocol()!.averageDuration!.toFixed(1) }}/10</div>
                         </div>
                       }
                     </div>
+                    <small class="text-muted d-block mb-1">Your rating</small>
+                    <app-protocol-rating [protocolId]="selectedProtocol()!.id" (saved)="refreshSelectedProtocol()" />
                   </div>
 
                   @if (selectedProtocol()!.protocolUrl) {
@@ -285,7 +289,9 @@
                       </button>
                       <button
                         class="btn btn-outline-danger"
-                        (click)="deleteProtocol(selectedProtocol()!.id, $event)">
+                        (click)="deleteProtocol(selectedProtocol()!.id, $event)"
+                        [disabled]="!canEditSelected()"
+                        [title]="canEditSelected() ? '' : denied">
                         <i class="bi bi-trash me-1"></i>
                         Delete
                       </button>

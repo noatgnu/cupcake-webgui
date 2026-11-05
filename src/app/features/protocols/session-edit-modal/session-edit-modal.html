@@ -71,6 +71,93 @@
         </div>
       </div>
     </div>
+
+    <div class="mb-3">
+      <label for="memberSearch" class="form-label">
+        Editors and Viewers
+      </label>
+      <div class="input-group">
+        <span class="input-group-text">
+          <i class="bi bi-search"></i>
+        </span>
+        <input
+          type="text"
+          class="form-control"
+          id="memberSearch"
+          placeholder="Search users by name, username, or email..."
+          [value]="searchTerm()"
+          (input)="onSearchChange($any($event.target).value)"
+          [disabled]="saving()">
+      </div>
+      <div class="form-text">
+        Editors can change the session; viewers can only view it
+      </div>
+
+      @if (searching()) {
+        <div class="text-center p-2">
+          <span class="spinner-border spinner-border-sm text-primary"></span>
+        </div>
+      } @else if (searchResults().length > 0) {
+        <ul class="list-group mt-2">
+          @for (user of searchResults(); track user.id) {
+            <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+              <div>
+                <div class="fw-semibold">{{ getUserDisplayName(user) }}</div>
+                @if (user.email) {
+                  <small class="text-muted">{{ user.email }}</small>
+                }
+              </div>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-primary" (click)="addEditor(user)" [disabled]="saving()">
+                  Editor
+                </button>
+                <button type="button" class="btn btn-outline-secondary" (click)="addViewer(user)" [disabled]="saving()">
+                  Viewer
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Editors</label>
+        @if (editors().length === 0) {
+          <div class="form-text">No editors</div>
+        } @else {
+          <ul class="list-group">
+            @for (user of editors(); track user.id) {
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                {{ getUserDisplayName(user) }}
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeEditor(user)" [disabled]="saving()" title="Remove editor">
+                  <i class="bi bi-x"></i>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Viewers</label>
+        @if (viewers().length === 0) {
+          <div class="form-text">No viewers</div>
+        } @else {
+          <ul class="list-group">
+            @for (user of viewers(); track user.id) {
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                {{ getUserDisplayName(user) }}
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeViewer(user)" [disabled]="saving()" title="Remove viewer">
+                  <i class="bi bi-x"></i>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
   </form>
 </div>
 

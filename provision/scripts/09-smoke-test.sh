@@ -48,13 +48,14 @@ set -a
 source /opt/cupcake/.env
 set +a
 
+ADMIN_PASSWORD=$(cat /opt/cupcake/.admin-password 2>/dev/null || echo cupcake)
 TOKEN=$(curl -sf -X POST "$API/auth/token/" \
     -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"cupcake"}' \
+    -d "$(jq -n --arg password "$ADMIN_PASSWORD" '{username: "admin", password: $password}')" \
     | jq -r '.access // empty' \
     2>/dev/null)
 
-check "default admin login"  test -n "$TOKEN"
+check "admin login"          test -n "$TOKEN"
 check "auth lab-groups"      curl -sf "$API/lab-groups/" \
     -H "Authorization: Bearer $TOKEN"
 check "auth annotations"     curl -sf "$API/annotations/" \
