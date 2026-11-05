@@ -173,6 +173,18 @@ jobs:
           $MANAGE load_ontologies --ontology all --no-limit
           $MANAGE sync_schemas
           $MANAGE load_column_templates
+          $MANAGE shell -c '
+          import sys
+          from ccv import models
+          names = ["Species", "Tissue", "HumanDisease", "SubcellularLocation", "Unimod", "MSUniqueVocabularies",
+                   "MondoDisease", "UberonAnatomy", "NCBITaxonomy", "ChEBICompound", "PSIMSOntology",
+                   "CellOntology", "BTOTerm", "DiseaseOntologyTerm"]
+          empty = [name for name in names if not getattr(models, name).objects.exists()]
+          for name in names:
+              print(f"{name}: {getattr(models, name).objects.count()} rows")
+          if empty:
+              sys.exit("Ontology tables left empty: " + ", ".join(empty))
+          '
 
       - name: Export mobile snapshot (ontology tables, SDRF schemas, column templates)
         env:
@@ -863,13 +875,15 @@ jobs:
       - name: Storage tests — discard overlay
         if: always()
         run: |
-          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
-          for i in $(seq 1 60); do
-            kill -0 ${STORAGE_QEMU_PID:-0} 2>/dev/null || break
-            sleep 3
-          done
-          kill ${STORAGE_QEMU_PID:-0} 2>/dev/null || true
-          sleep 2
+          if [ -n "${STORAGE_QEMU_PID:-}" ]; then
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i cupckey -p 2222 cupcake@localhost 'sudo shutdown -P now' 2>/dev/null || true
+            for i in $(seq 1 60); do
+              kill -0 "$STORAGE_QEMU_PID" 2>/dev/null || break
+              sleep 3
+            done
+            kill "$STORAGE_QEMU_PID" 2>/dev/null || true
+            sleep 2
+          fi
           rm -f storage-test.qcow2 usb-stick.img storage-seed.iso
 
       - name: Compact and compress

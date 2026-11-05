@@ -10,12 +10,17 @@ Configuration, through environment variables:
   CUPCAKE_USERNAME      admin user (default admin)
   CUPCAKE_PASSWORD      password of that user; tests that need a login are skipped without it
   CUPCAKE_ALLOW_WRITES  set to 1 to run tests that create and then delete test data
+  CUPCAKE_SDRF_FILE     a large SDRF file for the performance tests (skipped without it)
+  CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
 
 Run with:  CUPCAKE_HOST=... CUPCAKE_PASSWORD=... poetry run pytest
 """
 
+import json
 import os
+import secrets
 import time
+import uuid
 
 import pytest
 import requests
@@ -35,11 +40,27 @@ def pytest_collection_modifyitems(config, items):
 
 
 def pytest_terminal_summary(terminalreporter):
-    """Print how long the timed operations took on this appliance."""
+    """Print how long the timed operations took on this appliance, and save them when asked."""
     if TIMINGS:
         terminalreporter.section("appliance timings")
-        for name, seconds in TIMINGS:
-            terminalreporter.write_line(f"{name}: {seconds:.2f} s")
+        for entry in TIMINGS:
+            name, value, unit = entry if len(entry) == 3 else (*entry, "s")
+            terminalreporter.write_line(f"{name}: {value:.2f} {unit}")
+        timings_file = os.environ.get("CUPCAKE_TIMINGS_FILE")
+        if timings_file:
+            with open(timings_file, "w") as handle:
+                json.dump(
+                    {
+                        "host": os.environ.get("CUPCAKE_HOST"),
+                        "written": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                        "timings": [
+                            {"name": entry[0], "value": round(entry[1], 3), "unit": entry[2] if len(entry) == 3 else "s"}
+                            for entry in TIMINGS
+                        ],
+                    },
+                    handle,
+                    indent=2,
+                )
 
 
 def timed(name):
@@ -104,3 +125,47 @@ def schema(api, vanilla_url):
         pytest.skip("the backend on this appliance has no OpenAPI schema yet (/api/schema/ not found)")
     assert response.status_code == 200, f"/api/schema/ returned {response.status_code}"
     return response.json()
+
+
+@pytest.fixture(scope="session")
+def cleanup(api, api_url):
+    """Register objects to delete when the run ends, newest first, each with the client allowed to delete it."""
+    registered = []
+
+    def register(path, client=None):
+        registered.append((client or api, api_url + path))
+
+    yield register
+    for client, url in reversed(registered):
+        client.delete(url, timeout=60)
+
+
+@pytest.fixture(scope="session")
+def make_user(api, api_url, cleanup):
+    """Create a throwaway user and return a logged-in client for it; users are deleted when the run ends."""
+
+    def make(role):
+        username = f"ct-{role}-{uuid.uuid4().hex[:8]}"
+        password = f"{secrets.token_urlsafe(18)}Aa1!"
+        created = api.post(
+            api_url + "users/admin_create/",
+            json={
+                "username": username,
+                "email": f"{username}@example.org",
+                "password": password,
+                "password_confirm": password,
+            },
+            timeout=30,
+        )
+        assert created.status_code == 201, f"creating {role} failed: {created.status_code} {created.text[:200]}"
+        user = created.json()["user"]
+        cleanup(f"users/{user['id']}/")
+        login = requests.post(api_url + "auth/token/", json={"username": username, "password": password}, timeout=30)
+        assert login.status_code == 200, f"{role} could not log in: {login.status_code}"
+        client = requests.Session()
+        client.headers["Authorization"] = f"Bearer {login.json()['access']}"
+        client.user = user
+        client.access_token = login.json()["access"]
+        return client
+
+    return make
