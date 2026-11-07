@@ -146,6 +146,10 @@ export const routes: Routes = [
             loadComponent: () => import('@noatgnu/cupcake-vanilla').then(m => m.FavoriteManagement)
           },
           {
+            path: 'vocabularies',
+            loadComponent: () => import('./features/jobs/vocabularies-page/vocabularies-page').then(m => m.VocabulariesPage)
+          },
+          {
             path: ':id',
             loadComponent: () => import('./features/jobs/job-detail/job-detail').then(m => m.JobDetail)
           }
