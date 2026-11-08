@@ -1275,7 +1275,10 @@ jobs:
           echo "=== CUPCAKE: installing packages ==="
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y curl gpg
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /tmp/postgresql.asc
+          gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg /tmp/postgresql.asc
+          rm /tmp/postgresql.asc
           echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] https://apt.postgresql.org/pub/repos/apt trixie-pgdg main" > /etc/apt/sources.list.d/pgdg.list
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -1288,7 +1291,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y coturn || true
 
           echo "=== CUPCAKE: installing Tailscale ==="
-          curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
               -o /usr/share/keyrings/tailscale-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main" \
               > /etc/apt/sources.list.d/tailscale.list
@@ -1296,7 +1299,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y tailscale
 
           echo "=== CUPCAKE: installing cloudflared ==="
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb \
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb \
               -o /tmp/cloudflared.deb
           dpkg -i /tmp/cloudflared.deb
           rm /tmp/cloudflared.deb
