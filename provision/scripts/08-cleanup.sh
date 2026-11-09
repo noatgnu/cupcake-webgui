@@ -117,6 +117,7 @@ chown root:root /opt/cupcake/restore-backup.sh
 install -m 755 "$(dirname "$0")/cupcake-selftest" "$(dirname "$0")/cupcake-selftest-report" \
     "$(dirname "$0")/cupcake-credentials" /usr/local/sbin/
 install -m 755 "$(dirname "$0")/test-storage.sh" /usr/local/sbin/cupcake-test-storage
+install -D -m 755 "$(dirname "$0")/cupcake-remote-access-motd" /etc/update-motd.d/60-cupcake-remote-access
 install -m 644 "$(dirname "$0")/cupcake-selftest.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable cupcake-selftest.service

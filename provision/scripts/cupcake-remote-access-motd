@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""
+Login message lines for the remote access set up on the appliance: Tailscale and the Cloudflare tunnel.
+
+Installed as /etc/update-motd.d/60-cupcake-remote-access. A service that is not set up prints nothing.
+Each check gives up after two seconds.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import urllib.error
+import urllib.request
+
+CLOUDFLARED_READY = "http://127.0.0.1:20241/ready"
+TAILSCALE_STATE = "/var/lib/tailscale/tailscaled.state"
+TIMEOUT = 2
+NOT_SET_UP = {"NoState", "NeedsLogin"}
+
+
+def run(*command):
+    """Standard output of command, or an empty string when it fails or takes too long."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, timeout=TIMEOUT).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def tailscale():
+    """The Tailscale line, or None when Tailscale is not set up."""
+    if not shutil.which("tailscale"):
+        return None
+    try:
+        status = json.loads(run("tailscale", "status", "--json"))
+    except ValueError:
+        if os.path.exists(TAILSCALE_STATE) and os.path.getsize(TAILSCALE_STATE):
+            return "not answering; see systemctl status tailscaled"
+        return None
+    state = status.get("BackendState", "")
+    if state in NOT_SET_UP:
+        return None
+    if state != "Running":
+        return f"{state.lower() or 'unknown'}; run sudo tailscale up to connect"
+    me = status.get("Self") or {}
+    name = (me.get("DNSName") or me.get("HostName") or "").rstrip(".")
+    addresses = ", ".join(address for address in me.get("TailscaleIPs") or [] if ":" not in address)
+    line = f"connected as {name}" + (f" ({addresses})" if addresses else "")
+    if status.get("Health"):
+        line += f"; {len(status['Health'])} warning(s), see tailscale status"
+    return line
+
+
+def cloudflare():
+    """The Cloudflare tunnel line, or None when the tunnel is not set up."""
+    if not shutil.which("cloudflared") or run("systemctl", "is-enabled", "cloudflared") != "enabled":
+        return None
+    if run("systemctl", "is-active", "cloudflared") != "active":
+        return "stopped; see systemctl status cloudflared"
+    try:
+        with urllib.request.urlopen(CLOUDFLARED_READY, timeout=TIMEOUT) as response:
+            body = response.read()
+    except urllib.error.HTTPError as error:
+        body = error.read()
+    except OSError:
+        return "running; connection state unknown"
+    try:
+        connections = json.loads(body or b"{}").get("readyConnections", 0)
+    except (ValueError, AttributeError):
+        return "running; connection state unknown"
+    if not connections:
+        return "running, not connected to Cloudflare yet"
+    return f"connected, {connections} connection(s) to Cloudflare"
+
+
+def main():
+    lines = [(label, check()) for label, check in (("Tailscale", tailscale), ("Cloudflare tunnel", cloudflare))]
+    lines = [(label, text) for label, text in lines if text]
+    if not lines:
+        return
+    print()
+    for label, text in lines:
+        print(f"{label + ':':<20}{text}")
+
+
+if __name__ == "__main__":
+    main()

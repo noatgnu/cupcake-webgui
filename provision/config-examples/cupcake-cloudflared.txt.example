@@ -9,6 +9,9 @@
 # It is deleted after the tunnel is installed.
 # To re-configure a running appliance use:
 #   sudo /opt/cupcake/configure-cloudflared.sh <token>
+# The token is kept in /etc/cupcake/cloudflared.env, readable only by root.
+# Appliances set up before this change keep the token in the cloudflared unit
+# file; run the command above once to move it.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 

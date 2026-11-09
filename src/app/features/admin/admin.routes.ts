@@ -8,6 +8,7 @@ import { WorkerStatus } from './worker-status/worker-status';
 import { StorageAdmin } from './storage-admin/storage-admin';
 import { BackupAdmin } from './backup-admin/backup-admin';
 import { WifiAdmin } from './wifi-admin/wifi-admin';
+import { RemoteAccessAdmin } from './remote-access-admin/remote-access-admin';
 import { environment } from '../../../environments/environment';
 
 const applianceGuard = () => {
@@ -53,5 +54,11 @@ export const adminRoutes: Routes = [
     component: WifiAdmin,
     canActivate: [adminGuard, applianceGuard],
     title: 'WiFi Management'
+  },
+  {
+    path: 'remote-access',
+    component: RemoteAccessAdmin,
+    canActivate: [adminGuard, applianceGuard],
+    title: 'Remote Access'
   }
 ];

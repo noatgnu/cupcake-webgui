@@ -143,9 +143,8 @@ CLOUDFLARED_CONFIG=/opt/cupcake/cloudflared-token.txt
 if [ -f "$CLOUDFLARED_CONFIG" ]; then
     TOKEN=$(grep "^TUNNEL_TOKEN=" "$CLOUDFLARED_CONFIG" | cut -d= -f2-)
     if [ -n "$TOKEN" ]; then
-        timeout 60 cloudflared service install "$TOKEN" \
+        /opt/cupcake/configure-cloudflared.sh "$TOKEN" \
             || echo "Cloudflare tunnel was not installed; check the tunnel token"
-        systemctl enable --now cloudflared 2>/dev/null || true
     fi
     rm -f "$CLOUDFLARED_CONFIG"
 fi

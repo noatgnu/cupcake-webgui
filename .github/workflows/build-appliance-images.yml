@@ -607,6 +607,7 @@ jobs:
             provision/scripts/cupcake-selftest-report \
             provision/scripts/cupcake-selftest.service \
             provision/scripts/cupcake-credentials \
+            provision/scripts/cupcake-remote-access-motd \
             provision/scripts/test-storage.sh \
             cupcake@localhost:/tmp/
           scp -o StrictHostKeyChecking=no -i cupckey -P 2222 -r \
@@ -1208,6 +1209,8 @@ jobs:
             "${GITHUB_WORKSPACE}/provision/scripts/cupcake-credentials" "${ROOTFS_DIR}/usr/local/sbin/"
           install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/test-storage.sh" \
             "${ROOTFS_DIR}/usr/local/sbin/cupcake-test-storage"
+          install -D -m 755 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-remote-access-motd" \
+            "${ROOTFS_DIR}/etc/update-motd.d/60-cupcake-remote-access"
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
             "${ROOTFS_DIR}/etc/systemd/system/"
 
@@ -1530,9 +1533,8 @@ jobs:
           if [ -f "$CLOUDFLARED_CONFIG" ]; then
               TOKEN=$(grep "^TUNNEL_TOKEN=" "$CLOUDFLARED_CONFIG" | cut -d= -f2-)
               if [ -n "$TOKEN" ]; then
-                  timeout 60 cloudflared service install "$TOKEN" \
+                  /opt/cupcake/configure-cloudflared.sh "$TOKEN" \
                       || echo "Cloudflare tunnel was not installed; check the tunnel token"
-                  systemctl enable --now cloudflared 2>/dev/null || true
               fi
               rm -f "$CLOUDFLARED_CONFIG"
           fi
@@ -2229,6 +2231,8 @@ jobs:
           for f in cupcake-storage.txt cupcake-wifi.txt cupcake-tailscale.txt cupcake-cloudflared.txt; do
               check "drop-in $f consumed" test ! -e "/boot/firmware/$f"
           done
+          check "invalid tunnel token refused" test ! -e /etc/cupcake/cloudflared.env
+          check "remote access login message runs" timeout 15 /etc/update-motd.d/60-cupcake-remote-access
           check "SECRET_KEY generated on first boot" bash -c \
               '! grep -q "^SECRET_KEY=CHANGE-ON-FIRST-BOOT" /opt/cupcake/.env'
           check "secrets tied to this machine" bash -c \
