@@ -48,6 +48,27 @@ check "plugin appears in list" bash -c "cupcake-plugin list | grep -q '${PLUGIN_
 check "register with the backend" cupcake-plugin register "${PLUGIN_NAME}" http://cupcake.local:8001 1.0.0
 check "startup token written" grep -qE '^PLUGIN_TOKEN=.{64}$' "/etc/cupcake/plugins/${PLUGIN_NAME}.env"
 
+send_command() {
+    python3 -c 'import json, socket, sys
+client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+client.connect("/run/cupcake-plugin.sock")
+client.sendall(sys.argv[1].encode())
+client.shutdown(socket.SHUT_WR)
+reply = json.loads(b"".join(iter(lambda: client.recv(4096), b"")))
+sys.exit(0 if reply.get("ok") else 1)' "$1"
+}
+ENV_FILE="/etc/cupcake/plugins/${PLUGIN_NAME}.env"
+check "configure sets managed settings" send_command \
+    "{\"command\": \"configure\", \"name\": \"${PLUGIN_NAME}\", \"env\": {\"PLUGIN_HOST\": \"127.0.0.1\"}}"
+check "configured setting written"  grep -qx 'PLUGIN_HOST=127.0.0.1' "$ENV_FILE"
+check "token kept by configure"     grep -qE '^PLUGIN_TOKEN=.{64}$' "$ENV_FILE"
+check "env file readable by the services group only" bash -c "[ \"\$(stat -c '%U:%G %a' $ENV_FILE)\" = 'root:cupcake-svc 640' ]"
+refused() {
+    ! "$@"
+}
+check "configure refuses other settings" refused send_command \
+    "{\"command\": \"configure\", \"name\": \"${PLUGIN_NAME}\", \"env\": {\"PATH\": \"/x\"}}"
+
 echo ""
 echo "--- Status ---"
 check "status command succeeds" cupcake-plugin status "${PLUGIN_NAME}"

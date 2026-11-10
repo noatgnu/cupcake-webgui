@@ -48,8 +48,8 @@ ENV_FILE="/etc/cupcake/plugins/${PLUGIN_NAME}.env"
 
 if [ -z "$PLUGIN_NAME" ] || [ -z "$PLUGIN_BASE_URL" ]; then
     echo "Usage: cupcake-plugin-register <name> <base_url> [version]"
-    echo "  base_url: the URL the browser uses to reach the plugin server"
-    echo "  Example: cupcake-plugin-register my-plugin http://cupcake.local:8001 1.0.0"
+    echo "  base_url: the address the backend reaches the plugin at"
+    echo "  Example: cupcake-plugin-register my-plugin http://127.0.0.1:8101 1.0.0"
     exit 1
 fi
 
@@ -97,10 +97,8 @@ SCRIPTEOF
 
 chmod +x /usr/local/bin/cupcake-plugin-deregister
 
-if command -v ufw &>/dev/null; then
-    ufw allow 8001:8099/tcp comment 'Cupcake plugin servers' || true
+systemctl --root=/ enable cupcake-plugin-manager.socket
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    systemctl start cupcake-plugin-manager.socket
 fi
-
-systemctl daemon-reload
-systemctl enable cupcake-plugin-manager.socket
-systemctl start cupcake-plugin-manager.socket

@@ -1211,6 +1211,9 @@ jobs:
             "${ROOTFS_DIR}/usr/local/sbin/cupcake-test-storage"
           install -D -m 755 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-remote-access-motd" \
             "${ROOTFS_DIR}/etc/update-motd.d/60-cupcake-remote-access"
+          for f in cupcake-plugin-manager cupcake-plugin cupcake-plugin-manager.socket cupcake-plugin-manager.service 15-plugin.sh; do
+            install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${f}" "${ROOTFS_DIR}/tmp/${f}"
+          done
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
             "${ROOTFS_DIR}/etc/systemd/system/"
 
@@ -1936,6 +1939,11 @@ jobs:
           chown root:cupcake-svc /opt/cupcake/.env
           chmod 640 /opt/cupcake/.env
 
+          echo "=== CUPCAKE: installing the plugin system ==="
+          bash /tmp/15-plugin.sh
+          rm -f /tmp/cupcake-plugin-manager /tmp/cupcake-plugin /tmp/cupcake-plugin-manager.socket \
+              /tmp/cupcake-plugin-manager.service /tmp/15-plugin.sh
+
           echo "=== CUPCAKE: SD card write optimizations ==="
 
           # noatime: skip access-time update on every file read
@@ -2246,6 +2254,10 @@ jobs:
               sudo -u cupcake-svc bash -c "echo ok > $MEDIA_PATH/ci-write-test.txt && rm $MEDIA_PATH/ci-write-test.txt"
           check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
           check "network manager socket active" systemctl is-active cupcake-network-manager.socket
+          check "plugin manager socket active" systemctl is-active cupcake-plugin-manager.socket
+          check "plugin command installed" test -x /usr/local/bin/cupcake-plugin
+          check "plugins directory owned by the plugin user" bash -c \
+              '[ "$(stat -c %U /opt/cupcake/plugins)" = cupcake ]'
           check "backend active" systemctl is-active cupcake-backend
           check "api responds" bash -c 'for i in $(seq 1 60); do
               curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/ | grep -qE "^[234]" && exit 0
