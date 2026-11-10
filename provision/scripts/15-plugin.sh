@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+SRC=$(cd "$(dirname "$0")" && pwd)
+
 mkdir -p /opt/cupcake/plugins
 mkdir -p /etc/cupcake/plugins
 
@@ -27,14 +29,14 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
 
-cp /tmp/cupcake-plugin-manager /usr/local/bin/cupcake-plugin-manager
+cp "$SRC/cupcake-plugin-manager" /usr/local/bin/cupcake-plugin-manager
 chmod +x /usr/local/bin/cupcake-plugin-manager
 
-cp /tmp/cupcake-plugin /usr/local/bin/cupcake-plugin
+cp "$SRC/cupcake-plugin" /usr/local/bin/cupcake-plugin
 chmod +x /usr/local/bin/cupcake-plugin
 
-cp /tmp/cupcake-plugin-manager.socket /etc/systemd/system/cupcake-plugin-manager.socket
-cp /tmp/cupcake-plugin-manager.service /etc/systemd/system/cupcake-plugin-manager.service
+cp "$SRC/cupcake-plugin-manager.socket" /etc/systemd/system/cupcake-plugin-manager.socket
+cp "$SRC/cupcake-plugin-manager.service" /etc/systemd/system/cupcake-plugin-manager.service
 
 cat > /usr/local/bin/cupcake-plugin-register << 'SCRIPTEOF'
 #!/bin/bash

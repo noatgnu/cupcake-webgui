@@ -1211,8 +1211,9 @@ jobs:
             "${ROOTFS_DIR}/usr/local/sbin/cupcake-test-storage"
           install -D -m 755 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-remote-access-motd" \
             "${ROOTFS_DIR}/etc/update-motd.d/60-cupcake-remote-access"
+          mkdir -p "${ROOTFS_DIR}/opt/cupcake/plugin-setup"
           for f in cupcake-plugin-manager cupcake-plugin cupcake-plugin-manager.socket cupcake-plugin-manager.service 15-plugin.sh; do
-            install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${f}" "${ROOTFS_DIR}/tmp/${f}"
+            install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${f}" "${ROOTFS_DIR}/opt/cupcake/plugin-setup/${f}"
           done
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
             "${ROOTFS_DIR}/etc/systemd/system/"
@@ -1940,9 +1941,8 @@ jobs:
           chmod 640 /opt/cupcake/.env
 
           echo "=== CUPCAKE: installing the plugin system ==="
-          bash /tmp/15-plugin.sh
-          rm -f /tmp/cupcake-plugin-manager /tmp/cupcake-plugin /tmp/cupcake-plugin-manager.socket \
-              /tmp/cupcake-plugin-manager.service /tmp/15-plugin.sh
+          bash /opt/cupcake/plugin-setup/15-plugin.sh
+          rm -rf /opt/cupcake/plugin-setup
 
           echo "=== CUPCAKE: SD card write optimizations ==="
 
