@@ -3,6 +3,12 @@ set -eux
 
 export DEBIAN_FRONTEND=noninteractive
 
+cat > /etc/apt/apt.conf.d/80-cupcake-retries << 'APTEOF'
+Acquire::Retries "5";
+Acquire::http::Timeout "30";
+Acquire::https::Timeout "30";
+APTEOF
+
 apt-get update
 
 apt-get install -y \

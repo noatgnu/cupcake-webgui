@@ -132,6 +132,7 @@ if [ -f "$TAILSCALE_CONFIG" ]; then
     if [ -n "$AUTHKEY" ]; then
         if tailscale up --authkey "$AUTHKEY" --ssh --timeout=90s; then
             echo "Tailscale connected"
+            systemctl start --no-block cupcake-tailscale-https.service || true
         else
             echo "Tailscale did not connect; check the auth key and network"
         fi

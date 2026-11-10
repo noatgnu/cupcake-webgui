@@ -10,6 +10,7 @@ import urllib.request
 
 CLOUDFLARED_READY = "http://127.0.0.1:20241/ready"
 TAILSCALE_STATE = "/var/lib/tailscale/tailscaled.state"
+TAILSCALE_CERT = "/etc/ssl/cupcake/tailscale.crt"
 TIMEOUT = 2
 NOT_SET_UP = {"NoState", "NeedsLogin"}
 
@@ -41,6 +42,9 @@ def tailscale():
     name = (me.get("DNSName") or me.get("HostName") or "").rstrip(".")
     addresses = ", ".join(address for address in me.get("TailscaleIPs") or [] if ":" not in address)
     line = f"connected as {name}" + (f" ({addresses})" if addresses else "")
+    if os.path.exists(TAILSCALE_CERT):
+        expiry = run("openssl", "x509", "-in", TAILSCALE_CERT, "-noout", "-enddate").removeprefix("notAfter=")
+        line += f"; https://{name}/ and :8443" + (f", certificate until {expiry}" if expiry else "")
     if status.get("Health"):
         line += f"; {len(status['Health'])} warning(s), see tailscale status"
     return line

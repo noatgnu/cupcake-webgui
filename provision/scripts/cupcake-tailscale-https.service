@@ -1,0 +1,8 @@
+[Unit]
+Description=HTTPS certificate for the appliance's Tailscale name
+After=network-online.target tailscaled.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-tailscale-https

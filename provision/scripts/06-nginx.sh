@@ -13,6 +13,12 @@ cat > /etc/nginx/conf.d/cupcake-upstream.conf << 'NGINXEOF'
 upstream django_backend {
     server 127.0.0.1:8000;
 }
+
+map "$remote_addr:$http_x_forwarded_proto" $cupcake_forwarded_proto {
+    default            $scheme;
+    "127.0.0.1:https"  https;
+    "::1:https"        https;
+}
 NGINXEOF
 
 cat > /etc/nginx/snippets/cupcake-ssl.conf << 'NGINXEOF'
@@ -24,6 +30,75 @@ ssl_session_cache   shared:SSL:10m;
 ssl_session_timeout 10m;
 NGINXEOF
 
+cat > /etc/nginx/snippets/cupcake-tailscale-ssl.conf << 'NGINXEOF'
+ssl_certificate     /etc/ssl/cupcake/tailscale.crt;
+ssl_certificate_key /etc/ssl/cupcake/tailscale.key;
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_ciphers         HIGH:!aNULL:!MD5;
+ssl_session_cache   shared:SSL:10m;
+ssl_session_timeout 10m;
+NGINXEOF
+
+for site in vanilla:vanilla webgui:webgui; do
+    cat > "/etc/nginx/snippets/cupcake-${site%%:*}-site.conf" << NGINXEOF
+client_max_body_size 2G;
+
+root /opt/cupcake/${site##*:};
+index index.html;
+
+gzip on;
+gzip_types text/css application/javascript application/json image/svg+xml;
+gzip_vary on;
+
+location / {
+    try_files \$uri \$uri/ /index.html;
+}
+
+location /api/ {
+    proxy_pass http://django_backend;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$cupcake_forwarded_proto;
+    proxy_read_timeout 300s;
+}
+
+location /admin/static/ {
+    alias /opt/cupcake/backend/staticfiles/;
+    expires 7d;
+}
+
+location /admin/ {
+    proxy_pass http://django_backend;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$cupcake_forwarded_proto;
+}
+
+location /ws/ {
+    proxy_pass http://django_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_read_timeout 86400s;
+}
+
+location /static/ {
+    alias /opt/cupcake/backend/staticfiles/;
+    expires 7d;
+}
+
+location /internal/media/ {
+    internal;
+    alias /opt/cupcake/backend/media/;
+}
+NGINXEOF
+done
+
 # vanilla: default_server on 80/443 for IP access; also responds to vanilla.local
 cat > /etc/nginx/sites-available/vanilla.conf << 'NGINXEOF'
 server {
@@ -32,62 +107,7 @@ server {
     server_name vanilla.local vanilla localhost _;
 
     include /etc/nginx/snippets/cupcake-ssl.conf;
-
-    client_max_body_size 2G;
-
-    root /opt/cupcake/vanilla;
-    index index.html;
-
-    gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml;
-    gzip_vary on;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://django_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-    }
-
-    location /admin/static/ {
-        alias /opt/cupcake/backend/staticfiles/;
-        expires 7d;
-    }
-
-    location /admin/ {
-        proxy_pass http://django_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /ws/ {
-        proxy_pass http://django_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 86400s;
-    }
-
-    location /static/ {
-        alias /opt/cupcake/backend/staticfiles/;
-        expires 7d;
-    }
-
-    location /internal/media/ {
-        internal;
-        alias /opt/cupcake/backend/media/;
-    }
+    include /etc/nginx/snippets/cupcake-vanilla-site.conf;
 }
 NGINXEOF
 
@@ -101,62 +121,7 @@ server {
     server_name cupcake.local cupcake;
 
     include /etc/nginx/snippets/cupcake-ssl.conf;
-
-    client_max_body_size 2G;
-
-    root /opt/cupcake/webgui;
-    index index.html;
-
-    gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml;
-    gzip_vary on;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://django_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-    }
-
-    location /admin/static/ {
-        alias /opt/cupcake/backend/staticfiles/;
-        expires 7d;
-    }
-
-    location /admin/ {
-        proxy_pass http://django_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /ws/ {
-        proxy_pass http://django_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 86400s;
-    }
-
-    location /static/ {
-        alias /opt/cupcake/backend/staticfiles/;
-        expires 7d;
-    }
-
-    location /internal/media/ {
-        internal;
-        alias /opt/cupcake/backend/media/;
-    }
+    include /etc/nginx/snippets/cupcake-webgui-site.conf;
 }
 NGINXEOF
 
@@ -167,5 +132,7 @@ rm -f /etc/nginx/sites-enabled/default
 sed -i 's/worker_connections .*/worker_connections 1024;/' /etc/nginx/nginx.conf
 
 nginx -t
-systemctl enable nginx
-systemctl restart nginx
+systemctl --root=/ enable nginx
+if [ -d /run/systemd/system ]; then
+    systemctl restart nginx
+fi

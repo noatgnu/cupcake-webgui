@@ -118,9 +118,13 @@ install -m 755 "$(dirname "$0")/cupcake-selftest" "$(dirname "$0")/cupcake-selft
     "$(dirname "$0")/cupcake-credentials" /usr/local/sbin/
 install -m 755 "$(dirname "$0")/test-storage.sh" /usr/local/sbin/cupcake-test-storage
 install -D -m 755 "$(dirname "$0")/cupcake-remote-access-motd" /etc/update-motd.d/60-cupcake-remote-access
+install -m 755 "$(dirname "$0")/cupcake-tailscale-https" /usr/local/sbin/cupcake-tailscale-https
+install -m 644 "$(dirname "$0")/cupcake-tailscale-https.service" "$(dirname "$0")/cupcake-tailscale-https.timer" \
+    /etc/systemd/system/
 install -m 644 "$(dirname "$0")/cupcake-selftest.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable cupcake-selftest.service
+systemctl enable cupcake-tailscale-https.timer
 
 mkdir -p /opt/cupcake/examples
 EXAMPLES_DIR="$(dirname "$0")/../config-examples"

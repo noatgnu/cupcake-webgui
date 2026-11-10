@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""HTTPS for the appliance's Tailscale name: fetch its certificate and serve both web apps with it in nginx."""
+
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CERT_DIR = Path("/etc/ssl/cupcake")
+CERT_FILE = CERT_DIR / "tailscale.crt"
+KEY_FILE = CERT_DIR / "tailscale.key"
+SITE_FILE = Path("/etc/nginx/sites-available/cupcake-tailscale.conf")
+SITE_LINK = Path("/etc/nginx/sites-enabled/cupcake-tailscale.conf")
+
+SITE_TEMPLATE = """server {{
+    listen 443 ssl;
+    server_name {name};
+    include /etc/nginx/snippets/cupcake-tailscale-ssl.conf;
+    include /etc/nginx/snippets/cupcake-vanilla-site.conf;
+}}
+
+server {{
+    listen 8443 ssl;
+    server_name {name};
+    include /etc/nginx/snippets/cupcake-tailscale-ssl.conf;
+    include /etc/nginx/snippets/cupcake-webgui-site.conf;
+}}
+
+server {{
+    listen 80;
+    server_name {name};
+    return 301 https://$host$request_uri;
+}}
+
+server {{
+    listen 8080;
+    server_name {name};
+    return 301 https://$host:8443$request_uri;
+}}
+"""
+
+
+def log(message):
+    print(message, flush=True)
+
+
+def run(*command, timeout=120):
+    return subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+
+
+def tailscale_name():
+    """The tailnet name to certify, or None when Tailscale is not connected or the tailnet issues no certificates."""
+    if not shutil.which("tailscale"):
+        return None
+    try:
+        status = json.loads(run("tailscale", "status", "--json", timeout=15).stdout)
+    except (ValueError, subprocess.TimeoutExpired):
+        return None
+    if status.get("BackendState") != "Running":
+        return None
+    domains = status.get("CertDomains") or []
+    if not domains:
+        return None
+    name = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    return name if name in domains else domains[0]
+
+
+def remove_site():
+    """Stop serving the Tailscale name; return whether there was a site to remove."""
+    if not SITE_LINK.exists() and not SITE_FILE.exists():
+        return False
+    SITE_LINK.unlink(missing_ok=True)
+    SITE_FILE.unlink(missing_ok=True)
+    return True
+
+
+def reload_nginx():
+    test = run("nginx", "-t")
+    if test.returncode != 0:
+        log(f"nginx configuration test failed: {test.stderr.strip()}")
+        return False
+    run("systemctl", "reload", "nginx")
+    return True
+
+
+def fetch_certificate(name):
+    """Fetch the certificate into place; return whether it changed, or None when Tailscale could not issue it."""
+    CERT_DIR.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CERT_DIR) as directory:
+        cert = Path(directory) / "cert.pem"
+        key = Path(directory) / "key.pem"
+        result = run("tailscale", "cert", "--cert-file", str(cert), "--key-file", str(key), name)
+        if result.returncode != 0:
+            log(f"Tailscale did not issue a certificate for {name}: {result.stderr.strip()}")
+            return None
+        changed = not CERT_FILE.exists() or cert.read_bytes() != CERT_FILE.read_bytes()
+        if changed:
+            cert.chmod(0o644)
+            key.chmod(0o600)
+            cert.replace(CERT_FILE)
+            key.replace(KEY_FILE)
+        return changed
+
+
+def main():
+    name = tailscale_name()
+    if name is None:
+        if remove_site():
+            reload_nginx()
+            log("Tailscale HTTPS is off; stopped serving the Tailscale name")
+        return 0
+    changed = fetch_certificate(name)
+    if changed is None:
+        return 1
+    site = SITE_TEMPLATE.format(name=name)
+    current = SITE_FILE.read_text() if SITE_FILE.exists() else ""
+    if not changed and current == site and SITE_LINK.exists():
+        log(f"Certificate for {name} is current")
+        return 0
+    previous = current
+    SITE_FILE.write_text(site)
+    if not SITE_LINK.exists():
+        SITE_LINK.symlink_to(SITE_FILE)
+    if not reload_nginx():
+        if previous:
+            SITE_FILE.write_text(previous)
+        else:
+            remove_site()
+        return 1
+    log(f"Serving https://{name}/ and https://{name}:8443/ with the Tailscale certificate")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

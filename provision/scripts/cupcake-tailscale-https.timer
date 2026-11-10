@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew the HTTPS certificate for the appliance's Tailscale name
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=12h
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
