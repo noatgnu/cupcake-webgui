@@ -1352,6 +1352,7 @@ jobs:
             pg_ctlcluster "$(pg_lsclusters -h | head -1 | awk '{print $1, $2}')" restart
 
           echo "=== CUPCAKE: Python venv ==="
+          export PIP_CONFIG_FILE=/dev/null PIP_INDEX_URL=https://pypi.org/simple PIP_RETRIES=10 PIP_DEFAULT_TIMEOUT=60
           python3 -m venv /opt/cupcake/venv
           /opt/cupcake/venv/bin/pip install --upgrade pip
 
