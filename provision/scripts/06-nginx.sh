@@ -15,9 +15,8 @@ upstream django_backend {
 }
 
 map "$remote_addr:$http_x_forwarded_proto" $cupcake_forwarded_proto {
-    default            $scheme;
-    "127.0.0.1:https"  https;
-    "::1:https"        https;
+    default                         $scheme;
+    "~^(127\.0\.0\.1|::1):https$"  https;
 }
 NGINXEOF
 
