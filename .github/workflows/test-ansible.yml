@@ -14,7 +14,7 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +35,7 @@ jobs:
 
   deploy-ubuntu:
     name: Deploy (Ubuntu 24.04)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
 
   molecule-ubuntu:
     name: Molecule (Ubuntu 24.04)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - uses: actions/checkout@v4
@@ -129,7 +129,7 @@ jobs:
 
   molecule-debian:
     name: Molecule (Debian bookworm)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint
     steps:
       - uses: actions/checkout@v4
