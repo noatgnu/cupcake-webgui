@@ -281,7 +281,7 @@ jobs:
             python_version: "3.12"
             pg_version: "16"
           - distro: debian
-            image_url: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-amd64-daily.qcow2
+            image_url: https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2
             python_version: "3.13"
             pg_version: "17"
     steps:
@@ -1391,9 +1391,9 @@ jobs:
           WHISPERCPP_PATH=/opt/cupcake/whisper.cpp/build/bin/whisper-cli
           WHISPERCPP_DEFAULT_MODEL=/opt/cupcake/whisper.cpp/models/ggml-base.bin
           WHISPERCPP_THREAD_COUNT=4
-          COTURN_HOST=cupcake.local
+          COTURN_HOST=
           COTURN_PORT=3478
-          COTURN_TLS_PORT=5349
+          COTURN_TLS_PORT=
           COTURN_SECRET=CHANGE-ON-FIRST-BOOT
           COTURN_REALM=cupcake.local
           COTURN_TTL=86400

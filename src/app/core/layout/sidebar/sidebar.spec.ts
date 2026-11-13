@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal, WritableSignal } from '@angular/core';
 import { Subject, of } from 'rxjs';
-import { CUPCAKE_CORE_CONFIG, ThemeService, AuthService, SiteConfigService, DemoModeService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ThemeService, AuthService, SiteConfigService, DemoModeService, AsyncTaskMonitorService, PluginService, Plugin } from '@noatgnu/cupcake-core';
 import { NotificationService, CommunicationWebSocketService, MessageThreadService } from '@noatgnu/cupcake-mint-chocolate';
 import { Sidebar } from './sidebar';
 import { SidebarControl } from '../../services/sidebar-control';
@@ -18,6 +18,7 @@ describe('Sidebar', () => {
   let mockSidebarControl: jasmine.SpyObj<SidebarControl>;
   let currentUserSignal: WritableSignal<any>;
   let toggleSubject: Subject<void>;
+  let mockPluginService: jasmine.SpyObj<PluginService>;
 
   beforeEach(async () => {
     toggleSubject = new Subject<void>();
@@ -59,6 +60,13 @@ describe('Sidebar', () => {
       activeTasks: signal([])
     });
 
+    mockPluginService = jasmine.createSpyObj('PluginService', ['listAllPlugins']);
+    mockPluginService.listAllPlugins.and.returnValue(of([
+      { id: 4, isActive: true, manifestCache: { nav: [{ label: 'Device temperature', icon: 'bi bi-thermometer-half', path: 'temperature' }] } } as Plugin,
+      { id: 5, isActive: false, manifestCache: { nav: [{ label: 'Disabled plugin', path: 'home' }] } } as Plugin,
+      { id: 6, isActive: true, manifestCache: {} } as Plugin,
+    ]));
+
     await TestBed.configureTestingModule({
       imports: [Sidebar],
       providers: [
@@ -72,7 +80,8 @@ describe('Sidebar', () => {
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: CommunicationWebSocketService, useValue: mockWsService },
         { provide: MessageThreadService, useValue: mockMessageThreadService },
-        { provide: AsyncTaskMonitorService, useValue: mockAsyncTaskMonitor }
+        { provide: AsyncTaskMonitorService, useValue: mockAsyncTaskMonitor },
+        { provide: PluginService, useValue: mockPluginService }
       ]
     }).compileComponents();
 
@@ -83,6 +92,13 @@ describe('Sidebar', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('lists the pages of active plugins under Plugins', () => {
+    fixture.detectChanges();
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('ul.plugins a'));
+    expect(links.map(link => link.textContent?.trim())).toEqual(['Device temperature']);
+    expect(links[0].getAttribute('href')).toBe('/plugins/4/temperature');
   });
 
   it('isCollapsed starts as false', () => {

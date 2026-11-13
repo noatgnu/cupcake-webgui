@@ -164,6 +164,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/admin/admin.routes').then(m => m.adminRoutes)
       },
       {
+        path: 'plugins/:pluginId/:pagePath',
+        loadComponent: () => import('./features/plugins/plugin-view/plugin-view').then(m => m.PluginView)
+      },
+      {
+        path: 'plugins/:pluginId',
+        loadComponent: () => import('./features/plugins/plugin-view/plugin-view').then(m => m.PluginView)
+      },
+      {
         path: '',
         redirectTo: '/home',
         pathMatch: 'full'

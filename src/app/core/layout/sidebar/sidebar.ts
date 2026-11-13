@@ -3,7 +3,7 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
-import { ThemeService, AuthService, SiteConfigService, DemoModeService } from '@noatgnu/cupcake-core';
+import { ThemeService, AuthService, SiteConfigService, DemoModeService, PluginService, Plugin } from '@noatgnu/cupcake-core';
 import { NotificationDropdown } from '../../../shared/components/notification-dropdown/notification-dropdown';
 import { MessagingDropdown } from '../../../shared/components/messaging-dropdown/messaging-dropdown';
 import { AsyncTaskDropdown } from '../../../shared/components/async-task-dropdown/async-task-dropdown';
@@ -25,12 +25,24 @@ export class Sidebar implements OnInit, OnDestroy {
   private sidebarControl = inject(SidebarControl);
   private siteConfigService = inject(SiteConfigService);
   private demoModeService = inject(DemoModeService);
+  private pluginService = inject(PluginService);
   private subscription?: Subscription;
 
   isCollapsed = signal(false);
   currentUser = this.authService.currentUser;
   siteConfig = this.siteConfigService.siteConfig;
   isDemoMode = signal(false);
+  plugins = signal<Plugin[]>([]);
+  pluginItems = computed(() =>
+    this.plugins()
+      .filter(plugin => plugin.isActive)
+      .flatMap(plugin => (plugin.manifestCache?.nav ?? []).map(item => ({
+        key: `${plugin.id}/${item.path}`,
+        icon: item.icon || 'bi bi-plug',
+        label: item.label,
+        route: ['/plugins', plugin.id, item.path],
+      })))
+  );
 
   constructor() {
     effect(() => {
@@ -42,6 +54,10 @@ export class Sidebar implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.subscription = this.sidebarControl.toggle$.subscribe(() => {
       this.isCollapsed.update(v => !v);
+    });
+    this.pluginService.listAllPlugins().subscribe({
+      next: plugins => this.plugins.set(plugins),
+      error: () => this.plugins.set([]),
     });
   }
 
