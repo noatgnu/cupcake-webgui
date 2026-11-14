@@ -14,7 +14,11 @@ import {
   WebRTCSession,
   ChatMessage,
   FileTransferProgress,
-  FileOfferData
+  FileOfferData,
+  WebRTCPermissions,
+  WebRTCPermissionKind,
+  WebRTCPermissionOverrides,
+  WebRTCPermissionChange
 } from '@noatgnu/cupcake-mint-chocolate';
 import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 import { SessionService } from '@noatgnu/cupcake-red-velvet';
@@ -32,6 +36,15 @@ interface RemotePeer {
   hasScreenShare: boolean;
   connectionState: PeerConnectionState;
 }
+
+interface PermissionControl {
+  kind: WebRTCPermissionKind;
+  label: string;
+  icon: string;
+  action: string;
+}
+
+const ALL_ALLOWED: WebRTCPermissions = { audio: true, video: true, screenShare: true, chat: true };
 
 interface DisplayChatMessage {
   peerId: string;
@@ -88,6 +101,23 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
   isCreatingNewSession = signal(false);
   isDeletingSession = signal(false);
 
+  readOnly = signal(false);
+  canModerate = signal(false);
+  permissions = signal<Map<number, WebRTCPermissions>>(new Map());
+  overrides = signal<Map<number, WebRTCPermissionOverrides>>(new Map());
+  ownPermissions = signal<WebRTCPermissions>(ALL_ALLOWED);
+  viewOnly = computed(() => {
+    const own = this.ownPermissions();
+    return this.readOnly() && !own.audio && !own.video && !own.screenShare && !own.chat;
+  });
+
+  readonly permissionControls: PermissionControl[] = [
+    { kind: 'audio', label: 'Microphone', icon: 'bi-mic', action: 'unmute your microphone' },
+    { kind: 'video', label: 'Camera', icon: 'bi-camera-video', action: 'turn on your camera' },
+    { kind: 'screenShare', label: 'Screen sharing', icon: 'bi-display', action: 'share your screen' },
+    { kind: 'chat', label: 'Chat and files', icon: 'bi-chat-dots', action: 'send messages or files' }
+  ];
+
   connectionState = computed(() => {
     if (!this.isConnected()) return 'disconnected';
     return 'connected';
@@ -99,7 +129,7 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
   });
 
   activePeersCount = computed(() => this.remotePeers().length);
-  canSendMessages = computed(() => this.isConnected() && this.dataChannelReady());
+  canSendMessages = computed(() => this.isConnected() && this.dataChannelReady() && this.ownPermissions().chat);
 
   constructor(
     private webrtcService: WebRTCService,
@@ -295,11 +325,73 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     ).subscribe(ready => {
       this.dataChannelReady.set(ready);
     });
+
+    this.signalingService.readOnly$.pipe(takeUntil(this.destroy$)).subscribe(readOnly => this.readOnly.set(readOnly));
+    this.signalingService.canModerate$.pipe(takeUntil(this.destroy$)).subscribe(canModerate => this.canModerate.set(canModerate));
+    this.signalingService.overrides$.pipe(takeUntil(this.destroy$)).subscribe(overrides => this.overrides.set(overrides));
+    this.signalingService.permissions$.pipe(takeUntil(this.destroy$)).subscribe(permissions => {
+      this.previousOwnPermissions = this.ownPermissions();
+      this.permissions.set(permissions);
+      this.applyOwnPermissions(this.signalingService.ownPermissions);
+    });
+    this.signalingService.permissionChanges$.pipe(takeUntil(this.destroy$)).subscribe(change => this.announcePermissionChange(change));
+  }
+
+  private applyOwnPermissions(own: WebRTCPermissions): void {
+    this.ownPermissions.set(own);
+    if (!own.video) {
+      this.videoEnabled.set(false);
+    }
+    if (!own.audio) {
+      this.audioEnabled.set(false);
+    }
+    if (!own.screenShare) {
+      this.screenShareEnabled.set(false);
+    }
+  }
+
+  private announcePermissionChange(change: WebRTCPermissionChange): void {
+    if (change.userId !== this.authService.currentUser()?.id) {
+      return;
+    }
+    this.permissionControls.forEach(control => {
+      const now = change.permissions[control.kind];
+      if (this.previousOwnPermissions[control.kind] !== now) {
+        const verb = now ? 'allowed you to' : 'stopped you from being able to';
+        this.toastService.info(`${change.changedBy} ${verb} ${control.action}`);
+      }
+    });
+  }
+
+  private previousOwnPermissions: WebRTCPermissions = ALL_ALLOWED;
+
+  peerPermissions(userId: number): WebRTCPermissions {
+    return this.permissions().get(userId) ?? ALL_ALLOWED;
+  }
+
+  isOverridden(userId: number): boolean {
+    const overrides = this.overrides().get(userId);
+    return !!overrides && Object.values(overrides).some(value => value !== null);
+  }
+
+  togglePermission(peer: RemotePeer, kind: WebRTCPermissionKind): void {
+    this.signalingService.setPermissions(peer.userId, { [kind]: !this.peerPermissions(peer.userId)[kind] });
+  }
+
+  resetPermissions(peer: RemotePeer): void {
+    this.signalingService.setPermissions(peer.userId, { audio: null, video: null, screenShare: null, chat: null });
+  }
+
+  notAllowedTitle(kind: WebRTCPermissionKind): string | null {
+    if (this.ownPermissions()[kind]) {
+      return null;
+    }
+    const control = this.permissionControls.find(item => item.kind === kind)!;
+    return `The session owner has not allowed you to ${control.action}`;
   }
 
   private handleIncomingChatMessage(chatMessage: ChatMessage): void {
-    const currentUser = this.authService.currentUser();
-    const isLocal = currentUser?.username === chatMessage.username;
+    const isLocal = chatMessage.peerId === this.signalingService.peerId;
 
     const displayMessage: DisplayChatMessage = {
       peerId: chatMessage.peerId,
@@ -313,73 +405,26 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
     this.chatMessages.update(messages => [...messages, displayMessage]);
   }
 
+  private latestStreams = new Map<string, MediaStream>();
+
   private updateRemotePeers(streams: Map<string, MediaStream>): void {
-    const currentPeers = this.remotePeers();
-    const updatedPeers: RemotePeer[] = [];
-
-    streams.forEach((stream, peerId) => {
-      const existingPeer = currentPeers.find(p => p.peerId === peerId);
-      if (existingPeer) {
-        updatedPeers.push({ ...existingPeer, stream });
-      } else {
-        const peerInfo = this.signalingService.peers.find(p => p.id === peerId);
-        if (peerInfo) {
-          updatedPeers.push({
-            peerId: peerInfo.id,
-            userId: peerInfo.userId,
-            username: peerInfo.username,
-            stream,
-            role: peerInfo.peerRole,
-            hasVideo: peerInfo.hasVideo,
-            hasAudio: peerInfo.hasAudio,
-            hasScreenShare: peerInfo.hasScreenShare,
-            connectionState: peerInfo.connectionState
-          });
-        }
-      }
-    });
-
-    this.remotePeers.set(updatedPeers);
+    this.latestStreams = new Map(streams);
+    this.remotePeers.update(peers => peers.map(peer => ({ ...peer, stream: streams.get(peer.peerId) })));
   }
 
   private updatePeerInfo(peers: PeerInfo[]): void {
-    const currentPeers = this.remotePeers();
-    const updatedPeers: RemotePeer[] = [];
-    const processedPeerIds = new Set<string>();
-
-    currentPeers.forEach(remotePeer => {
-      const peerInfo = peers.find(p => p.id === remotePeer.peerId);
-      if (peerInfo) {
-        updatedPeers.push({
-          ...remotePeer,
-          hasVideo: peerInfo.hasVideo,
-          hasAudio: peerInfo.hasAudio,
-          hasScreenShare: peerInfo.hasScreenShare,
-          connectionState: peerInfo.connectionState
-        });
-        processedPeerIds.add(peerInfo.id);
-      } else {
-        updatedPeers.push(remotePeer);
-      }
-    });
-
-    peers.forEach(peerInfo => {
-      if (!processedPeerIds.has(peerInfo.id)) {
-        updatedPeers.push({
-          peerId: peerInfo.id,
-          userId: peerInfo.userId,
-          username: peerInfo.username,
-          stream: undefined,
-          role: peerInfo.peerRole,
-          hasVideo: peerInfo.hasVideo,
-          hasAudio: peerInfo.hasAudio,
-          hasScreenShare: peerInfo.hasScreenShare,
-          connectionState: peerInfo.connectionState
-        });
-      }
-    });
-
-    this.remotePeers.set(updatedPeers);
+    const streams = this.latestStreams;
+    this.remotePeers.set(peers.map(info => ({
+      peerId: info.id,
+      userId: info.userId,
+      username: info.username,
+      stream: streams.get(info.id),
+      role: info.peerRole,
+      hasVideo: info.hasVideo,
+      hasAudio: info.hasAudio,
+      hasScreenShare: info.hasScreenShare,
+      connectionState: info.connectionState
+    })));
   }
 
   async connect(): Promise<void> {
@@ -418,9 +463,9 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
 
       this.isCreatingSession.set(false);
       this.toastService.success('Connected to WebRTC session');
-    } catch (error) {
+    } catch (error: any) {
       this.isCreatingSession.set(false);
-      this.toastService.error('Failed to connect to WebRTC session');
+      this.toastService.error(error?.error?.error || 'Failed to connect to WebRTC session');
     }
   }
 

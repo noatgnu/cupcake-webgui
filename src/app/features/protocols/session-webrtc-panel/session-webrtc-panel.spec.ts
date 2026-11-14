@@ -24,10 +24,20 @@ describe('SessionWebrtcPanel', () => {
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let connectedSubject: BehaviorSubject<boolean>;
   let peersValue: PeerInfo[];
+  let chatMessages: Subject<any>;
+  let remoteStreams: Subject<Map<string, MediaStream>>;
+  let activePeers: Subject<PeerInfo[]>;
+  let permissions: BehaviorSubject<Map<number, any>>;
+  let ownPermissions: any;
 
   beforeEach(async () => {
     connectedSubject = new BehaviorSubject<boolean>(false);
     peersValue = [];
+    chatMessages = new Subject<any>();
+    remoteStreams = new Subject<Map<string, MediaStream>>();
+    activePeers = new Subject<PeerInfo[]>();
+    permissions = new BehaviorSubject<Map<number, any>>(new Map());
+    ownPermissions = { audio: true, video: true, screenShare: true, chat: true };
 
     mockWebRTCService = jasmine.createSpyObj('WebRTCService', [
       'startSession',
@@ -41,16 +51,29 @@ describe('SessionWebrtcPanel', () => {
     ], {
       connectionState$: new BehaviorSubject<string>('disconnected').asObservable(),
       localStream$: new Subject<MediaStream | null>().asObservable(),
-      remoteStreams$: new Subject<Map<string, MediaStream>>().asObservable(),
-      activePeers$: new Subject<PeerInfo[]>().asObservable(),
-      chatMessages$: new Subject<any>().asObservable(),
+      remoteStreams$: remoteStreams.asObservable(),
+      activePeers$: activePeers.asObservable(),
+      chatMessages$: chatMessages.asObservable(),
       fileTransferProgress$: new Subject<any>().asObservable(),
       dataChannelReady$: new Subject<boolean>().asObservable(),
       localMediaStream: null
     });
 
-    mockSignalingService = jasmine.createSpyObj('WebRTCSignallingService', ['sendPeerState'], {
-      connected$: connectedSubject.asObservable()
+    mockSignalingService = jasmine.createSpyObj('WebRTCSignallingService', ['sendPeerState', 'setPermissions'], {
+      connected$: connectedSubject.asObservable(),
+      readOnly$: new BehaviorSubject<boolean>(false).asObservable(),
+      canModerate$: new BehaviorSubject<boolean>(true).asObservable(),
+      overrides$: new BehaviorSubject<Map<number, any>>(new Map()).asObservable(),
+      permissions$: permissions.asObservable(),
+      permissionChanges$: new Subject<any>().asObservable()
+    });
+    Object.defineProperty(mockSignalingService, 'ownPermissions', {
+      get: () => ownPermissions,
+      configurable: true
+    });
+    Object.defineProperty(mockSignalingService, 'peerId', {
+      get: () => 'own-peer',
+      configurable: true
     });
     Object.defineProperty(mockSignalingService, 'peers', {
       get: () => peersValue,
@@ -173,5 +196,51 @@ describe('SessionWebrtcPanel', () => {
     expect(mockWebRTCService.endSession).toHaveBeenCalled();
     expect(component['destroy$'].next).toHaveBeenCalled();
     expect(component['destroy$'].complete).toHaveBeenCalled();
+  });
+
+  it('marks only messages sent from this browser as local', () => {
+    const timestamp = '2026-11-13T17:00:00Z';
+    chatMessages.next({ type: 'chat', peerId: 'own-peer', userId: 0, username: 'You', message: 'mine', timestamp });
+    chatMessages.next({ type: 'chat', peerId: 'other-peer', userId: 2, username: 'colleague', message: 'theirs', timestamp });
+    expect(component.chatMessages().map(message => [message.message, message.username, message.isLocal])).toEqual([
+      ['mine', 'You', true],
+      ['theirs', 'colleague', false]
+    ]);
+  });
+
+  it('lets the session owner mute and reset what someone may send', () => {
+    const peer = {
+      peerId: 'peer-2', userId: 2, username: 'colleague', role: PeerRole.PARTICIPANT,
+      hasVideo: false, hasAudio: true, hasScreenShare: false, connectionState: PeerConnectionState.CONNECTED
+    };
+    component.togglePermission(peer, 'audio');
+    expect(mockSignalingService.setPermissions).toHaveBeenCalledWith(2, { audio: false });
+    component.resetPermissions(peer);
+    expect(mockSignalingService.setPermissions).toHaveBeenCalledWith(2, { audio: null, video: null, screenShare: null, chat: null });
+  });
+
+  it('turns off the controls the session owner has not allowed and says why', () => {
+    component.videoEnabled.set(true);
+    ownPermissions = { audio: true, video: false, screenShare: true, chat: false };
+    permissions.next(new Map([[1, ownPermissions]]));
+    expect(component.videoEnabled()).toBeFalse();
+    expect(component.canSendMessages()).toBeFalse();
+    expect(component.notAllowedTitle('video')).toBe('The session owner has not allowed you to turn on your camera');
+    expect(component.notAllowedTitle('audio')).toBeNull();
+  });
+
+  it('keeps people without camera or microphone in the call when someone else leaves', () => {
+    const person = (id: string, userId: number): PeerInfo => ({
+      id, userId, username: id, peerRole: PeerRole.PARTICIPANT, connectionState: PeerConnectionState.CONNECTED,
+      hasVideo: false, hasAudio: false, hasScreenShare: false
+    });
+    const stream = new MediaStream();
+    remoteStreams.next(new Map([['presenter', stream]]));
+    activePeers.next([person('presenter', 2), person('watcher', 3), person('leaver', 4)]);
+    expect(component.remotePeers().find(peer => peer.peerId === 'presenter')?.stream).toBe(stream);
+    remoteStreams.next(new Map([['presenter', stream]]));
+    activePeers.next([person('presenter', 2), person('watcher', 3)]);
+    expect(component.remotePeers().map(peer => peer.peerId)).toEqual(['presenter', 'watcher']);
+    expect(component.activePeersCount()).toBe(2);
   });
 });

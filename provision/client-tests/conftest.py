@@ -13,6 +13,8 @@ Configuration, through environment variables:
   CUPCAKE_SDRF_FILE     a large SDRF file for the performance tests (skipped without it)
   CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
 
+The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox
+
 Run with:  CUPCAKE_HOST=... CUPCAKE_PASSWORD=... poetry run pytest
 """
 
@@ -166,6 +168,7 @@ def make_user(api, api_url, cleanup):
         client.headers["Authorization"] = f"Bearer {login.json()['access']}"
         client.user = user
         client.access_token = login.json()["access"]
+        client.refresh_token = login.json()["refresh"]
         return client
 
     return make

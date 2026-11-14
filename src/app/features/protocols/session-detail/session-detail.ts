@@ -99,7 +99,7 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
       return PeerRole.HOST;
     }
 
-    return PeerRole.PARTICIPANT;
+    return PeerRole.VIEWER;
   });
   sections = signal<ProtocolSection[]>([]);
   selectedSectionIndex = signal(0);

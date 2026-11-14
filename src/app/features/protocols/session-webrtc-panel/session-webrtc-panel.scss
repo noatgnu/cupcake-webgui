@@ -191,6 +191,13 @@
         object-fit: cover;
       }
 
+      .peer-moderation {
+        position: absolute;
+        top: 0.25rem;
+        right: 0.25rem;
+        z-index: 2;
+      }
+
       .video-overlay {
         position: absolute;
         top: 0;

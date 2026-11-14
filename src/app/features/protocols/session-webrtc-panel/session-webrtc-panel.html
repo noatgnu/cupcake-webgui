@@ -14,6 +14,9 @@
           <span class="badge bg-success">
             <i class="bi bi-dot"></i>Connected
           </span>
+          @if (viewOnly()) {
+            <span class="badge bg-info text-dark" title="You can watch and listen; the session owner can allow you to take part">View only</span>
+          }
         } @else {
           <span class="badge bg-secondary">Disconnected</span>
         }
@@ -51,15 +54,15 @@
               <span class="visually-hidden">Toggle Dropdown</span>
             </button>
             <div ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
-              <button ngbDropdownItem (click)="toggleVideo()">
+              <button ngbDropdownItem (click)="toggleVideo()" [disabled]="!ownPermissions().video" [attr.title]="notAllowedTitle('video')">
                 <i class="bi" [class.bi-camera-video]="videoEnabled()" [class.bi-camera-video-off]="!videoEnabled()"></i>
                 {{ videoEnabled() ? 'Turn off camera' : 'Turn on camera' }}
               </button>
-              <button ngbDropdownItem (click)="toggleAudio()">
+              <button ngbDropdownItem (click)="toggleAudio()" [disabled]="!ownPermissions().audio" [attr.title]="notAllowedTitle('audio')">
                 <i class="bi" [class.bi-mic]="audioEnabled()" [class.bi-mic-mute]="!audioEnabled()"></i>
                 {{ audioEnabled() ? 'Mute microphone' : 'Unmute microphone' }}
               </button>
-              <button ngbDropdownItem (click)="toggleScreenShare()">
+              <button ngbDropdownItem (click)="toggleScreenShare()" [disabled]="!ownPermissions().screenShare" [attr.title]="notAllowedTitle('screenShare')">
                 <i class="bi" [class.bi-display]="!screenShareEnabled()" [class.bi-stop-circle]="screenShareEnabled()"></i>
                 {{ screenShareEnabled() ? 'Stop screen share' : 'Share screen' }}
               </button>
@@ -155,13 +158,13 @@
             class="btn btn-sm btn-outline-secondary"
             (click)="openFileSelector()"
             [disabled]="!canSendMessages()"
-            title="Send file">
+            [attr.title]="notAllowedTitle('chat') ?? 'Send file'">
             <i class="bi bi-paperclip"></i>
           </button>
           <input
             type="text"
             class="form-control form-control-sm"
-            [placeholder]="canSendMessages() ? 'Type a message...' : 'Waiting for connection...'"
+            [placeholder]="!ownPermissions().chat ? 'The session owner has not allowed you to send messages' : canSendMessages() ? 'Type a message...' : 'Waiting for connection...'"
             [(ngModel)]="chatInput"
             (keydown.enter)="sendChatMessage()"
             [disabled]="!canSendMessages()">
@@ -398,6 +401,7 @@
                 autoplay
                 playsinline
                 class="video-element"></video>
+              <ng-container *ngTemplateOutlet="moderation; context: { $implicit: peer }"></ng-container>
               <div class="video-overlay">
                 <span class="badge bg-dark">{{ peer.username }}</span>
                 <div class="video-status">
@@ -424,6 +428,7 @@
                 <i class="bi bi-person-circle fs-1"></i>
                 <div class="mt-2">{{ peer.username }}</div>
               </div>
+              <ng-container *ngTemplateOutlet="moderation; context: { $implicit: peer }"></ng-container>
               <div class="video-overlay">
                 <div class="video-status">
                   @if (!peer.hasAudio) {
@@ -450,6 +455,39 @@
     </div>
   }
 </div>
+
+<ng-template #moderation let-peer>
+  @if (canModerate()) {
+    <div ngbDropdown class="peer-moderation" placement="bottom-end">
+      <button
+        type="button"
+        class="btn btn-sm btn-dark"
+        [class.text-warning]="isOverridden(peer.userId)"
+        ngbDropdownToggle
+        [attr.title]="'What ' + peer.username + ' may send'">
+        <i class="bi bi-sliders"></i>
+      </button>
+      <div ngbDropdownMenu class="dropdown-menu-end">
+        <h6 class="dropdown-header">{{ peer.username }} may send</h6>
+        @for (control of permissionControls; track control.kind) {
+          <button ngbDropdownItem class="d-flex align-items-center gap-2" (click)="togglePermission(peer, control.kind)">
+            <i class="bi" [ngClass]="control.icon"></i>
+            <span class="flex-grow-1">{{ control.label }}</span>
+            @if (peerPermissions(peer.userId)[control.kind]) {
+              <span class="badge bg-success">Allowed</span>
+            } @else {
+              <span class="badge bg-danger">Muted</span>
+            }
+          </button>
+        }
+        <div class="dropdown-divider"></div>
+        <button ngbDropdownItem (click)="resetPermissions(peer)" [disabled]="!isOverridden(peer.userId)" [attr.title]="isOverridden(peer.userId) ? null : 'Nothing has been changed for this person'">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to their role
+        </button>
+      </div>
+    </div>
+  }
+</ng-template>
 
 @if (showCreateSessionModal()) {
   <div class="modal-backdrop fade show"></div>
