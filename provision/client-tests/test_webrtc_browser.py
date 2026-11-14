@@ -6,7 +6,8 @@ fake camera and microphone, press Live Session and connect; the viewer joins vie
 allows and mutes what each person may send. The tests check that the browsers connect to each
 other, that chat messages and files sent through the panel reach everyone intact, that turning on the
 camera, the microphone and screen sharing reaches the others, that the session settings and the device
-lists work, and that leaving is shown to the others. A second call forces every connection through the
+lists work, and that leaving is shown to the others. With CUPCAKE_SCREENSHOTS_DIR set they also save
+screenshots of the panel for the documentation. A second call forces every connection through the
 appliance's TURN server, over UDP and then over TCP; the UDP call is skipped, with the reason, when the
 machine running the tests cannot send the large UDP datagrams the browser's DTLS handshake needs.
 Every test runs in Chromium and in Firefox. Needs CUPCAKE_ALLOW_WRITES=1 and the Playwright browsers
@@ -30,6 +31,7 @@ from support import created, lab, unique  # noqa: F401
 pytestmark = [pytest.mark.login, pytest.mark.writes]
 
 CONNECT_TIMEOUT_MS = 30000
+VIEWPORT = {"width": 1440, "height": 900}
 expect.set_options(timeout=CONNECT_TIMEOUT_MS)
 FILE_SIZE_BYTES = 200 * 1024
 LARGE_DATAGRAM_BYTES = 1400
@@ -39,7 +41,7 @@ LAUNCH_OPTIONS = {
         "args": [
             "--use-fake-ui-for-media-stream",
             "--use-fake-device-for-media-stream",
-            "--auto-select-desktop-capture-source=Entire screen",
+            "--auto-select-tab-capture-source-by-title=Cupcake",
         ]
     },
     "firefox": {
@@ -144,14 +146,16 @@ video => ({
 class Person:
     """One user with Cupcake open in their own browser context."""
 
-    def __init__(self, label, client, browser, cupcake_url, relay=None):
+    def __init__(self, label, client, browser, cupcake_url, screenshots, relay=None):
         """Open a browser context logged in as client."""
         self.label = label
+        self.browser_name = browser.browser_type.name
+        self.screenshots = screenshots
         self.client = client
         self.username = client.user["username"]
         origin = cupcake_url.rstrip("/")
         permissions = CONTEXT_PERMISSIONS[browser.browser_type.name]
-        self.context = browser.new_context(ignore_https_errors=True, permissions=permissions)
+        self.context = browser.new_context(ignore_https_errors=True, permissions=permissions, viewport=VIEWPORT)
         settings = {
             "origin": origin,
             "access": client.access_token,
@@ -167,6 +171,18 @@ class Person:
         self.page.on("console", lambda message: self.console.append(f"{message.type}: {message.text}"[:300]))
         self.cupcake_url = cupcake_url
         self.panel = self.page.locator(".webrtc-panel")
+
+    def screenshot(self, name, caption, keep_notifications=False):
+        """Save what this person sees for the documentation, when screenshots are turned on."""
+        if not keep_notifications:
+            notifications = self.page.locator(".toast-container ngb-toast")
+            for close in notifications.locator(".btn-close").all():
+                if close.is_visible():
+                    close.click()
+            expect(notifications).to_have_count(0)
+        else:
+            expect(self.page.locator(".toast-container ngb-toast.showing")).to_have_count(0)
+        self.screenshots(self.page, self.browser_name, name, caption)
 
     def _record_failure(self, response):
         if response.status >= 400 and "/api/" in response.url:
@@ -210,18 +226,31 @@ class Person:
             self.panel.locator("button[title='Chat']").click()
         expect(self.panel.locator(".panel-chat")).to_have_count(0)
 
+    def open_permission_menu(self, username):
+        """Open the permission menu on username's tile and return it."""
+        self.close_chat()
+        self.tile(username).locator(".peer-moderation .dropdown-toggle").click()
+        menu = self.page.locator(".peer-moderation-menu.show")
+        expect(menu.locator(".dropdown-header")).to_have_text(f"{username} may send")
+        return menu
+
+    def show_videos(self):
+        """Close the chat and settings and expand the panel, to see the video tiles."""
+        self.close_chat()
+        if self.panel.locator(".panel-settings").count():
+            self.panel.locator(".panel-settings button[title='Close settings']").click()
+        if "expanded" not in (self.panel.get_attribute("class") or ""):
+            self.more_options("Expand")
+        expect(self.panel).to_have_class(re.compile("expanded"))
+
     def permission_menu(self, username, label):
         """Open the permission menu on username's tile and toggle label."""
         self.close_chat()
-        menu = self.tile(username).locator(".peer-moderation")
-        menu.locator(".dropdown-toggle").click()
-        menu.locator("[ngbDropdownItem]", has_text=label).click()
+        self.open_permission_menu(username).locator("[ngbDropdownItem]", has_text=label).click()
 
     def reset_permissions(self, username):
         self.close_chat()
-        menu = self.tile(username).locator(".peer-moderation")
-        menu.locator(".dropdown-toggle").click()
-        menu.locator("[ngbDropdownItem]", has_text="Reset to their role").click()
+        self.open_permission_menu(username).locator("[ngbDropdownItem]", has_text="Reset to their role").click()
 
     def open_chat(self):
         if not self.panel.locator(".panel-chat").is_visible():
@@ -246,6 +275,14 @@ class Person:
             f"async () => (await ({INBOUND})('{kind}')) > {above}", timeout=CONNECT_TIMEOUT_MS, polling=500
         )
 
+    def expect_picture(self, username):
+        """Wait until username's tile shows a picture."""
+        video = self.tile(username).locator("video").element_handle()
+        try:
+            self.page.wait_for_function("video => video.videoWidth > 0", arg=video, timeout=CONNECT_TIMEOUT_MS)
+        except PlaywrightTimeout:
+            raise AssertionError(f"{self.label} shows {username}'s video with no picture: {video.evaluate(VIDEO_STATE)}") from None
+
     def tile(self, username):
         return self.panel.locator(".remote-video-container", has_text=username)
 
@@ -268,19 +305,23 @@ def browser(request, playwright):
 
 
 @pytest.fixture(scope="module")
-def room(lab, browser, cupcake_url, api_url, make_user):
+def room(lab, browser, cupcake_url, api_url, make_user, screenshots):
     """The owner, two editors and the viewer connected to the session's live call in their browsers."""
     colleague = make_user("colleague")
     session_url = api_url + f"sessions/{lab['session']['id']}/"
     shared = lab["owner"].patch(session_url, json={"editors": [lab["editor"].user["id"], colleague.user["id"]]}, timeout=30)
     assert shared.status_code == 200, f"adding the second editor failed: {shared.status_code} {shared.text[:300]}"
     clients = {"owner": lab["owner"], "editor": lab["editor"], "colleague": colleague, "viewer": lab["viewer"]}
-    people = {role: Person(role, client, browser, cupcake_url) for role, client in clients.items()}
+    people = {role: Person(role, client, browser, cupcake_url, screenshots) for role, client in clients.items()}
     for person in people.values():
         person.open_live_session(lab["session"]["id"])
+        if person.label == "owner":
+            person.screenshot("live-session-panel", "The Live Session panel on a session, before connecting")
         person.connect()
     for person in people.values():
         person.expect_peers(len(people) - 1)
+    people["owner"].show_videos()
+    people["owner"].screenshot("live-session-connected", "The session owner connected with two editors and a viewer")
     yield people
     for person in people.values():
         person.close()
@@ -310,6 +351,7 @@ def test_replies_reach_everyone(room):
     for role in ("owner", "editor"):
         room[role].open_chat()
         expect(room[role].message(text).locator(".chat-username")).to_have_text(room["colleague"].username)
+    room["owner"].screenshot("live-session-chat", "Chat messages from everyone in the call")
 
 
 def test_a_file_sent_in_the_chat_downloads_intact_for_the_others(room):
@@ -326,6 +368,8 @@ def test_a_file_sent_in_the_chat_downloads_intact_for_the_others(room):
         receiver.open_chat()
         offer = receiver.message(name)
         expect(offer.locator(".chat-username")).to_have_text(sender.username)
+        if role == "owner":
+            receiver.screenshot("live-session-file-offer", "A file sent in the chat, ready to download")
         with receiver.page.expect_download(timeout=CONNECT_TIMEOUT_MS * 2) as download:
             offer.get_by_role("button", name="Download").click()
         assert download.value.suggested_filename == name
@@ -343,12 +387,9 @@ def test_turning_on_the_camera_shows_live_video_to_the_others(room):
         expect(watcher.tile(room["owner"].username).locator("video")).to_be_visible()
         frames = watcher.inbound("video")
         watcher.wait_for_inbound("video", frames + 10)
-        video = watcher.tile(room["owner"].username).locator("video").element_handle()
-        try:
-            watcher.page.wait_for_function("video => video.videoWidth > 0", arg=video, timeout=CONNECT_TIMEOUT_MS)
-        except PlaywrightTimeout:
-            state = video.evaluate(VIDEO_STATE)
-            raise AssertionError(f"{role} shows the owner's video with no picture: {state}") from None
+        watcher.expect_picture(room["owner"].username)
+    room["editor"].show_videos()
+    room["editor"].screenshot("live-session-camera", "The session owner's camera, seen by an editor")
 
 
 def test_unmuting_the_microphone_sends_audio_to_the_others(room):
@@ -366,6 +407,9 @@ def test_screen_sharing_reaches_the_others(room):
         tile = room[role].tile(room["colleague"].username)
         expect(tile.locator("video")).to_be_visible()
         expect(tile.locator(".video-status .bi-display")).to_be_visible()
+        room[role].expect_picture(room["colleague"].username)
+    room["owner"].show_videos()
+    room["owner"].screenshot("live-session-screen-share", "An editor sharing their screen")
     room["colleague"].media_menu("Stop screen share")
 
 
@@ -377,6 +421,7 @@ def test_the_device_settings_list_the_camera_and_microphone(room):
     for label in ("Camera", "Microphone"):
         select = settings.locator(".mb-3", has=person.page.locator("label", has_text=label)).locator("select")
         assert select.locator("option").count() >= 2, f"no {label.lower()} is listed in the settings"
+    person.screenshot("live-session-device-settings", "Choosing the camera and microphone")
     settings.locator("button[title='Close settings']").click()
     expect(settings).to_have_count(0)
 
@@ -390,6 +435,7 @@ def test_an_editor_renames_the_call(room):
     name_input.fill(name)
     settings.locator("button[title='Save name']").click()
     expect(editor.panel.locator(".panel-header h6")).to_contain_text(name)
+    editor.screenshot("live-session-call-settings", "Renaming the call")
     settings.locator("button[title='Close settings']").click()
 
 
@@ -401,6 +447,7 @@ def test_the_viewer_watches_but_cannot_send(room):
         entry = viewer.page.locator("[ngbDropdownItem]", has_text=item)
         expect(entry).to_be_disabled()
         expect(entry).to_have_attribute("title", re.compile("The session owner has not allowed you to"))
+    viewer.screenshot("live-session-view-only", "A viewer watching: sending is turned off until the session owner allows it")
     viewer.page.keyboard.press("Escape")
     viewer.open_chat()
     expect(viewer.panel.locator(".chat-input-container input[type='text']")).to_be_disabled()
@@ -410,7 +457,13 @@ def test_the_viewer_watches_but_cannot_send(room):
 
 
 def test_only_the_session_owner_sees_the_permission_controls(room):
-    expect(room["owner"].tile(room["viewer"].username).locator(".peer-moderation")).to_have_count(1)
+    owner = room["owner"]
+    expect(owner.tile(room["viewer"].username).locator(".peer-moderation")).to_have_count(1)
+    owner.show_videos()
+    menu = owner.open_permission_menu(room["viewer"].username)
+    expect(menu.locator("[ngbDropdownItem]", has_text="Screen sharing")).to_be_visible()
+    owner.screenshot("live-session-permissions", "The session owner choosing what a viewer may send")
+    owner.page.keyboard.press("Escape")
     for role in ("editor", "colleague", "viewer"):
         expect(room[role].panel.locator(".peer-moderation")).to_have_count(0)
 
@@ -419,13 +472,16 @@ def test_the_owner_lets_the_viewer_share_their_screen_and_then_stops_it(room):
     owner, viewer = room["owner"], room["viewer"]
     owner.permission_menu(viewer.username, "Screen sharing")
     expect(viewer.page.get_by_text(f"{owner.username} allowed you to share your screen")).to_be_visible()
+    viewer.screenshot(
+        "live-session-permission-granted",
+        "A viewer told the session owner allowed them to share their screen",
+        keep_notifications=True,
+    )
     expect(viewer.panel.locator(".badge", has_text="View only")).to_have_count(0)
     viewer.media_menu("Share screen")
     for role in ("owner", "editor"):
-        tile = room[role].tile(viewer.username)
-        expect(tile.locator(".video-status .bi-display")).to_be_visible()
-        frames = room[role].inbound("video")
-        room[role].wait_for_inbound("video", frames + 10)
+        expect(room[role].tile(viewer.username).locator(".video-status .bi-display")).to_be_visible()
+        room[role].expect_picture(viewer.username)
 
     owner.permission_menu(viewer.username, "Screen sharing")
     expect(viewer.page.get_by_text(f"{owner.username} stopped you from being able to share your screen")).to_be_visible()
@@ -478,7 +534,7 @@ def test_leaving_the_call_is_shown_to_the_others(room):
 
 
 @pytest.fixture(params=["udp", "tcp"])
-def relay_room(request, lab, browser, cupcake_url, api_url, cleanup):
+def relay_room(request, lab, browser, cupcake_url, api_url, cleanup, screenshots):
     """The owner and the editor in a call on a new session, allowed to connect only through TURN over UDP, then over TCP."""
     owner = lab["owner"]
     session = created(
@@ -488,7 +544,7 @@ def relay_room(request, lab, browser, cupcake_url, api_url, cleanup):
     cleanup(f"sessions/{session['id']}/")
     shared = owner.patch(api_url + f"sessions/{session['id']}/", json={"editors": [lab["editor"].user["id"]]}, timeout=30)
     assert shared.status_code == 200, f"sharing the session failed: {shared.status_code} {shared.text[:300]}"
-    people = {role: Person(role, lab[role], browser, cupcake_url, relay=request.param) for role in ("owner", "editor")}
+    people = {role: Person(role, lab[role], browser, cupcake_url, screenshots, relay=request.param) for role in ("owner", "editor")}
     for person in people.values():
         person.open_live_session(session["id"])
         person.connect()

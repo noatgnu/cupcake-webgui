@@ -12,6 +12,9 @@ Configuration, through environment variables:
   CUPCAKE_ALLOW_WRITES  set to 1 to run tests that create and then delete test data
   CUPCAKE_SDRF_FILE     a large SDRF file for the performance tests (skipped without it)
   CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
+  CUPCAKE_SCREENSHOTS_DIR    save screenshots of the browser tests here for the documentation, in a
+                             folder per browser, with a manifest.json describing each one
+  CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
 
 The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox
 
@@ -23,6 +26,7 @@ import os
 import secrets
 import time
 import uuid
+from pathlib import Path
 
 import pytest
 import requests
@@ -140,6 +144,35 @@ def cleanup(api, api_url):
     yield register
     for client, url in reversed(registered):
         client.delete(url, timeout=60)
+
+
+@pytest.fixture(scope="session")
+def screenshots(host):
+    """
+    Save a screenshot for the documentation when CUPCAKE_SCREENSHOTS_DIR is set; otherwise do nothing.
+
+    Each screenshot is written to <dir>/<browser>/<name>.png and listed in <dir>/manifest.json.
+    """
+    directory = os.environ.get("CUPCAKE_SCREENSHOTS_DIR")
+    taken = []
+
+    def take(page, browser, name, caption, target=None):
+        if not directory:
+            return
+        path = Path(directory) / browser / f"{name}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        (target or page).screenshot(path=str(path), animations="disabled")
+        taken.append({"name": name, "browser": browser, "file": f"{browser}/{name}.png", "caption": caption})
+
+    yield take
+    if directory and taken:
+        manifest = {
+            "host": host,
+            "label": os.environ.get("CUPCAKE_SCREENSHOTS_LABEL"),
+            "taken": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "screenshots": sorted(taken, key=lambda shot: (shot["browser"], shot["name"])),
+        }
+        Path(directory, "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 @pytest.fixture(scope="session")

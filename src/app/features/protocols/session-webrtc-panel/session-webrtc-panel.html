@@ -458,7 +458,7 @@
 
 <ng-template #moderation let-peer>
   @if (canModerate()) {
-    <div ngbDropdown class="peer-moderation" placement="bottom-end">
+    <div ngbDropdown class="peer-moderation" placement="bottom-end top-end left-top" container="body">
       <button
         type="button"
         class="btn btn-sm btn-dark"
@@ -467,7 +467,7 @@
         [attr.title]="'What ' + peer.username + ' may send'">
         <i class="bi bi-sliders"></i>
       </button>
-      <div ngbDropdownMenu class="dropdown-menu-end">
+      <div ngbDropdownMenu class="dropdown-menu-end peer-moderation-menu">
         <h6 class="dropdown-header">{{ peer.username }} may send</h6>
         @for (control of permissionControls; track control.kind) {
           <button ngbDropdownItem class="d-flex align-items-center gap-2" (click)="togglePermission(peer, control.kind)">
