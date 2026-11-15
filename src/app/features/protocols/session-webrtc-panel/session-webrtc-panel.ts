@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, ChangeDetectionStrategy, afterEveryRender } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
@@ -143,6 +143,25 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       const stream = this.webrtcService.localMediaStream;
       this.localStream.set(stream || null);
     });
+    afterEveryRender(() => this.resumeRemoteMedia());
+  }
+
+  playbackBlocked = signal(false);
+
+  private resumeRemoteMedia(): void {
+    if (this.playbackBlocked()) {
+      return;
+    }
+    document.querySelectorAll<HTMLMediaElement>('.remote-video-container video, .remote-video-container audio').forEach(media => {
+      if (media.paused && media.srcObject) {
+        media.play().catch(() => this.playbackBlocked.set(true));
+      }
+    });
+  }
+
+  startPlayback(): void {
+    this.playbackBlocked.set(false);
+    this.resumeRemoteMedia();
   }
 
   private readonly STORAGE_PREFIX = 'cupcake-vanilla-ng_webrtc';

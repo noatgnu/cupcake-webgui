@@ -10,8 +10,9 @@ lists work, and that leaving is shown to the others. With CUPCAKE_SCREENSHOTS_DI
 screenshots of the panel for the documentation. A second call forces every connection through the
 appliance's TURN server, over UDP and then over TCP; the UDP call is skipped, with the reason, when the
 machine running the tests cannot send the large UDP datagrams the browser's DTLS handshake needs.
-Every test runs with everyone in Chromium, everyone in Firefox, and with the two mixed in one call. Needs CUPCAKE_ALLOW_WRITES=1 and the Playwright browsers
-(poetry run playwright install chromium firefox).
+Every test runs with everyone in Chromium, everyone in Firefox, everyone in WebKit (the engine of Safari),
+Chromium and Firefox mixed, and all three engines in one call. Needs CUPCAKE_ALLOW_WRITES=1 and the Playwright browsers
+(poetry run playwright install chromium firefox webkit, and once: sudo playwright install-deps webkit).
 """
 
 import hashlib
@@ -53,13 +54,16 @@ LAUNCH_OPTIONS = {
             "permissions.default.microphone": 1,
         }
     },
+    "webkit": {},
 }
-CONTEXT_PERMISSIONS = {"chromium": ["camera", "microphone"], "firefox": []}
+CONTEXT_PERMISSIONS = {"chromium": ["camera", "microphone"], "firefox": [], "webkit": ["camera", "microphone"]}
 ROLES = ("owner", "editor", "colleague", "viewer")
 LINEUPS = {
     "chromium": {role: "chromium" for role in ROLES},
     "firefox": {role: "firefox" for role in ROLES},
+    "webkit": {role: "webkit" for role in ROLES},
     "mixed": {"owner": "chromium", "editor": "firefox", "colleague": "firefox", "viewer": "chromium"},
+    "all-engines": {"owner": "webkit", "editor": "chromium", "colleague": "firefox", "viewer": "webkit"},
 }
 
 PAGE_SCRIPT = """
@@ -121,7 +125,8 @@ async () => {
       ? stats.find(s => s.id === transport.selectedCandidatePairId)
       : stats.find(s => s.type === 'candidate-pair' && (s.selected || s.nominated) && s.state === 'succeeded');
     const local = pair && stats.find(s => s.id === pair.localCandidateId);
-    types.push(local ? `${local.candidateType}/${local.relayProtocol || local.protocol}` : 'none');
+    const via = local && (local.relayProtocol || (local.url && local.url.includes('transport=tcp') ? 'tcp' : local.protocol));
+    types.push(local ? `${local.candidateType}/${via}` : 'none');
   }
   return types;
 }
@@ -144,6 +149,7 @@ async (kind) => {
 
 VIDEO_STATE = """
 video => ({
+  element: video.tagName,
   readyState: video.readyState,
   paused: video.paused,
   stream: video.srcObject && video.srcObject.id,
@@ -285,9 +291,37 @@ class Person:
             f"async () => (await ({INBOUND})('{kind}')) > {above}", timeout=CONNECT_TIMEOUT_MS, polling=500
         )
 
+    def start_playback_if_asked(self):
+        """Press Start audio and video when the browser blocked playback, as a Safari user would."""
+        button = self.panel.locator(".start-playback")
+        if button.is_visible():
+            self.close_chat()
+            button.click()
+
+    def expect_hearing(self, username):
+        """Wait until username's audio is playing in this browser."""
+        self.start_playback_if_asked()
+        media = self.tile(username).locator("video, audio").first.element_handle()
+        playing = "media => !media.paused && media.srcObject && media.srcObject.getAudioTracks().some(track => track.enabled)"
+        try:
+            self.page.wait_for_function(playing, arg=media, timeout=CONNECT_TIMEOUT_MS)
+        except PlaywrightTimeout:
+            raise AssertionError(f"{self.label} does not play {username}'s audio: {media.evaluate(VIDEO_STATE)}") from None
+
     def expect_picture(self, username):
-        """Wait until username's tile shows a picture."""
+        """
+        Wait until username's tile shows a picture.
+
+        Headless WebKit on Linux decodes remote video but never paints it into a video element, so in WebKit
+        this waits for the tile to play a live video track while new frames are decoded.
+        """
+        self.start_playback_if_asked()
         video = self.tile(username).locator("video").element_handle()
+        if self.browser_name == "webkit":
+            live = "video => !video.paused && video.srcObject && video.srcObject.getVideoTracks().some(t => t.readyState === 'live' && !t.muted)"
+            self.page.wait_for_function(live, arg=video, timeout=CONNECT_TIMEOUT_MS)
+            self.wait_for_inbound("video", self.inbound("video") + 10)
+            return
         try:
             self.page.wait_for_function("video => video.videoWidth > 0", arg=video, timeout=CONNECT_TIMEOUT_MS)
         except PlaywrightTimeout:
@@ -321,17 +355,23 @@ def lineup(request, browsers):
 
 
 @pytest.fixture(scope="module")
-def room(lab, lineup, cupcake_url, api_url, make_user, screenshots):
-    """The owner, two editors and the viewer connected to the session's live call in their browsers."""
+def room(lab, lineup, cupcake_url, api_url, make_user, cleanup, screenshots):
+    """The owner, two editors and the viewer connected to the live call of a new session, one per line-up."""
     colleague = make_user("colleague")
-    session_url = api_url + f"sessions/{lab['session']['id']}/"
-    shared = lab["owner"].patch(session_url, json={"editors": [lab["editor"].user["id"], colleague.user["id"]]}, timeout=30)
-    assert shared.status_code == 200, f"adding the second editor failed: {shared.status_code} {shared.text[:300]}"
+    owner = lab["owner"]
+    session = created(
+        owner.post(api_url + "sessions/", json={"name": unique("live session"), "protocols": [lab["protocol"]["id"]]}, timeout=30),
+        "session",
+    )
+    cleanup(f"sessions/{session['id']}/")
+    members = {"editors": [lab["editor"].user["id"], colleague.user["id"]], "viewers": [lab["viewer"].user["id"]]}
+    shared = owner.patch(api_url + f"sessions/{session['id']}/", json=members, timeout=30)
+    assert shared.status_code == 200, f"sharing the session failed: {shared.status_code} {shared.text[:300]}"
     clients = {"owner": lab["owner"], "editor": lab["editor"], "colleague": colleague, "viewer": lab["viewer"]}
     folder, assigned = lineup
     people = {role: Person(role, client, assigned[role], cupcake_url, screenshots, folder) for role, client in clients.items()}
     for person in people.values():
-        person.open_live_session(lab["session"]["id"])
+        person.open_live_session(session["id"])
         if person.label == "owner":
             person.screenshot("live-session-panel", "The Live Session panel on a session, before connecting")
         person.connect()
@@ -411,13 +451,20 @@ def test_turning_on_the_camera_shows_live_video_to_the_others(room):
 
 def test_unmuting_the_microphone_sends_audio_to_the_others(room):
     room["editor"].media_menu("Unmute microphone")
-    for role in ("owner", "colleague"):
+    for role in ("owner", "colleague", "viewer"):
         listener = room[role]
         received = listener.inbound("audio")
         listener.wait_for_inbound("audio", received + 2000)
+        listener.expect_hearing(room["editor"].username)
+
+
+def skip_screen_sharing_in(person):
+    if person.browser_name == "webkit":
+        pytest.skip("headless WebKit refuses screen capture even after a click, so screen sharing cannot be automated in it")
 
 
 def test_screen_sharing_reaches_the_others(room):
+    skip_screen_sharing_in(room["colleague"])
     room["colleague"].media_menu("Share screen")
     expect(room["colleague"].page.locator(".toast, ngb-toast", has_text="Screen sharing started")).to_be_visible()
     for role in ("owner", "editor"):
@@ -495,6 +542,7 @@ def test_the_owner_lets_the_viewer_share_their_screen_and_then_stops_it(room):
         keep_notifications=True,
     )
     expect(viewer.panel.locator(".badge", has_text="View only")).to_have_count(0)
+    skip_screen_sharing_in(viewer)
     viewer.media_menu("Share screen")
     for role in ("owner", "editor"):
         expect(room[role].tile(viewer.username).locator(".video-status .bi-display")).to_be_visible()

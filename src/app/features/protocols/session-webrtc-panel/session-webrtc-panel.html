@@ -364,6 +364,13 @@
 
   @if (isConnected()) {
     <div class="panel-body">
+      @if (playbackBlocked() && remotePeers().length > 0) {
+        <div class="playback-blocked">
+          <button type="button" class="btn btn-sm btn-primary start-playback" (click)="startPlayback()">
+            <i class="bi bi-play-fill me-1"></i>Start audio and video
+          </button>
+        </div>
+      }
       <div class="video-grid">
         @if (videoEnabled() || screenShareEnabled()) {
           <div class="local-video-container">
@@ -424,6 +431,7 @@
             </div>
           } @else {
             <div class="remote-video-container audio-only">
+              <audio [srcObject]="peer.stream" autoplay></audio>
               <div class="audio-only-placeholder">
                 <i class="bi bi-person-circle fs-1"></i>
                 <div class="mt-2">{{ peer.username }}</div>

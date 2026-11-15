@@ -12,11 +12,13 @@ Configuration, through environment variables:
   CUPCAKE_ALLOW_WRITES  set to 1 to run tests that create and then delete test data
   CUPCAKE_SDRF_FILE     a large SDRF file for the performance tests (skipped without it)
   CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
-  CUPCAKE_SCREENSHOTS_DIR    save screenshots of the browser tests here for the documentation, in a
-                             folder per browser line-up (chromium, firefox, mixed), with a manifest.json
+  CUPCAKE_SCREENSHOTS_DIR    save screenshots of the browser tests here for the documentation, with a
+                             manifest.json: gui-cupcake/ and gui-vanilla/ for the screens of both apps,
+                             and one folder per browser line-up for the live session panel
   CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
 
-The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox
+The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox webkit
+(WebKit also needs its system libraries, once:  sudo <venv>/bin/playwright install-deps webkit)
 
 Run with:  CUPCAKE_HOST=... CUPCAKE_PASSWORD=... poetry run pytest
 """

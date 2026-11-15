@@ -167,6 +167,11 @@
     min-height: 0;
   }
 
+  .playback-blocked {
+    padding: 0.5rem 1rem 0;
+    text-align: center;
+  }
+
   .video-grid {
     flex: 1;
     display: grid;

@@ -243,4 +243,20 @@ describe('SessionWebrtcPanel', () => {
     expect(component.remotePeers().map(peer => peer.peerId)).toEqual(['presenter', 'watcher']);
     expect(component.activePeersCount()).toBe(2);
   });
+
+  it('plays microphone-only people through an audio element', () => {
+    component.isConnected.set(true);
+    activePeers.next([{
+      id: 'speaker', userId: 5, username: 'speaker', peerRole: PeerRole.PARTICIPANT, connectionState: PeerConnectionState.CONNECTED,
+      hasVideo: false, hasAudio: true, hasScreenShare: false
+    }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.remote-video-container.audio-only audio')).not.toBeNull();
+  });
+
+  it('offers to start playback when the browser blocks it, and retries when pressed', () => {
+    component.playbackBlocked.set(true);
+    component.startPlayback();
+    expect(component.playbackBlocked()).toBeFalse();
+  });
 });

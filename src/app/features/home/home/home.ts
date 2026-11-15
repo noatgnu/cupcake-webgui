@@ -139,14 +139,15 @@ export class Home implements OnInit, OnDestroy {
   }
 
   private updateActiveSection(): void {
-    const urlSegments = this.router.url.split('/');
-    const lastSegment = urlSegments[urlSegments.length - 1].split('#')[0];
+    const segments = this.router.url.split(/[?#]/)[0].split('/').filter(segment => segment);
+    const section = segments[segments.indexOf('home') + 1];
     const fragment = this.route.snapshot.fragment;
+    const sections = ['projects', 'lab-groups', 'users', 'messages', 'notifications', 'profile', 'site-config', 'tasks', 'devices'];
 
     if (fragment === 'tasks') {
       this.activeSection = 'tasks';
-    } else if (lastSegment === 'projects' || lastSegment === 'lab-groups' || lastSegment === 'users' || lastSegment === 'messages' || lastSegment === 'notifications' || lastSegment === 'profile' || lastSegment === 'site-config' || lastSegment === 'tasks' || lastSegment === 'devices') {
-      this.activeSection = lastSegment as typeof this.activeSection;
+    } else if (section && sections.includes(section)) {
+      this.activeSection = section as typeof this.activeSection;
     } else {
       this.activeSection = 'dashboard';
     }

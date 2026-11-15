@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { CUPCAKE_CORE_CONFIG, SiteConfigService } from '@noatgnu/cupcake-core';
@@ -83,5 +83,21 @@ describe('Home', () => {
 
   it('recentSessions starts empty', () => {
     expect(component.recentSessions()).toEqual([]);
+  });
+
+  it('opens the section a deep link points at, including a message thread', () => {
+    const router = TestBed.inject(Router);
+    const cases: [string, string][] = [
+      ['/home/messages/2f1c', 'messages'],
+      ['/home/messages', 'messages'],
+      ['/home/lab-groups?limit=10', 'lab-groups'],
+      ['/home', 'dashboard']
+    ];
+    const currentUrl = spyOnProperty(router, 'url');
+    for (const [url, section] of cases) {
+      currentUrl.and.returnValue(url);
+      component['updateActiveSection']();
+      expect(component.activeSection).withContext(url).toBe(section as typeof component.activeSection);
+    }
   });
 });
