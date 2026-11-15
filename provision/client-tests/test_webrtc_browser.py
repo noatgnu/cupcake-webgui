@@ -10,7 +10,7 @@ lists work, and that leaving is shown to the others. With CUPCAKE_SCREENSHOTS_DI
 screenshots of the panel for the documentation. A second call forces every connection through the
 appliance's TURN server, over UDP and then over TCP; the UDP call is skipped, with the reason, when the
 machine running the tests cannot send the large UDP datagrams the browser's DTLS handshake needs.
-Every test runs in Chromium and in Firefox. Needs CUPCAKE_ALLOW_WRITES=1 and the Playwright browsers
+Every test runs with everyone in Chromium, everyone in Firefox, and with the two mixed in one call. Needs CUPCAKE_ALLOW_WRITES=1 and the Playwright browsers
 (poetry run playwright install chromium firefox).
 """
 
@@ -55,6 +55,12 @@ LAUNCH_OPTIONS = {
     },
 }
 CONTEXT_PERMISSIONS = {"chromium": ["camera", "microphone"], "firefox": []}
+ROLES = ("owner", "editor", "colleague", "viewer")
+LINEUPS = {
+    "chromium": {role: "chromium" for role in ROLES},
+    "firefox": {role: "firefox" for role in ROLES},
+    "mixed": {"owner": "chromium", "editor": "firefox", "colleague": "firefox", "viewer": "chromium"},
+}
 
 PAGE_SCRIPT = """
 (() => {
@@ -110,7 +116,10 @@ async () => {
   const types = [];
   for (const pc of window.__peerConnections.filter(pc => pc.connectionState === 'connected')) {
     const stats = [...(await pc.getStats()).values()];
-    const pair = stats.find(s => s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded');
+    const transport = stats.find(s => s.type === 'transport' && s.selectedCandidatePairId);
+    const pair = transport
+      ? stats.find(s => s.id === transport.selectedCandidatePairId)
+      : stats.find(s => s.type === 'candidate-pair' && (s.selected || s.nominated) && s.state === 'succeeded');
     const local = pair && stats.find(s => s.id === pair.localCandidateId);
     types.push(local ? `${local.candidateType}/${local.relayProtocol || local.protocol}` : 'none');
   }
@@ -146,10 +155,11 @@ video => ({
 class Person:
     """One user with Cupcake open in their own browser context."""
 
-    def __init__(self, label, client, browser, cupcake_url, screenshots, relay=None):
-        """Open a browser context logged in as client."""
+    def __init__(self, label, client, browser, cupcake_url, screenshots, folder, relay=None):
+        """Open a browser context logged in as client; screenshots go to the folder for this line-up."""
         self.label = label
         self.browser_name = browser.browser_type.name
+        self.folder = folder
         self.screenshots = screenshots
         self.client = client
         self.username = client.user["username"]
@@ -182,7 +192,7 @@ class Person:
             expect(notifications).to_have_count(0)
         else:
             expect(self.page.locator(".toast-container ngb-toast.showing")).to_have_count(0)
-        self.screenshots(self.page, self.browser_name, name, caption)
+        self.screenshots(self.page, self.folder, name, caption)
 
     def _record_failure(self, response):
         if response.status >= 400 and "/api/" in response.url:
@@ -296,23 +306,30 @@ def playwright():
         yield driver
 
 
-@pytest.fixture(scope="module", params=sorted(LAUNCH_OPTIONS))
-def browser(request, playwright):
-    """Each test runs once in Chromium and once in Firefox."""
-    launched = getattr(playwright, request.param).launch(**LAUNCH_OPTIONS[request.param])
+@pytest.fixture(scope="module")
+def browsers(playwright):
+    launched = {name: getattr(playwright, name).launch(**options) for name, options in LAUNCH_OPTIONS.items()}
     yield launched
-    launched.close()
+    for browser in launched.values():
+        browser.close()
+
+
+@pytest.fixture(scope="module", params=sorted(LINEUPS))
+def lineup(request, browsers):
+    """Each test runs with everyone in Chromium, everyone in Firefox, and with Chromium and Firefox mixed."""
+    return request.param, {role: browsers[name] for role, name in LINEUPS[request.param].items()}
 
 
 @pytest.fixture(scope="module")
-def room(lab, browser, cupcake_url, api_url, make_user, screenshots):
+def room(lab, lineup, cupcake_url, api_url, make_user, screenshots):
     """The owner, two editors and the viewer connected to the session's live call in their browsers."""
     colleague = make_user("colleague")
     session_url = api_url + f"sessions/{lab['session']['id']}/"
     shared = lab["owner"].patch(session_url, json={"editors": [lab["editor"].user["id"], colleague.user["id"]]}, timeout=30)
     assert shared.status_code == 200, f"adding the second editor failed: {shared.status_code} {shared.text[:300]}"
     clients = {"owner": lab["owner"], "editor": lab["editor"], "colleague": colleague, "viewer": lab["viewer"]}
-    people = {role: Person(role, client, browser, cupcake_url, screenshots) for role, client in clients.items()}
+    folder, assigned = lineup
+    people = {role: Person(role, client, assigned[role], cupcake_url, screenshots, folder) for role, client in clients.items()}
     for person in people.values():
         person.open_live_session(lab["session"]["id"])
         if person.label == "owner":
@@ -534,7 +551,7 @@ def test_leaving_the_call_is_shown_to_the_others(room):
 
 
 @pytest.fixture(params=["udp", "tcp"])
-def relay_room(request, lab, browser, cupcake_url, api_url, cleanup, screenshots):
+def relay_room(request, lab, lineup, cupcake_url, api_url, cleanup, screenshots):
     """The owner and the editor in a call on a new session, allowed to connect only through TURN over UDP, then over TCP."""
     owner = lab["owner"]
     session = created(
@@ -544,7 +561,11 @@ def relay_room(request, lab, browser, cupcake_url, api_url, cleanup, screenshots
     cleanup(f"sessions/{session['id']}/")
     shared = owner.patch(api_url + f"sessions/{session['id']}/", json={"editors": [lab["editor"].user["id"]]}, timeout=30)
     assert shared.status_code == 200, f"sharing the session failed: {shared.status_code} {shared.text[:300]}"
-    people = {role: Person(role, lab[role], browser, cupcake_url, screenshots, relay=request.param) for role in ("owner", "editor")}
+    folder, assigned = lineup
+    people = {
+        role: Person(role, lab[role], assigned[role], cupcake_url, screenshots, folder, relay=request.param)
+        for role in ("owner", "editor")
+    }
     for person in people.values():
         person.open_live_session(session["id"])
         person.connect()
@@ -585,8 +606,13 @@ def test_calls_work_when_every_connection_must_go_through_turn(relay_room):
             )
         raise
     for person in relay_room.values():
-        selected = person.page.evaluate(SELECTED_CANDIDATES)
-        assert selected == [f"relay/{transport}"], f"{person.label} is not connected through TURN over {transport}: {selected}"
+        expected = [f"relay/{transport}"]
+        for _ in range(20):
+            selected = person.page.evaluate(SELECTED_CANDIDATES)
+            if selected == expected:
+                break
+            person.page.wait_for_timeout(500)
+        assert selected == expected, f"{person.label} is not connected through TURN over {transport}: {selected}"
     text = f"relayed {secrets.token_hex(4)}"
     relay_room["owner"].send_message(text)
     relay_room["editor"].open_chat()

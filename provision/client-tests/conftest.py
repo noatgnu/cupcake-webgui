@@ -13,7 +13,7 @@ Configuration, through environment variables:
   CUPCAKE_SDRF_FILE     a large SDRF file for the performance tests (skipped without it)
   CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
   CUPCAKE_SCREENSHOTS_DIR    save screenshots of the browser tests here for the documentation, in a
-                             folder per browser, with a manifest.json describing each one
+                             folder per browser line-up (chromium, firefox, mixed), with a manifest.json
   CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
 
 The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox
@@ -151,18 +151,18 @@ def screenshots(host):
     """
     Save a screenshot for the documentation when CUPCAKE_SCREENSHOTS_DIR is set; otherwise do nothing.
 
-    Each screenshot is written to <dir>/<browser>/<name>.png and listed in <dir>/manifest.json.
+    Each screenshot is written to <dir>/<lineup>/<name>.png and listed in <dir>/manifest.json.
     """
     directory = os.environ.get("CUPCAKE_SCREENSHOTS_DIR")
     taken = []
 
-    def take(page, browser, name, caption, target=None):
+    def take(page, lineup, name, caption, target=None):
         if not directory:
             return
-        path = Path(directory) / browser / f"{name}.png"
+        path = Path(directory) / lineup / f"{name}.png"
         path.parent.mkdir(parents=True, exist_ok=True)
         (target or page).screenshot(path=str(path), animations="disabled")
-        taken.append({"name": name, "browser": browser, "file": f"{browser}/{name}.png", "caption": caption})
+        taken.append({"name": name, "lineup": lineup, "file": f"{lineup}/{name}.png", "caption": caption})
 
     yield take
     if directory and taken:
@@ -170,7 +170,7 @@ def screenshots(host):
             "host": host,
             "label": os.environ.get("CUPCAKE_SCREENSHOTS_LABEL"),
             "taken": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "screenshots": sorted(taken, key=lambda shot: (shot["browser"], shot["name"])),
+            "screenshots": sorted(taken, key=lambda shot: (shot["lineup"], shot["name"])),
         }
         Path(directory, "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 

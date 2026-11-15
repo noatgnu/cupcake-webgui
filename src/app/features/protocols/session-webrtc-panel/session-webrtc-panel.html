@@ -392,7 +392,7 @@
         }
 
         @for (peer of remotePeers(); track peer.peerId) {
-          @if ((peer.hasVideo || peer.hasScreenShare) || (peer.stream && peer.stream.getVideoTracks().length > 0)) {
+          @if (peer.hasVideo || peer.hasScreenShare) {
             <div class="remote-video-container">
               <video
                 [id]="'remote-video-' + peer.peerId"
@@ -405,7 +405,7 @@
               <div class="video-overlay">
                 <span class="badge bg-dark">{{ peer.username }}</span>
                 <div class="video-status">
-                  @if (!peer.hasVideo && !(peer.stream && peer.stream.getVideoTracks().length > 0)) {
+                  @if (!peer.hasVideo && !peer.hasScreenShare) {
                     <i class="bi bi-camera-video-off text-danger"></i>
                   }
                   @if (!peer.hasAudio) {
