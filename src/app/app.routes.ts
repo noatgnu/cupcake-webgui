@@ -147,7 +147,7 @@ export const routes: Routes = [
           },
           {
             path: 'vocabularies',
-            loadComponent: () => import('./features/jobs/vocabularies-page/vocabularies-page').then(m => m.VocabulariesPage)
+            loadComponent: () => import('@noatgnu/cupcake-vanilla').then(m => m.VocabularyManager)
           },
           {
             path: ':id',

@@ -1,5 +1,9 @@
 @import 'bootstrap/scss/bootstrap';
 @import 'bootstrap-icons/font/bootstrap-icons.css';
+@import '@fontsource/rajdhani/500.css';
+@import '@fontsource/rajdhani/600.css';
+@import '@fontsource/rajdhani/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
 @import 'quill/dist/quill.snow.css';
 
 // Cupcake Bootstrap integration (theme-agnostic; uses :root prefix)
@@ -11,6 +15,7 @@
 // Palette themes — default first, then palette overrides
 @import '@noatgnu/cupcake-core/src/lib/styles/themes/default';
 @import '@noatgnu/cupcake-core/src/lib/styles/themes/eink';
+@import '@noatgnu/cupcake-core/src/lib/styles/themes/scifi-compact';
 
 // Make Bootstrap utilities respect the theme
 .card-header {

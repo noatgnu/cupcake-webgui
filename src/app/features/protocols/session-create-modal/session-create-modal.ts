@@ -25,7 +25,7 @@ export class SessionCreateModal {
 
   sessionForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
-    enabled: [true]
+    enabled: [false]
   });
 
   saving = signal(false);

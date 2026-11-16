@@ -8,24 +8,47 @@
     </div>
   } @else {
     <div class="mb-3">
-      <label for="template" class="form-label">
+      <label for="templateSearch" class="form-label">
         Metadata Table Template <span class="text-danger">*</span>
       </label>
-      <select
-        class="form-select"
-        id="template"
-        [value]="state.selectedTemplateId() || ''"
-        (change)="state.selectedTemplateId.set(+$any($event.target).value)">
-        <option value="">Select a template</option>
+      <input
+        type="search"
+        class="form-control mb-2"
+        id="templateSearch"
+        placeholder="Search templates by name or description"
+        [value]="state.templateSearch()"
+        (input)="state.templateSearchSubject.next($any($event.target).value)">
+      <div class="list-group template-list">
         @for (template of state.templates(); track template.id) {
-          <option [value]="template.id">
-            {{ template.name }}
+          <button
+            type="button"
+            class="list-group-item list-group-item-action"
+            [class.active]="template.id === state.selectedTemplateId()"
+            (click)="state.selectTemplate(template)">
+            <div class="fw-semibold">{{ template.name }}</div>
             @if (template.description) {
-              - {{ template.description }}
+              <small [class.text-muted]="template.id !== state.selectedTemplateId()">{{ template.description }}</small>
             }
-          </option>
+          </button>
+        } @empty {
+          <div class="list-group-item text-muted">
+            {{ state.templateSearch() ? 'No templates match the search' : 'No templates are available for this lab group' }}
+          </div>
         }
-      </select>
+      </div>
+      @if (state.templateCount() > state.templatePageSize) {
+        <div class="d-flex justify-content-center mt-2">
+          <ngb-pagination
+            [collectionSize]="state.templateCount()"
+            [page]="state.templatePage() + 1"
+            [pageSize]="state.templatePageSize"
+            [maxSize]="5"
+            [rotate]="true"
+            (pageChange)="state.goToTemplatePage($event - 1)"
+            class="pagination-sm">
+          </ngb-pagination>
+        </div>
+      }
       <small class="text-muted">
         Select a template to generate the metadata table structure for your samples.
       </small>
@@ -34,7 +57,7 @@
     @if (state.selectedTemplateId()) {
       <div class="alert alert-info">
         <i class="bi bi-info-circle me-2"></i>
-        Template selected. The metadata table will be created in the next step with {{ state.sampleNumber() }} sample(s).
+        {{ state.selectedTemplate()?.name || 'Template' }} selected. The metadata table will be created in the next step with {{ state.sampleNumber() }} sample(s).
       </div>
     }
 

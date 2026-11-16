@@ -292,10 +292,11 @@ class Person:
         )
 
     def start_playback_if_asked(self):
-        """Press Start audio and video when the browser blocked playback, as a Safari user would."""
+        """Press Play call audio and video when the browser blocked playback, as a Safari user would."""
         button = self.panel.locator(".start-playback")
         if button.is_visible():
             self.close_chat()
+            self.screenshot("live-session-play-call", "The prompt shown when the browser waits for a click before playing the call")
             button.click()
 
     def expect_hearing(self, username):

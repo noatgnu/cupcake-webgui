@@ -14,7 +14,8 @@ Configuration, through environment variables:
   CUPCAKE_TIMINGS_FILE  also write the timings to this JSON file
   CUPCAKE_SCREENSHOTS_DIR    save screenshots of the browser tests here for the documentation, with a
                              manifest.json: gui-cupcake/ and gui-vanilla/ for the screens of both apps,
-                             and one folder per browser line-up for the live session panel
+                             steps-cupcake/ and steps-vanilla/ for tasks shown step by step, and one
+                             folder per browser line-up for the live session panel
   CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
 
 The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox webkit
@@ -153,7 +154,8 @@ def screenshots(host):
     """
     Save a screenshot for the documentation when CUPCAKE_SCREENSHOTS_DIR is set; otherwise do nothing.
 
-    Each screenshot is written to <dir>/<lineup>/<name>.png and listed in <dir>/manifest.json.
+    Each screenshot is written to <dir>/<lineup>/<name>.png and listed in <dir>/manifest.json, which keeps the
+    screenshots of earlier runs that were not taken again.
     """
     directory = os.environ.get("CUPCAKE_SCREENSHOTS_DIR")
     taken = []
@@ -168,13 +170,17 @@ def screenshots(host):
 
     yield take
     if directory and taken:
+        manifest_file = Path(directory, "manifest.json")
+        earlier = json.loads(manifest_file.read_text()).get("screenshots", []) if manifest_file.exists() else []
+        retaken = {shot["file"] for shot in taken}
+        kept = [shot for shot in earlier if shot["file"] not in retaken and Path(directory, shot["file"]).exists()]
         manifest = {
             "host": host,
             "label": os.environ.get("CUPCAKE_SCREENSHOTS_LABEL"),
             "taken": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "screenshots": sorted(taken, key=lambda shot: (shot["lineup"], shot["name"])),
+            "screenshots": sorted(kept + taken, key=lambda shot: (shot["lineup"], shot["name"])),
         }
-        Path(directory, "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 @pytest.fixture(scope="session")

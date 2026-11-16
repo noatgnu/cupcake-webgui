@@ -172,7 +172,7 @@ export class JobSubmission implements OnInit {
         }
 
         if (job.metadataTableTemplate) {
-          this.state.selectedTemplateId.set(job.metadataTableTemplate);
+          this.state.loadSelectedTemplate(job.metadataTableTemplate);
         }
 
         if (job.project) {

@@ -15,13 +15,12 @@ import os
 import re
 
 import pytest
+from browser_support import TIMEOUT_MS, Screen
 from playwright.sync_api import expect, sync_playwright
 from support import created, lab, unique  # noqa: F401
 
 pytestmark = [pytest.mark.login, pytest.mark.writes]
 
-TIMEOUT_MS = 30000
-VIEWPORT = {"width": 1440, "height": 900}
 SDRF = (
     "source name\tcharacteristics[organism]\tcharacteristics[organism part]\tcharacteristics[disease]\tassay name\t"
     "technology type\tcomment[instrument]\tcomment[data file]\n"
@@ -31,58 +30,6 @@ SDRF = (
     "kidney-1\thomo sapiens\tkidney\tnormal\trun 3\tproteomic profiling by mass spectrometry\tOrbitrap Exploris 480\t"
     "kidney-1.raw\n"
 )
-TOKENS_SCRIPT = """
-localStorage.setItem('ccvAccessToken', %s);
-localStorage.setItem('ccvRefreshToken', %s);
-"""
-
-expect.set_options(timeout=TIMEOUT_MS)
-
-
-class Screen:
-    """A logged-in browser tab on one of the apps, recording API requests that failed."""
-
-    def __init__(self, browser, base_url, folder, screenshots, access=None, refresh=None):
-        """Open a tab on base_url, logged in when tokens are given."""
-        self.context = browser.new_context(ignore_https_errors=True, viewport=VIEWPORT)
-        if access:
-            self.context.add_init_script(TOKENS_SCRIPT % (json.dumps(access), json.dumps(refresh)))
-        self.page = self.context.new_page()
-        self.page.set_default_timeout(TIMEOUT_MS)
-        self.base_url = base_url
-        self.folder = folder
-        self.screenshots = screenshots
-        self.failures = []
-        self.page.on("response", self._record_failure)
-
-    def _record_failure(self, response):
-        if response.status >= 400 and "/api/" in response.url:
-            self.failures.append(f"{response.request.method} {response.url} {response.status}")
-
-    def open(self, path, marker, *texts):
-        """Open path, wait for marker and texts, and check that no API request failed on the way."""
-        self.page.goto("about:blank")
-        self.failures.clear()
-        self.page.goto(f"{self.base_url}#/{path}")
-        expect(self.page.locator(marker).first).to_be_visible()
-        for text in texts:
-            expect(self.page.get_by_text(text, exact=False).filter(visible=True).first).to_be_visible()
-        self.page.wait_for_load_state("networkidle")
-        assert not self.failures, f"/{path} had failed requests: {self.failures}"
-
-    def screenshot(self, name, caption):
-        """Save the screen for the manual after closing notifications, when screenshots are turned on."""
-        notifications = self.page.locator(".toast-container ngb-toast")
-        for close in notifications.locator(".btn-close").all():
-            if close.is_visible():
-                close.click()
-        expect(notifications).to_have_count(0)
-        self.screenshots(self.page, self.folder, name, caption)
-
-    def close(self):
-        self.context.close()
-
-
 @pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
@@ -187,7 +134,7 @@ SCREENS = [
     ("cupcake", "owner", "jobs/submit", "app-job-submission", [], "cupcake-job-submit", "Submitting an instrument job"),
     ("cupcake", "owner", "jobs/templates", "app-jobs", ["Table Templates"], "cupcake-table-templates", "Metadata table templates"),
     ("cupcake", "owner", "jobs/column-templates", "app-jobs", ["Column Templates"], "cupcake-column-templates", "Metadata column templates"),
-    ("cupcake", "owner", "jobs/vocabularies", "app-vocabularies-page", [], "cupcake-vocabularies", "Vocabularies"),
+    ("cupcake", "owner", "jobs/vocabularies", "ccv-vocabulary-manager", [], "cupcake-vocabularies", "Vocabularies"),
     ("cupcake", "admin", "home/users", "app-user-list", [], "cupcake-users", "Managing users"),
     ("cupcake", "admin", "billing/records", "app-billing-records", [], "cupcake-billing-records", "Billing records"),
     ("cupcake", "admin", "billing/service-tiers", "app-service-tiers", [], "cupcake-billing-tiers", "Service tiers"),
@@ -207,7 +154,7 @@ SCREENS = [
     ),
     ("vanilla", "owner", "metadata-templates", "app-root", ["Column Templates"], "vanilla-column-templates", "Column templates"),
     ("vanilla", "owner", "metadata-table-templates", "app-root", ["Table Templates"], "vanilla-table-templates", "Table templates"),
-    ("vanilla", "owner", "vocabularies", "app-vocabularies-page", [], "vanilla-vocabularies", "Vocabularies"),
+    ("vanilla", "owner", "vocabularies", "ccv-vocabulary-manager", [], "vanilla-vocabularies", "Vocabularies"),
     ("vanilla", "owner", "lab-groups", "app-root", ["group.name"], "vanilla-lab-groups", "Lab groups"),
     ("vanilla", "owner", "users/profile", "app-root", ["User Profile"], "vanilla-profile", "Your profile"),
     ("vanilla", "owner", "favorites", "app-root", ["Favorite Management"], "vanilla-favorites", "Favourite values"),
@@ -286,4 +233,51 @@ def test_reading_a_message_thread(tabs, sample):
 def test_opening_a_thread_from_a_link(tabs, sample):
     tab = tabs[("cupcake", "owner")]
     tab.open(f"home/messages/{sample['thread']['id']}", "app-messages-view", "Starting the digestion now")
+
+
+THEMES = [
+    ("default-light", "default", "light"),
+    ("default-dark", "default", "dark"),
+    ("eink", "eink", "light"),
+    ("scifi-compact", "scifi-compact", "auto"),
+]
+THEMED_SCREENS = [
+    ("cupcake", "owner", "home", "app-home", [], "cupcake-home", "The home dashboard"),
+    (
+        "cupcake", "owner", "protocols/sessions/{session.id}", "app-session-detail", ["Add trypsin and incubate"],
+        "cupcake-session", "A session step",
+    ),
+    (
+        "cupcake", "admin", "instruments/{instrument.id}", "app-instruments", ["instrument.instrument_name"],
+        "cupcake-instrument", "An instrument",
+    ),
+    ("cupcake", "owner", "jobs/submit", "app-job-submission", [], "cupcake-job-submit", "Submitting an instrument job"),
+    ("cupcake", "owner", "home/profile", "app-user-profile", [], "cupcake-profile", "The profile page"),
+    (
+        "vanilla", "owner", "metadata-tables/{table.id}/table", "app-root", ["liver-2", "hepatocellular carcinoma"],
+        "vanilla-table-editor", "Editing a metadata table",
+    ),
+    ("vanilla", "owner", "vocabularies", "ccv-vocabulary-manager", [], "vanilla-vocabularies", "Vocabularies"),
+]
+THEME_SCRIPT = "localStorage.setItem('cupcake-palette', %s); localStorage.setItem('cupcake-theme', %s);"
+
+
+@pytest.mark.parametrize("theme, palette, mode", THEMES, ids=[theme[0] for theme in THEMES])
+def test_main_screens_in_each_theme(browser, lab, tokens, sample, cupcake_url, vanilla_url, screenshots, theme, palette, mode):
+    owner = lab["owner"]
+    logins = {"owner": (owner.access_token, owner.refresh_token), "admin": (tokens["access"], tokens["refresh"])}
+    opened = {}
+    try:
+        for app, who, path, marker, texts, name, caption in THEMED_SCREENS:
+            if (app, who) not in opened:
+                tab = Screen(browser, cupcake_url if app == "cupcake" else vanilla_url, f"themes/{theme}", screenshots, *logins[who])
+                tab.context.add_init_script(THEME_SCRIPT % (json.dumps(palette), json.dumps(mode)))
+                opened[(app, who)] = tab
+            tab = opened[(app, who)]
+            tab.open(resolve(path, sample), marker, *(resolve(text, sample) for text in texts))
+            expect(tab.page.locator(f"html.theme-{palette}")).to_have_count(1)
+            tab.screenshot(name, f"{caption}, {theme.replace('-', ' ')} theme")
+    finally:
+        for tab in opened.values():
+            tab.close()
 

@@ -63,6 +63,13 @@ export class JobSubmissionStateService {
   showCostCenterSuggestions = signal(false);
 
   templates = signal<MetadataTableTemplate[]>([]);
+  templateCount = signal(0);
+  templatePage = signal(0);
+  templateSearch = signal('');
+  selectedTemplate = signal<MetadataTableTemplate | null>(null);
+  readonly templatePageSize = 10;
+  private templateLabGroupId: number | null = null;
+  templateSearchSubject = new Subject<string>();
 
   projectSearchSubject = new Subject<string>();
   labGroupSearchSubject = new Subject<string>();
@@ -94,6 +101,14 @@ export class JobSubmissionStateService {
     this.costCenterSearchSubject
       .pipe(debounceTime(300), distinctUntilChanged())
       .subscribe(search => this.searchCostCenters(search));
+
+    this.templateSearchSubject
+      .pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe(search => {
+        this.templateSearch.set(search.trim());
+        this.templatePage.set(0);
+        this.loadTemplates();
+      });
   }
 
   searchProjects(search: string): void {
@@ -184,24 +199,49 @@ export class JobSubmissionStateService {
   }
 
   loadLabGroupTemplates(labGroupId: number): void {
+    this.templateLabGroupId = labGroupId;
+    this.templatePage.set(0);
+    this.loadTemplates();
+  }
+
+  loadUserTemplates(): void {
+    this.templateLabGroupId = null;
+    this.templatePage.set(0);
+    this.loadTemplates();
+  }
+
+  /**
+   * Load the current page of templates for the chosen lab group, or the user's templates, matching the search.
+   */
+  loadTemplates(): void {
     this.metadataTableTemplateService.getMetadataTableTemplates({
-      labGroupId: labGroupId,
-      limit: 10
+      labGroupId: this.templateLabGroupId ?? undefined,
+      search: this.templateSearch() || undefined,
+      limit: this.templatePageSize,
+      offset: this.templatePage() * this.templatePageSize
     }).subscribe({
       next: (response) => {
         this.templates.set(response.results);
+        this.templateCount.set(response.count);
       },
       error: () => {}
     });
   }
 
-  loadUserTemplates(): void {
-    this.metadataTableTemplateService.getMetadataTableTemplates({
-      limit: 10
-    }).subscribe({
-      next: (response) => {
-        this.templates.set(response.results);
-      },
+  goToTemplatePage(page: number): void {
+    this.templatePage.set(page);
+    this.loadTemplates();
+  }
+
+  selectTemplate(template: MetadataTableTemplate): void {
+    this.selectedTemplateId.set(template.id);
+    this.selectedTemplate.set(template);
+  }
+
+  loadSelectedTemplate(templateId: number): void {
+    this.selectedTemplateId.set(templateId);
+    this.metadataTableTemplateService.getMetadataTableTemplate(templateId).subscribe({
+      next: (template) => this.selectedTemplate.set(template),
       error: () => {}
     });
   }
@@ -255,6 +295,9 @@ export class JobSubmissionStateService {
     this.costCenterSearchTerm.set('');
     this.sampleNumber.set(1);
     this.selectedTemplateId.set(null);
+    this.selectedTemplate.set(null);
+    this.templateSearch.set('');
+    this.templatePage.set(0);
     this.templateSource.set('user');
     this.metadataTableId.set(null);
     this.metadataTableCreated.set(false);

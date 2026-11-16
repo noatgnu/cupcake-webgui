@@ -365,11 +365,10 @@
   @if (isConnected()) {
     <div class="panel-body">
       @if (playbackBlocked() && remotePeers().length > 0) {
-        <div class="playback-blocked">
-          <button type="button" class="btn btn-sm btn-primary start-playback" (click)="startPlayback()">
-            <i class="bi bi-play-fill me-1"></i>Start audio and video
-          </button>
-        </div>
+        <button type="button" class="btn btn-sm btn-dark rounded-pill shadow start-playback" (click)="startPlayback()"
+                title="Your browser paused the call until you allow it to play sound">
+          <i class="bi bi-volume-up-fill me-1"></i>Play call audio and video
+        </button>
       }
       <div class="video-grid">
         @if (videoEnabled() || screenShareEnabled()) {
