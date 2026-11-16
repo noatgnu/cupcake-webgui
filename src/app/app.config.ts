@@ -4,7 +4,7 @@ import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/ht
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
-import { authInterceptor, CUPCAKE_CORE_CONFIG, CupcakeCoreConfig } from '@noatgnu/cupcake-core';
+import { authInterceptor, maintenanceInterceptor, CUPCAKE_CORE_CONFIG, CupcakeCoreConfig } from '@noatgnu/cupcake-core';
 import { DesktopService } from '@noatgnu/cupcake-vanilla';
 
 /**
@@ -35,7 +35,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: environment.apiUrl } satisfies CupcakeCoreConfig },
     provideAppInitializer(resolveDesktopBackendUrls),
     provideHttpClient(withXhr(),
-      withInterceptors([authInterceptor])
+      withInterceptors([authInterceptor, maintenanceInterceptor])
     )
   ]
 };

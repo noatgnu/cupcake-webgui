@@ -535,6 +535,17 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/15-plugin.sh && sudo /tmp/15-plugin.sh"
 
+      - name: Provision — 16-power-manager
+        timeout-minutes: 5
+        run: |
+          for f in cupcake-power-manager cupcake-power-manager.socket cupcake-power-manager.service 16-power-manager.sh; do
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/$f cupcake@localhost:/tmp/
+          done
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "chmod +x /tmp/16-power-manager.sh && sudo /tmp/16-power-manager.sh"
+          ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
+            "systemctl is-active cupcake-power-manager.socket && sudo -u cupcake-svc python3 -c \"import json,socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/cupcake-power.sock'); s.sendall(json.dumps({'command': 'status-check'}).encode()); s.shutdown(socket.SHUT_WR); r=json.loads(s.recv(4096)); assert r == {'ok': False, 'error': 'Unknown command: status-check'}, r; print('power manager answers the backend user')\""
+
       - name: Download seed database
         uses: actions/download-artifact@v4
         with:
@@ -584,7 +595,9 @@ jobs:
       - name: Provision — 06-nginx
         timeout-minutes: 5
         run: |
-          scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/06-nginx.sh cupcake@localhost:/tmp/
+          for f in 06-nginx.sh cupcake-maintenance.html cupcake-maintenance.conf; do
+            scp -o StrictHostKeyChecking=no -i cupckey -P 2222 provision/scripts/$f cupcake@localhost:/tmp/
+          done
           ssh -o StrictHostKeyChecking=no -i cupckey -p 2222 cupcake@localhost \
             "chmod +x /tmp/06-nginx.sh && sudo /tmp/06-nginx.sh"
 
@@ -1209,7 +1222,7 @@ jobs:
           install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/restore-backup.sh" "${ROOTFS_DIR}/opt/cupcake/restore-backup.sh"
           cp "${GITHUB_WORKSPACE}/provision/scripts/configure-wifi.sh" "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
           chmod +x "${ROOTFS_DIR}/opt/cupcake/configure-wifi.sh"
-          for helper in cupcake-storage-manager cupcake-network-manager; do
+          for helper in cupcake-storage-manager cupcake-network-manager cupcake-power-manager; do
             install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${helper}" "${ROOTFS_DIR}/usr/local/bin/${helper}"
             install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/${helper}.socket" \
               "${GITHUB_WORKSPACE}/provision/scripts/${helper}.service" "${ROOTFS_DIR}/etc/systemd/system/"
@@ -1226,7 +1239,7 @@ jobs:
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-tailscale-https.service" \
             "${GITHUB_WORKSPACE}/provision/scripts/cupcake-tailscale-https.timer" "${ROOTFS_DIR}/etc/systemd/system/"
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/setup-scripts"
-          for f in cupcake-plugin-manager cupcake-plugin cupcake-plugin-manager.socket cupcake-plugin-manager.service 15-plugin.sh 06-nginx.sh; do
+          for f in cupcake-plugin-manager cupcake-plugin cupcake-plugin-manager.socket cupcake-plugin-manager.service 15-plugin.sh 06-nginx.sh cupcake-maintenance.html cupcake-maintenance.conf; do
             install -m 755 "${GITHUB_WORKSPACE}/provision/scripts/${f}" "${ROOTFS_DIR}/opt/cupcake/setup-scripts/${f}"
           done
           install -m 644 "${GITHUB_WORKSPACE}/provision/scripts/cupcake-selftest.service" \
@@ -1686,7 +1699,7 @@ jobs:
           UNITEOF
 
           systemctl --root=/ enable cupcake-firstboot.service
-          systemctl --root=/ enable cupcake-storage-manager.socket cupcake-network-manager.socket
+          systemctl --root=/ enable cupcake-storage-manager.socket cupcake-network-manager.socket cupcake-power-manager.socket
           systemctl --root=/ enable cupcake-selftest.service
           systemctl --root=/ enable cupcake-tailscale-https.timer
 
@@ -2119,6 +2132,7 @@ jobs:
           check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
           check "network manager socket active" systemctl is-active cupcake-network-manager.socket
           check "plugin manager socket active" systemctl is-active cupcake-plugin-manager.socket
+          check "power manager socket active" systemctl is-active cupcake-power-manager.socket
           check "Tailscale HTTPS timer enabled" systemctl is-enabled cupcake-tailscale-https.timer
           check "Tailscale HTTPS does nothing without a tailnet certificate" /usr/local/sbin/cupcake-tailscale-https
           check "no Tailscale site without a certificate" test ! -e /etc/nginx/sites-enabled/cupcake-tailscale.conf

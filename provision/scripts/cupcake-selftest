@@ -57,6 +57,7 @@ first_boot_checks() {
         bash -c '[ "$(cat /opt/cupcake/.credentials-machine-id)" = "$(cat /etc/machine-id)" ]'
     check "storage manager socket active" systemctl is-active cupcake-storage-manager.socket
     check "network manager socket active" systemctl is-active cupcake-network-manager.socket
+    check "power manager socket active" systemctl is-active cupcake-power-manager.socket
 }
 
 # Point REPORT_DIR at where the request came from, mounting the config stick when needed.

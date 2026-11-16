@@ -98,15 +98,15 @@ export async function startJobWithMetadataTable(
   await mcp.fill('#sampleNumber', String(sampleCount), MAIN);
   expectTrue(await clickButtonWithText('Save & Continue'), 'Samples step could not continue');
 
-  expectTrue(await mcp.waitForElement('#template', 30000, MAIN), 'Template step did not open');
+  expectTrue(await mcp.waitForElement('#templateSearch', 30000, MAIN), 'Template step did not open');
+  await mcp.fill('#templateSearch', templateName, MAIN);
   expectTrue(
     await mcp.waitFor(() => mcp.evaluate(
-      `const select = document.querySelector('#template');
-       const option = [...select.options].find(o => o.textContent.includes(${JSON.stringify(templateName)}));
-       if (!option) return false;
-       select.value = option.value;
-       select.dispatchEvent(new Event('change', { bubbles: true }));
-       return true;`,
+      `const choice = [...document.querySelectorAll('.template-list button')]
+         .find(button => button.textContent.includes(${JSON.stringify(templateName)}));
+       if (!choice) return false;
+       choice.click();
+       return choice.classList.contains('active');`,
       MAIN,
     ), 30000, 1000),
     `Template "${templateName}" is not offered`,

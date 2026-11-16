@@ -92,9 +92,11 @@ test.describe("job submission", () => {
     await adminPage.locator("#sampleNumber").fill("2");
     await adminPage.getByRole("button", { name: /save.*continue/i }).click();
 
-    // Step 4: Template selection (select first available template)
-    await expect(adminPage.locator("#template")).toBeVisible({ timeout: 10000 });
-    await adminPage.locator("#template").selectOption({ index: 1 });
+    await expect(adminPage.locator("#templateSearch")).toBeVisible({ timeout: 10000 });
+    const firstTemplate = adminPage.locator(".template-list button").first();
+    await expect(firstTemplate).toBeVisible({ timeout: 10000 });
+    await firstTemplate.click();
+    await expect(firstTemplate).toHaveClass(/active/);
     await adminPage.getByRole("button", { name: /save.*continue/i }).click();
 
     // Step 5: Create metadata table then submit

@@ -1,0 +1,10 @@
+[Unit]
+Description=Cupcake Power Manager
+Requires=cupcake-power-manager.socket
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cupcake-power-manager
+StandardInput=null

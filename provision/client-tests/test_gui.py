@@ -146,6 +146,7 @@ SCREENS = [
     ("cupcake", "admin", "admin/wifi", "app-wifi-admin", [], "cupcake-admin-wifi", "WiFi"),
     ("cupcake", "admin", "admin/remote-access", "app-remote-access-admin", [], "cupcake-admin-remote-access", "Remote access"),
     ("cupcake", "admin", "admin/plugins", "app-plugin-admin", [], "cupcake-admin-plugins", "Plugins"),
+    ("cupcake", "admin", "admin/power", "ccc-appliance-power", ["Restart backend"], "cupcake-admin-power", "Restarting or shutting down the appliance"),
     ("vanilla", "owner", "metadata", "app-metadata-selector", [], "vanilla-home", "Metadata management"),
     ("vanilla", "owner", "metadata-tables", "app-metadata-tables", ["table.name"], "vanilla-tables", "Metadata tables"),
     (
@@ -164,6 +165,7 @@ SCREENS = [
     ("vanilla", "admin", "admin/storage", "app-storage-page", [], "vanilla-admin-storage", "Appliance storage"),
     ("vanilla", "admin", "admin/backup", "app-backup-page", [], "vanilla-admin-backup", "Backups"),
     ("vanilla", "admin", "admin/wifi", "app-wifi-page", [], "vanilla-admin-wifi", "WiFi"),
+    ("vanilla", "admin", "admin/power", "ccc-appliance-power", ["Restart backend"], "vanilla-admin-power", "Restarting or shutting down the appliance"),
 ]
 
 

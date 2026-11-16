@@ -1,6 +1,7 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NgbCollapse } from '@ng-bootstrap/ng-bootstrap';
+import { AuthService } from '@noatgnu/cupcake-core';
 import { SidebarControl } from '../../../core/services/sidebar-control';
 import { environment } from '../../../../environments/environment';
 
@@ -13,7 +14,9 @@ import { environment } from '../../../../environments/environment';
 })
 export class AdminNavbar {
   private sidebarControl = inject(SidebarControl);
+  private authService = inject(AuthService);
   isAppliance = !!(environment as any).isAppliance;
+  isSuperuser = computed(() => !!this.authService.currentUser()?.isSuperuser);
 
   isMenuCollapsed = signal(true);
 

@@ -1,6 +1,10 @@
 #!/bin/bash
 set -eux
 
+SRC=$(cd "$(dirname "$0")" && pwd)
+install -D -m 644 "$SRC/cupcake-maintenance.html" /opt/cupcake/maintenance/cupcake-maintenance.html
+install -D -m 644 "$SRC/cupcake-maintenance.conf" /etc/nginx/snippets/cupcake-maintenance.conf
+
 mkdir -p /etc/ssl/cupcake
 openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout /etc/ssl/cupcake/cupcake.key \
@@ -49,6 +53,8 @@ gzip on;
 gzip_types text/css application/javascript application/json image/svg+xml;
 gzip_vary on;
 
+include /etc/nginx/snippets/cupcake-maintenance.conf;
+
 location / {
     try_files \$uri \$uri/ /index.html;
 }
@@ -60,6 +66,7 @@ location /api/ {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$cupcake_forwarded_proto;
     proxy_read_timeout 300s;
+    error_page 502 504 = @cupcake_backend_down;
 }
 
 location /admin/static/ {
@@ -73,6 +80,7 @@ location /admin/ {
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$cupcake_forwarded_proto;
+    error_page 502 504 =503 /cupcake-maintenance.html;
 }
 
 location /ws/ {
@@ -84,6 +92,7 @@ location /ws/ {
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_read_timeout 86400s;
+    error_page 502 504 = @cupcake_backend_down;
 }
 
 location /static/ {

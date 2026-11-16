@@ -576,6 +576,28 @@
       notify: Reload nginx
       tags: [nginx]
 
+    - name: Create the maintenance page directory
+      ansible.builtin.file:
+        path: /opt/cupcake/maintenance
+        state: directory
+        mode: '0755'
+      tags: [nginx]
+
+    - name: Install the maintenance page shown while the backend restarts
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/cupcake-maintenance.html"
+        dest: /opt/cupcake/maintenance/cupcake-maintenance.html
+        mode: '0644'
+      tags: [nginx]
+
+    - name: Write nginx maintenance snippet
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/cupcake-maintenance.conf"
+        dest: /etc/nginx/snippets/cupcake-maintenance.conf
+        mode: '0644'
+      notify: Reload nginx
+      tags: [nginx]
+
     - name: Write vanilla nginx site
       ansible.builtin.copy:
         dest: /etc/nginx/sites-available/vanilla.conf
@@ -595,6 +617,8 @@
               gzip_types text/css application/javascript application/json image/svg+xml;
               gzip_vary on;
 
+              include /etc/nginx/snippets/cupcake-maintenance.conf;
+
               location / { try_files $uri $uri/ /index.html; }
 
               location /api/ {
@@ -604,6 +628,7 @@
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
                   proxy_read_timeout 300s;
+                  error_page 502 504 = @cupcake_backend_down;
               }
 
               location /ws/ {
@@ -615,6 +640,7 @@
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_read_timeout 86400s;
+                  error_page 502 504 = @cupcake_backend_down;
               }
 
               location /admin/ {
@@ -623,6 +649,7 @@
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
+                  error_page 502 504 =503 /cupcake-maintenance.html;
               }
 
               location /static/ {
@@ -664,6 +691,8 @@
               gzip_types text/css application/javascript application/json image/svg+xml;
               gzip_vary on;
 
+              include /etc/nginx/snippets/cupcake-maintenance.conf;
+
               location / { try_files $uri $uri/ /index.html; }
 
               location /api/ {
@@ -673,6 +702,7 @@
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
                   proxy_read_timeout 300s;
+                  error_page 502 504 = @cupcake_backend_down;
               }
 
               location /ws/ {
@@ -684,6 +714,7 @@
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_read_timeout 86400s;
+                  error_page 502 504 = @cupcake_backend_down;
               }
 
               location /admin/ {
@@ -692,6 +723,7 @@
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
+                  error_page 502 504 =503 /cupcake-maintenance.html;
               }
 
               location /static/ {

@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""
+Privileged power manager for the Cupcake appliance.
+
+Activated by systemd socket (cupcake-power-manager.socket). Reads a JSON command from the inherited
+socket fd, schedules the action a few seconds ahead with systemd-run so the reply reaches the backend
+before it stops, and writes back a JSON result.
+
+Accepted commands:
+  {"command": "restart-backend"}   restart the backend and its workers
+  {"command": "reboot"}            restart the appliance
+  {"command": "shutdown"}          power the appliance off
+
+Result shape:
+  {"ok": true,  "output": "..."}
+  {"ok": false, "error":  "..."}
+"""
+import json
+import socket
+import subprocess
+import time
+
+SOCKET_FD = 3
+DELAY_SECONDS = 3
+BACKEND_UNITS = ["cupcake-backend.service", "cupcake-rqworker.service", "cupcake-transcribe-worker.service"]
+
+
+def recv_all(conn):
+    data = b""
+    while True:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+def send_result(conn, result):
+    conn.sendall(json.dumps(result).encode())
+    conn.shutdown(socket.SHUT_WR)
+
+
+def installed(unit):
+    return subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
+
+
+def schedule(name, command):
+    """Run command DELAY_SECONDS from now in its own transient unit, outside this request."""
+    unit = f"cupcake-power-{name}-{int(time.time())}"
+    result = subprocess.run(
+        ["systemd-run", f"--unit={unit}", f"--on-active={DELAY_SECONDS}", "--timer-property=AccuracySec=100ms", *command],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    output = result.stdout + result.stderr
+    if result.returncode != 0:
+        return {"ok": False, "error": output.strip() or f"systemd-run exited with {result.returncode}"}
+    return {"ok": True, "output": f"{name} in {DELAY_SECONDS} seconds"}
+
+
+def handle(conn):
+    raw = recv_all(conn)
+    try:
+        payload = json.loads(raw.decode())
+    except Exception as e:
+        send_result(conn, {"ok": False, "error": f"Invalid JSON: {e}"})
+        return
+
+    command = payload.get("command")
+    try:
+        if command == "restart-backend":
+            units = [unit for unit in BACKEND_UNITS if installed(unit)]
+            if not units:
+                send_result(conn, {"ok": False, "error": "No backend services are installed"})
+                return
+            send_result(conn, schedule("restart-backend", ["/bin/systemctl", "restart", *units]))
+        elif command == "reboot":
+            send_result(conn, schedule("reboot", ["/bin/systemctl", "reboot"]))
+        elif command == "shutdown":
+            send_result(conn, schedule("shutdown", ["/bin/systemctl", "poweroff"]))
+        else:
+            send_result(conn, {"ok": False, "error": f"Unknown command: {command}"})
+    except Exception as e:
+        send_result(conn, {"ok": False, "error": str(e)})
+
+
+if __name__ == "__main__":
+    sock = socket.fromfd(SOCKET_FD, socket.AF_UNIX, socket.SOCK_STREAM)
+    conn, _ = sock.accept()
+    try:
+        handle(conn)
+    finally:
+        conn.close()
+        sock.close()

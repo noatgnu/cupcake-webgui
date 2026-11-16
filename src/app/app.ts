@@ -4,14 +4,14 @@ import { Title } from '@angular/platform-browser';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { filter } from 'rxjs/operators';
 
-import { SiteConfigService, ToastService, ToastContainerComponent, AuthService, WebSocketService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
+import { SiteConfigService, ToastService, ToastContainerComponent, MaintenanceOverlay, AuthService, WebSocketService, AsyncTaskMonitorService } from '@noatgnu/cupcake-core';
 import { CommunicationWebSocketService } from '@noatgnu/cupcake-mint-chocolate';
 import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NgbModule, ToastContainerComponent],
+  imports: [RouterOutlet, NgbModule, ToastContainerComponent, MaintenanceOverlay],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

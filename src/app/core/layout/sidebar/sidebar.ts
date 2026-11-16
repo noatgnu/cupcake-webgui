@@ -99,7 +99,10 @@ export class Sidebar implements OnInit, OnDestroy {
   ];
 
   superuserItems = [
-    { icon: 'bi-cpu-fill', label: 'Worker Status', route: '/admin/worker-status', requiresSuperuser: true }
+    { icon: 'bi-cpu-fill', label: 'Worker Status', route: '/admin/worker-status', requiresSuperuser: true },
+    ...((environment as any).isAppliance ? [
+      { icon: 'bi-power', label: 'Power', route: '/admin/power', requiresSuperuser: true }
+    ] : [])
   ];
 
   isAdmin(): boolean {
