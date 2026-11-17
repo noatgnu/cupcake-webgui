@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
@@ -51,16 +52,42 @@ func NewBackendDownloader(progressHandler func(models.DownloadProgress)) *Backen
 	}
 }
 
-func (b *BackendDownloader) GetAvailableReleases() ([]models.ReleaseInfo, error) {
-	resp, err := http.Get(GithubReleasesURL)
+// githubAPIGet requests url from the GitHub API, authenticated with GITHUB_TOKEN when it is set, and returns an
+// error naming GitHub's reason when the answer is not 200.
+func githubAPIGet(url string) (*http.Response, error) {
+	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("User-Agent", "cupcake-desktop")
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("GitHub could not be reached: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		var failure struct {
+			Message string `json:"message"`
+		}
+		json.NewDecoder(resp.Body).Decode(&failure)
+		return nil, fmt.Errorf("GitHub answered %s: %s", resp.Status, failure.Message)
+	}
+	return resp, nil
+}
+
+// GetAvailableReleases lists the backend releases, marking those with portable downloads; when GitHub cannot be
+// read it lists only the default branch, which has no portable download.
+func (b *BackendDownloader) GetAvailableReleases() ([]models.ReleaseInfo, error) {
+	resp, err := githubAPIGet(GithubReleasesURL)
+	if err != nil {
+		log.Printf("[BackendDownloader] Could not list releases: %v", err)
 		return b.getDefaultBranch(), nil
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return b.getDefaultBranch(), nil
-	}
 
 	var releases []struct {
 		TagName     string `json:"tag_name"`
@@ -111,15 +138,12 @@ func (b *BackendDownloader) getDefaultBranch() []models.ReleaseInfo {
 }
 
 func (b *BackendDownloader) fetchDefaultBranch() string {
-	resp, err := http.Get(GithubRepoURL)
+	resp, err := githubAPIGet(GithubRepoURL)
 	if err != nil {
+		log.Printf("[BackendDownloader] Could not read the default branch: %v", err)
 		return "master"
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "master"
-	}
 
 	var repo struct {
 		DefaultBranch string `json:"default_branch"`

@@ -144,6 +144,7 @@ jobs:
         env:
           CI: 'true'
           MCP_URL: 'http://127.0.0.1:9099/mcp'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export XDG_CONFIG_HOME="$RUNNER_TEMP/cupcake-config"
           mkdir -p "$XDG_CONFIG_HOME"

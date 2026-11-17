@@ -10,9 +10,9 @@ const APP_NAME: string = JSON.parse(readFileSync(join(__dirname, '..', '..', '..
 const LINEUP = `${APP_NAME}-launcher`;
 
 const RELEASES = [
-  { tag: '0.0.25', name: 'Cupcake Vanilla 0.0.25', publishedAt: '2026-11-10T09:00:00Z' },
-  { tag: '0.0.24', name: 'Cupcake Vanilla 0.0.24', publishedAt: '2026-10-28T09:00:00Z' },
-  { tag: 'master', name: 'Latest (master branch)', publishedAt: '' },
+  { tag: '0.0.25', name: 'Cupcake Vanilla 0.0.25', publishedAt: '2026-11-10T09:00:00Z', hasPortable: true },
+  { tag: '0.0.24', name: 'Cupcake Vanilla 0.0.24', publishedAt: '2026-10-28T09:00:00Z', hasPortable: true },
+  { tag: 'master', name: 'Latest (master branch)', publishedAt: '', hasPortable: false },
 ];
 
 const PYTHONS = [
@@ -118,6 +118,20 @@ test.describe('Launcher windows', () => {
     await expect(page.locator('.error-bar .error-text')).toContainText('no portable release found');
     await expect(page.locator('.btn-retry')).toBeVisible();
     await screenshot(page, LINEUP, 'setup-05-backend-failed', 'A download that failed, with the reason and a retry');
+  });
+
+  test('first run: GitHub cannot be read, so no portable version is offered', async ({ page }) => {
+    const calls = await openWindow(page, 'downloader?type=backend', { width: 500, height: 400 }, {
+      GetAvailableReleases: [{ tag: 'master', name: 'Latest (master branch)', publishedAt: '', hasPortable: false }],
+    });
+    await page.locator('.mode-row', { hasText: 'Portable' }).click();
+    await expect(page.locator('.no-releases')).toContainText('No portable release could be found');
+    await expect(page.locator('.version-section .select-row')).toHaveCount(0);
+    await expect(page.locator('.panel-footer .btn-primary')).toBeDisabled();
+    await expect(page.locator('.panel-footer .btn-primary')).toHaveAttribute('title', 'Choose a version with a portable download');
+    await screenshot(page, LINEUP, 'setup-05b-no-portable-release', 'GitHub could not be read: no portable version, with a retry');
+    await page.locator('.no-releases .btn-retry').click();
+    await expect.poll(() => called(calls, 'GetAvailableReleases').length).toBe(2);
   });
 
   test('first run: downloading the cache server', async ({ page }) => {

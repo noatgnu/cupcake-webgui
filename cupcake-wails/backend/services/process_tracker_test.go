@@ -14,7 +14,7 @@ func startSleeper(t *testing.T) *exec.Cmd {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses the POSIX sleep command")
 	}
-	cmd := exec.Command("sleep", "30")
+	cmd := exec.Command(sleepPath(t), "30")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("starting sleep: %v", err)
 	}

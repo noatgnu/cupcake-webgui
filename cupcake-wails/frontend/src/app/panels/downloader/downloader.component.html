@@ -40,10 +40,15 @@
           @if (loadingReleases()) {
             <div class="loading-row"><span class="spinner"></span> Loading...</div>
           } @else {
-            @for (release of releases(); track release.tag) {
+            @for (release of portableReleases(); track release.tag) {
               <div class="select-row" [class.active]="selectedVersion() === release.tag" (click)="selectVersion(release.tag)">
                 <span class="row-main">{{ release.tag }}</span>
                 <span class="row-meta">{{ formatDate(release.publishedAt) }}</span>
+              </div>
+            } @empty {
+              <div class="no-releases">
+                <span>No portable release could be found. GitHub may be unreachable or busy: try again in a few minutes, or use the native backend.</span>
+                <button class="btn-retry" (click)="loadReleases()">Try again</button>
               </div>
             }
           }
@@ -121,7 +126,7 @@
         {{ selectedVersion() }}
       </span>
       <div class="spacer"></div>
-      <button class="btn-primary" [disabled]="!canDownload()" (click)="startDownload()">
+      <button class="btn-primary" [disabled]="!canDownload()" [title]="downloadHint()" (click)="startDownload()">
         {{ downloadButtonLabel() }}
       </button>
     } @else if (success()) {

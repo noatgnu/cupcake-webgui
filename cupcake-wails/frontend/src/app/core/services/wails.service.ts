@@ -45,6 +45,7 @@ export interface ReleaseInfo {
   tag: string;
   name: string;
   publishedAt: string;
+  hasPortable: boolean;
 }
 
 export interface DistributionInfo {

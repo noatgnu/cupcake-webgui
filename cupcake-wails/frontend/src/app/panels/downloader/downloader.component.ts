@@ -65,6 +65,14 @@ export class DownloaderComponent implements OnInit {
     return this.distributionMode() === 'portable' ? 'Begin Download' : 'Start Orchestration';
   });
 
+  portableReleases = computed(() => this.releases().filter(release => release.hasPortable));
+
+  downloadHint = computed(() => {
+    if (this.downloadType !== 'backend' || this.canDownload()) return '';
+    if (this.distributionMode() === 'portable') return 'Choose a version with a portable download';
+    return 'Choose a branch and a Python installation';
+  });
+
   canDownload = computed(() => {
     if (this.downloading() || this.success()) return false;
     if (this.downloadType === 'valkey') return true;
@@ -126,10 +134,8 @@ export class DownloaderComponent implements OnInit {
     try {
       const releases = await this.wails.getAvailableReleases();
       this.releases.set(releases);
-      if (releases.length > 0) {
-        this.selectedVersion.set(releases[0].tag);
-        this.selectedBranch.set(releases[0].tag);
-      }
+      this.selectedVersion.set(releases.find(release => release.hasPortable)?.tag ?? '');
+      this.selectedBranch.set(releases[0]?.tag ?? '');
     } catch (error) {
       this.error.set(`Release API error: ${error}`);
     } finally {

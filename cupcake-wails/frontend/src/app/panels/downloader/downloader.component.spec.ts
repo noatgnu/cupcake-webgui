@@ -13,8 +13,8 @@ describe('DownloaderComponent', () => {
   let mockRoute: { snapshot: { queryParams: Record<string, string>; data: Record<string, string>; paramMap: ReturnType<typeof convertToParamMap> } };
 
   const mockReleases: ReleaseInfo[] = [
-    { tag: 'master', name: 'Latest (master branch)', publishedAt: '' },
-    { tag: 'v1.0.0', name: 'Release v1.0.0', publishedAt: '2025-01-01T00:00:00Z' }
+    { tag: 'master', name: 'Latest (master branch)', publishedAt: '', hasPortable: false },
+    { tag: 'v1.0.0', name: 'Release v1.0.0', publishedAt: '2025-01-01T00:00:00Z', hasPortable: true }
   ];
 
   const mockPythonCandidates: PythonCandidate[] = [
@@ -82,7 +82,7 @@ describe('DownloaderComponent', () => {
 
     it('should auto-select first release and python candidate', async () => {
       await component.ngOnInit();
-      expect(component.selectedVersion()).toBe('master');
+      expect(component.selectedVersion()).toBe('v1.0.0');
       expect(component.selectedBranch()).toBe('master');
       expect(component.selectedPython()).toBe('uv:3.12');
     });
@@ -144,7 +144,36 @@ describe('DownloaderComponent', () => {
       await component.ngOnInit();
       component.setDistributionMode('portable');
       await component.startDownload();
-      expect(mockWailsService.downloadPortableBackend).toHaveBeenCalledWith('master');
+      expect(mockWailsService.downloadPortableBackend).toHaveBeenCalledWith('v1.0.0');
+    });
+
+    it('offers no portable version when GitHub could only name a branch, and says so', async () => {
+      mockWailsService.getAvailableReleases.and.resolveTo([{ tag: 'master', name: 'Latest (master branch)', publishedAt: '', hasPortable: false }]);
+      await component.ngOnInit();
+      component.setDistributionMode('portable');
+      fixture.detectChanges();
+
+      expect(component.selectedVersion()).toBe('');
+      expect(component.canDownload()).toBeFalse();
+      expect(component.downloadHint()).toBe('Choose a version with a portable download');
+      expect(fixture.nativeElement.querySelector('.version-section .select-row')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.no-releases').textContent).toContain('No portable release could be found');
+      expect(component.selectedBranch()).toBe('master');
+    });
+
+    it('reads the releases again when asked to try again', async () => {
+      mockWailsService.getAvailableReleases.and.resolveTo([{ tag: 'master', name: 'Latest (master branch)', publishedAt: '', hasPortable: false }]);
+      await component.ngOnInit();
+      component.setDistributionMode('portable');
+      fixture.detectChanges();
+      mockWailsService.getAvailableReleases.and.resolveTo(mockReleases);
+
+      fixture.nativeElement.querySelector('.no-releases .btn-retry').click();
+      await new Promise(resolve => setTimeout(resolve));
+      fixture.detectChanges();
+
+      expect(component.selectedVersion()).toBe('v1.0.0');
+      expect(fixture.nativeElement.querySelector('.no-releases')).toBeNull();
     });
 
     it('should call setupNativeBackend for native mode', async () => {
