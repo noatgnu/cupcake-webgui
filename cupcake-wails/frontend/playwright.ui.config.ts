@@ -13,5 +13,6 @@ export default defineConfig({
     { name: 'portable-setup', testMatch: /first-run\.spec\.ts/ },
     { name: 'native-setup', testMatch: /native-setup\.spec\.ts/ },
     { name: 'workflows', testMatch: /job-workflows\.spec\.ts/, dependencies: ['portable-setup'] },
+    { name: 'desktop-sign-in', testMatch: /desktop-sign-in\.spec\.ts/ },
   ],
 });

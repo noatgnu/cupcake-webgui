@@ -37,6 +37,11 @@
       </div>
     </div>
 
+    <label class="auto-sign-in">
+      <input id="signInAutomatically" type="checkbox" [(ngModel)]="signInAutomatically" [disabled]="creating()" />
+      Sign in automatically with this account
+    </label>
+
     @if (error()) {
       <div class="msg-bar error">
         <i class="bi bi-exclamation-circle"></i>

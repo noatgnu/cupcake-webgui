@@ -1,0 +1,64 @@
+<div class="sign-in-layout">
+  <header class="panel-header">
+    <i class="bi bi-person-lock header-icon"></i>
+    <h1 class="title">Sign-in</h1>
+  </header>
+
+  <main class="panel-main">
+    @if (loading()) {
+      <div class="msg-bar"><span class="spinner"></span> Reading the sign-in settings...</div>
+    } @else {
+      <label class="choice" [class.active]="mode() === modes.SignInAutomatic" data-mode="automatic">
+        <input type="radio" name="mode" [checked]="mode() === modes.SignInAutomatic" (change)="choose(modes.SignInAutomatic)" />
+        <div class="choice-body">
+          <span class="choice-title">Sign in automatically</span>
+          <span class="choice-text">Cupcake opens signed in. Anyone using this computer account can use it.</span>
+          @if (mode() === modes.SignInAutomatic) {
+            <select id="account" class="field" [ngModel]="username()" (ngModelChange)="username.set($event); saved.set(false)">
+              <option value="" disabled>Choose an account</option>
+              @for (account of accounts(); track account) {
+                <option [value]="account">{{ account }}</option>
+              }
+            </select>
+          }
+        </div>
+      </label>
+
+      <label class="choice" [class.active]="mode() === modes.SignInLogin" data-mode="login">
+        <input type="radio" name="mode" [checked]="mode() === modes.SignInLogin" (change)="choose(modes.SignInLogin)" />
+        <div class="choice-body">
+          <span class="choice-title">Use the login screen</span>
+          <span class="choice-text">Cupcake asks for a username and password again when a sign-in runs out.</span>
+          @if (mode() === modes.SignInLogin) {
+            <div class="days-row">
+              <label for="sessionDays">A sign-in lasts</label>
+              <select id="sessionDays" class="field" [ngModel]="sessionDays()" (ngModelChange)="sessionDays.set(+$event); saved.set(false)">
+                @for (days of dayChoices; track days) {
+                  <option [value]="days">{{ days === 1 ? '1 day' : days + ' days' }}</option>
+                }
+              </select>
+            </div>
+          }
+        </div>
+      </label>
+    }
+
+    @if (error()) {
+      <div class="msg-bar error"><i class="bi bi-exclamation-circle"></i> {{ error() }}</div>
+    }
+    @if (saved()) {
+      <div class="msg-bar success"><i class="bi bi-check-circle-fill"></i> Saved. It applies from the next sign-in.</div>
+    }
+  </main>
+
+  <footer class="panel-footer">
+    <button class="btn-outline" (click)="close()" [disabled]="saving()">Close</button>
+    <div class="spacer"></div>
+    <button class="btn-primary" (click)="save()" [disabled]="!canSave() || loading()" [title]="saveHint()">
+      @if (saving()) {
+        <span class="spinner"></span>
+      }
+      Save
+    </button>
+  </footer>
+</div>

@@ -1,6 +1,9 @@
 import { Injectable, signal, Signal } from '@angular/core';
 import { Events } from '@wailsio/runtime';
 import * as App from '../../../../bindings/github.com/noatgnu/cupcake-webgui/cupcake-wails/app';
+import { SignInMode, SignInSettings } from '../../../../bindings/github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models/models';
+
+export { SignInMode, SignInSettings };
 
 export interface BackendStatus {
   service: string;
@@ -58,6 +61,12 @@ export interface CommandOutput {
   output: string;
   type: string;
 }
+
+export interface NumberedCommandOutput extends CommandOutput {
+  sequence: number;
+}
+
+const COMMAND_OUTPUT_KEPT = 1000;
 
 export interface SyncSchemasOptions {
   force?: boolean;
@@ -125,6 +134,10 @@ export class WailsService {
 
   private _commandOutput = signal<CommandOutput | null>(null);
   readonly commandOutput: Signal<CommandOutput | null> = this._commandOutput.asReadonly();
+
+  private commandSequence = 0;
+  private _commandOutputs = signal<NumberedCommandOutput[]>([]);
+  readonly commandOutputs: Signal<NumberedCommandOutput[]> = this._commandOutputs.asReadonly();
 
   private _showPythonSelection = signal<boolean>(false);
   readonly showPythonSelection: Signal<boolean> = this._showPythonSelection.asReadonly();
@@ -198,6 +211,8 @@ export class WailsService {
       const output = event.data as unknown as CommandOutput;
       if (output) {
         this._commandOutput.set(output);
+        const numbered = { ...output, sequence: ++this.commandSequence };
+        this._commandOutputs.update(outputs => [...outputs.slice(1 - COMMAND_OUTPUT_KEPT), numbered]);
       }
     });
 
@@ -293,6 +308,23 @@ export class WailsService {
   async resetPassword(username: string, newPassword: string): Promise<void> {
     if (!this.isWails) return;
     return App.ResetPassword(username, newPassword);
+  }
+
+  async getSignInSettings(): Promise<SignInSettings> {
+    if (!this.isWails) {
+      return new SignInSettings({ mode: SignInMode.SignInLogin, username: '', sessionDays: 30 });
+    }
+    return App.GetSignInSettings();
+  }
+
+  async saveSignInSettings(settings: SignInSettings): Promise<void> {
+    if (!this.isWails) return;
+    return App.SaveSignInSettings(settings);
+  }
+
+  closeSignInWindow(): void {
+    if (!this.isWails) return;
+    App.CloseSignInWindow();
   }
 
   closePasswordResetWindow(): void {

@@ -24,6 +24,8 @@ interface CommandStatus {
   options: CommandOption[];
 }
 
+const TERMINAL_LINES_KEPT = 1000;
+
 @Component({
   selector: 'app-management',
   standalone: true,
@@ -35,15 +37,15 @@ interface CommandStatus {
 export class ManagementComponent implements OnInit, OnDestroy {
   @ViewChild('terminalViewport') private terminalViewport!: ElementRef;
   private wails = inject(WailsService);
-  private lastOutputTime = 0;
+  private lastOutputSequence = 0;
 
   constructor() {
     effect(() => {
-      const output = this.wails.commandOutput();
-      if (output && Date.now() - this.lastOutputTime > 100) {
-        this.lastOutputTime = Date.now();
-        const type = output.type === 'error' ? 'error' : 'info';
-        this.addOutput(output.output, type);
+      for (const output of this.wails.commandOutputs()) {
+        if (output.sequence > this.lastOutputSequence) {
+          this.lastOutputSequence = output.sequence;
+          this.addOutput(output.output, output.type === 'error' ? 'error' : 'info');
+        }
       }
     });
   }
@@ -350,7 +352,7 @@ export class ManagementComponent implements OnInit, OnDestroy {
   }
 
   private addOutput(text: string, type: string): void {
-    this.outputLines.update(lines => [...lines, { text, type }]);
+    this.outputLines.update(lines => [...lines.slice(1 - TERMINAL_LINES_KEPT), { text, type }]);
     setTimeout(() => this.scrollToBottom(), 10);
   }
 

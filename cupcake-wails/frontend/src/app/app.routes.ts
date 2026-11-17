@@ -40,6 +40,10 @@ export const routes: Routes = [
     loadComponent: () => import('./panels/superuser/superuser.component').then(m => m.SuperuserComponent)
   },
   {
+    path: 'sign-in',
+    loadComponent: () => import('./panels/sign-in/sign-in').then(m => m.SignIn)
+  },
+  {
     path: 'password-reset',
     loadComponent: () => import('./panels/password-reset/password-reset').then(m => m.PasswordResetComponent)
   },

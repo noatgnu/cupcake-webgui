@@ -40,6 +40,7 @@ type RedisManager struct {
 	redisPort    int
 	redisProcess *os.Process
 	logCallback  func(message string, msgType string)
+	tracker      *ProcessTracker
 }
 
 func NewRedisManager(opts RedisManagerOptions) *RedisManager {
@@ -123,6 +124,8 @@ func (r *RedisManager) StartRedis() error {
 	r.redisPort = availablePort
 
 	args := []string{
+		"--bind", "127.0.0.1",
+		"--protected-mode", "yes",
 		"--port", strconv.Itoa(availablePort),
 		"--daemonize", "no",
 		"--appendonly", "yes",
@@ -141,6 +144,10 @@ func (r *RedisManager) StartRedis() error {
 	}
 
 	r.redisProcess = cmd.Process
+	redisProcess := cmd.Process
+	if r.tracker != nil {
+		r.tracker.TrackProcess(redisProcess.Pid, "redis", serverPath)
+	}
 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
@@ -158,6 +165,9 @@ func (r *RedisManager) StartRedis() error {
 
 	go func() {
 		cmd.Wait()
+		if r.tracker != nil {
+			r.tracker.UntrackProcess(redisProcess.Pid)
+		}
 		r.redisProcess = nil
 	}()
 
@@ -224,16 +234,9 @@ func (r *RedisManager) GetRedisURL() string {
 	return fmt.Sprintf("redis://127.0.0.1:%d/0", r.redisPort)
 }
 
-func (r *RedisManager) KillOrphanedRedisProcesses() {
-	if runtime.GOOS == "windows" {
-		cmd := exec.Command("taskkill", "/F", "/IM", "redis-server.exe")
-		hideWindow(cmd)
-		cmd.Run()
-	} else {
-		cmd := exec.Command("pkill", "-f", "valkey-server|redis-server")
-		hideWindow(cmd)
-		cmd.Run()
-	}
+// SetProcessTracker records the Redis server the manager starts in tracker.
+func (r *RedisManager) SetProcessTracker(tracker *ProcessTracker) {
+	r.tracker = tracker
 }
 
 func (r *RedisManager) ValkeyExists() bool {

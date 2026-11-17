@@ -16,34 +16,36 @@ import (
 )
 
 type App struct {
-	ctx                    context.Context
-	wailsApp               *application.App
-	splashWindow           *application.WebviewWindow
-	mainWindow             *application.WebviewWindow
-	pythonSelectionWindow  *application.WebviewWindow
-	downloaderWindow       *application.WebviewWindow
-	managementWindow       *application.WebviewWindow
-	debugWindow            *application.WebviewWindow
-	superuserWindow        *application.WebviewWindow
-	passwordResetWindow    *application.WebviewWindow
-	appMenu                *application.Menu
-	db                     *services.DatabaseService
-	pythonManager          *services.PythonManager
-	backendManager         *services.BackendManager
-	redisManager           *services.RedisManager
-	userManager            *services.UserManager
-	backupManager          *services.BackupManager
-	backendUpdater         *services.BackendUpdater
-	downloader             *services.DownloadManager
-	processTracker         *services.ProcessTracker
-	logHandler             *services.LogHandler
-	windowManager          *services.WindowManager
-	logFilePath            string
-	backendReady           bool
-	venvPath               string
-	userDataPath           string
-	isDev                  bool
-	initialized            chan struct{}
+	ctx                   context.Context
+	wailsApp              *application.App
+	splashWindow          *application.WebviewWindow
+	mainWindow            *application.WebviewWindow
+	pythonSelectionWindow *application.WebviewWindow
+	downloaderWindow      *application.WebviewWindow
+	managementWindow      *application.WebviewWindow
+	debugWindow           *application.WebviewWindow
+	superuserWindow       *application.WebviewWindow
+	passwordResetWindow   *application.WebviewWindow
+	signInWindow          *application.WebviewWindow
+	appMenu               *application.Menu
+	db                    *services.DatabaseService
+	pythonManager         *services.PythonManager
+	backendManager        *services.BackendManager
+	redisManager          *services.RedisManager
+	userManager           *services.UserManager
+	backupManager         *services.BackupManager
+	backendUpdater        *services.BackendUpdater
+	downloader            *services.DownloadManager
+	processTracker        *services.ProcessTracker
+	signInStore           *services.SignInStore
+	logHandler            *services.LogHandler
+	windowManager         *services.WindowManager
+	logFilePath           string
+	backendReady          bool
+	venvPath              string
+	userDataPath          string
+	isDev                 bool
+	initialized           chan struct{}
 }
 
 func NewApp() *App {
@@ -121,6 +123,7 @@ func (a *App) InitializeBackend() {
 
 	a.logHandler = services.NewLogHandler(a.userDataPath)
 	a.processTracker = services.NewProcessTracker(a.userDataPath)
+	a.signInStore = services.NewSignInStore(a.userDataPath)
 	a.pythonManager = services.NewPythonManager(a.userDataPath)
 	a.pythonManager.SetLogCallback(func(message string, msgType string) {
 		a.sendBackendLog(fmt.Sprintf("python: %s", message), msgType)
@@ -138,8 +141,11 @@ func (a *App) InitializeBackend() {
 	a.redisManager.SetLogCallback(func(message string, msgType string) {
 		a.sendBackendLog(fmt.Sprintf("redis: %s", message), msgType)
 	})
+	a.redisManager.SetProcessTracker(a.processTracker)
 
 	a.backendManager = services.NewBackendManager(a.userDataPath, a.isDev, a.redisManager)
+	a.backendManager.SetProcessTracker(a.processTracker)
+	a.backendManager.SetSignInSettings(a.signInStore.Load())
 	a.backendManager.SetLogCallback(func(message string, msgType string) {
 		a.sendBackendLog(message, msgType)
 	})
@@ -769,6 +775,75 @@ func (a *App) ResetPassword(username, newPassword string) error {
 	return a.userManager.ChangePassword(backendDir, a.venvPath, username, newPassword)
 }
 
+// GetSignInSettings returns how the app signs its user in.
+func (a *App) GetSignInSettings() (models.SignInSettings, error) {
+	if !a.WaitForInitialization(30 * time.Second) {
+		return models.SignInSettings{}, fmt.Errorf("timeout waiting for initialization")
+	}
+	return a.signInStore.Load(), nil
+}
+
+// SaveSignInSettings saves how the app signs its user in; the account for automatic sign-in must exist, and the
+// web server restarts when the length or kind of sign-in changes.
+func (a *App) SaveSignInSettings(settings models.SignInSettings) error {
+	if !a.WaitForInitialization(30 * time.Second) {
+		return fmt.Errorf("timeout waiting for initialization")
+	}
+	if settings.SessionDays == 0 {
+		settings.SessionDays = services.DefaultSessionDays
+	}
+	if err := services.ValidateSignInSettings(settings); err != nil {
+		return err
+	}
+	if settings.Mode == models.SignInAutomatic {
+		users, err := a.ListUsers()
+		if err != nil {
+			return fmt.Errorf("could not check the account: %w", err)
+		}
+		if !containsString(users, settings.Username) {
+			return fmt.Errorf("there is no account named %s", settings.Username)
+		}
+	}
+	previous := a.signInStore.Load()
+	if err := a.signInStore.Save(settings); err != nil {
+		return err
+	}
+	a.backendManager.SetSignInSettings(settings)
+	if a.backendReady && (previous.Mode != settings.Mode || previous.SessionDays != settings.SessionDays) {
+		a.sendBackendLog("Restarting the web server with the new sign-in settings...", "info")
+		if err := a.backendManager.RestartWebServer(a.getBackendPath(), a.venvPath); err != nil {
+			return fmt.Errorf("saved, but the web server did not restart: %w", err)
+		}
+	}
+	return nil
+}
+
+// GetAutomaticSignIn signs in the account chosen for automatic sign-in and returns its tokens, or nil when the
+// app uses the login screen.
+func (a *App) GetAutomaticSignIn() (*models.AutomaticSignIn, error) {
+	if !a.WaitForInitialization(30 * time.Second) {
+		return nil, fmt.Errorf("timeout waiting for initialization")
+	}
+	settings := a.signInStore.Load()
+	if settings.Mode != models.SignInAutomatic {
+		return nil, nil
+	}
+	if !a.backendReady {
+		return nil, fmt.Errorf("the backend is not running")
+	}
+	baseURL := fmt.Sprintf("http://127.0.0.1:%d", a.backendManager.GetBackendPort())
+	return services.RequestAutomaticSignIn(baseURL, a.backendManager.LauncherSecret(), settings.Username)
+}
+
+func containsString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *App) ListUsers() ([]string, error) {
 	if a.userManager == nil {
 		return nil, fmt.Errorf("user manager not initialized")
@@ -1264,6 +1339,33 @@ func (a *App) OpenPasswordResetPanel() {
 	})
 
 	a.passwordResetWindow.Show()
+}
+
+// OpenSignInPanel opens the window for choosing between automatic sign-in and the login screen.
+func (a *App) OpenSignInPanel() {
+	if a.signInWindow != nil {
+		a.signInWindow.Focus()
+		return
+	}
+
+	a.signInWindow = a.wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{Name: "sign-in"})
+	a.signInWindow.SetTitle("Sign-in")
+	a.signInWindow.SetSize(460, 420)
+	a.signInWindow.SetMinSize(420, 380)
+	a.signInWindow.SetURL("/setup/#/sign-in")
+
+	a.signInWindow.OnWindowEvent(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		a.signInWindow = nil
+	})
+
+	a.signInWindow.Show()
+}
+
+func (a *App) CloseSignInWindow() {
+	if a.signInWindow != nil {
+		a.signInWindow.Close()
+		a.signInWindow = nil
+	}
 }
 
 func (a *App) ClosePasswordResetWindow() {

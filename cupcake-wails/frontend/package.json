@@ -19,7 +19,9 @@
     "test:wails-ui": "playwright test --config=playwright.ui.config.ts --project=workflows",
     "test:wails-ui-native": "playwright test --config=playwright.ui.config.ts --project=native-setup",
     "test:wails-ui-workflows": "playwright test --config=playwright.ui.config.ts --project=workflows --no-deps",
-    "test:all": "npm run test:e2e && npm run test:integration && npm run test:setup-flows"
+    "test:screens": "playwright test --config=playwright.screens.config.ts",
+    "test:wails-ui-sign-in": "playwright test --config=playwright.ui.config.ts --project=desktop-sign-in",
+    "test:all": "npm run test:e2e && npm run test:integration && npm run test:setup-flows && npm run test:screens"
   },
   "dependencies": {
     "@angular/animations": "22.0.8",

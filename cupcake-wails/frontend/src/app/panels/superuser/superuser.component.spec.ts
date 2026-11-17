@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SuperuserComponent } from './superuser.component';
-import { WailsService } from '../../core/services/wails.service';
+import { SignInMode, WailsService } from '../../core/services/wails.service';
 
 describe('SuperuserComponent', () => {
   let component: SuperuserComponent;
@@ -10,12 +10,14 @@ describe('SuperuserComponent', () => {
   beforeEach(async () => {
     mockWailsService = jasmine.createSpyObj('WailsService', [
       'createSuperuser',
-      'dismissSuperuserCreation'
+      'dismissSuperuserCreation',
+      'saveSignInSettings'
     ], {
       isWails: false
     });
 
     mockWailsService.createSuperuser.and.resolveTo();
+    mockWailsService.saveSignInSettings.and.resolveTo();
 
     await TestBed.configureTestingModule({
       imports: [SuperuserComponent],
@@ -79,6 +81,44 @@ describe('SuperuserComponent', () => {
       component.password = 'password123';
       component.confirmPassword = 'password123';
       expect(component.isValid()).toBeTrue();
+    });
+  });
+
+  describe('automatic sign-in', () => {
+    function fillValidAccount(): void {
+      component.username = 'bench-owner';
+      component.email = 'owner@test.com';
+      component.password = 'password123';
+      component.confirmPassword = 'password123';
+    }
+
+    it('is off until the user ticks it', () => {
+      expect(component.signInAutomatically).toBeFalse();
+      expect(fixture.nativeElement.querySelector('#signInAutomatically').checked).toBeFalse();
+    });
+
+    it('keeps the login screen when it is not ticked', async () => {
+      fillValidAccount();
+      await component.create();
+      expect(mockWailsService.saveSignInSettings).not.toHaveBeenCalled();
+    });
+
+    it('signs the new account in automatically when ticked', async () => {
+      fillValidAccount();
+      component.signInAutomatically = true;
+      await component.create();
+      const saved = mockWailsService.saveSignInSettings.calls.mostRecent().args[0];
+      expect(saved.mode).toBe(SignInMode.SignInAutomatic);
+      expect(saved.username).toBe('bench-owner');
+      expect(mockWailsService.createSuperuser).toHaveBeenCalledBefore(mockWailsService.saveSignInSettings);
+    });
+
+    it('reports a failure to save the choice', async () => {
+      fillValidAccount();
+      component.signInAutomatically = true;
+      mockWailsService.saveSignInSettings.and.rejectWith('there is no account named bench-owner');
+      await component.create();
+      expect(component.error()).toContain('there is no account named bench-owner');
     });
   });
 

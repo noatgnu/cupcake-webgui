@@ -48,22 +48,22 @@ func getMainAppAssets() fs.FS {
 func getMimeType(path string) string {
 	ext := strings.ToLower(filepath.Ext(path))
 	mimeTypes := map[string]string{
-		".html": "text/html; charset=utf-8",
-		".css":  "text/css; charset=utf-8",
-		".js":   "application/javascript; charset=utf-8",
-		".mjs":  "application/javascript; charset=utf-8",
-		".json": "application/json; charset=utf-8",
-		".png":  "image/png",
-		".jpg":  "image/jpeg",
-		".jpeg": "image/jpeg",
-		".gif":  "image/gif",
-		".svg":  "image/svg+xml",
-		".ico":  "image/x-icon",
-		".woff": "font/woff",
+		".html":  "text/html; charset=utf-8",
+		".css":   "text/css; charset=utf-8",
+		".js":    "application/javascript; charset=utf-8",
+		".mjs":   "application/javascript; charset=utf-8",
+		".json":  "application/json; charset=utf-8",
+		".png":   "image/png",
+		".jpg":   "image/jpeg",
+		".jpeg":  "image/jpeg",
+		".gif":   "image/gif",
+		".svg":   "image/svg+xml",
+		".ico":   "image/x-icon",
+		".woff":  "font/woff",
 		".woff2": "font/woff2",
-		".ttf":  "font/ttf",
-		".eot":  "application/vnd.ms-fontobject",
-		".map":  "application/json",
+		".ttf":   "font/ttf",
+		".eot":   "application/vnd.ms-fontobject",
+		".map":   "application/json",
 	}
 	if mime, ok := mimeTypes[ext]; ok {
 		return mime
@@ -73,16 +73,17 @@ func getMimeType(path string) string {
 
 func newDualSPAHandler(setupFS fs.FS, mainAppFS fs.FS) http.Handler {
 	setupRoutes := map[string]bool{
-		"/splash":              true,
-		"/python-selection":    true,
-		"/backend-download":    true,
-		"/valkey-download":     true,
-		"/backend-setup":       true,
-		"/management":          true,
-		"/debug":               true,
-		"/downloader":          true,
-		"/superuser-creation":  true,
-		"/password-reset":      true,
+		"/splash":             true,
+		"/python-selection":   true,
+		"/backend-download":   true,
+		"/valkey-download":    true,
+		"/backend-setup":      true,
+		"/management":         true,
+		"/debug":              true,
+		"/downloader":         true,
+		"/superuser-creation": true,
+		"/password-reset":     true,
+		"/sign-in":            true,
 	}
 
 	isStaticAsset := func(path string) bool {
@@ -235,6 +236,9 @@ func createApplicationMenu(app *App) *application.Menu {
 	})
 	managementMenu.Add("Reset Password").OnClick(func(ctx *application.Context) {
 		app.OpenPasswordResetPanel()
+	})
+	managementMenu.Add("Sign-in").OnClick(func(ctx *application.Context) {
+		app.OpenSignInPanel()
 	})
 	managementMenu.AddSeparator()
 	managementMenu.Add("Open User Data Folder").OnClick(func(ctx *application.Context) {

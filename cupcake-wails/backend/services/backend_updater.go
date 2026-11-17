@@ -20,12 +20,11 @@ type BackendUpdater struct {
 }
 
 type UpdateOptions struct {
-	Version           string
-	CreateBackup      bool
-	PythonVersion     string
+	Version            string
+	CreateBackup       bool
+	PythonVersion      string
 	ForceReinstallDeps bool
 }
-
 
 func NewBackendUpdater(
 	userDataPath string,
@@ -125,11 +124,13 @@ func (u *BackendUpdater) Update(opts UpdateOptions) (*models.UpdateResult, error
 	if opts.CreateBackup {
 		u.log("Creating pre-update backup...", "info")
 		if err := u.createPreUpdateBackup(); err != nil {
-			u.log(fmt.Sprintf("Warning: backup creation failed: %v", err), "warn")
-		} else {
-			result.BackupCreated = true
-			u.log("Pre-update backup created successfully", "success")
+			result.Success = false
+			result.Message = fmt.Sprintf("Update cancelled: the backup before updating failed: %v", err)
+			u.log(result.Message, "error")
+			return result, err
 		}
+		result.BackupCreated = true
+		u.log("Pre-update backup created successfully", "success")
 	}
 
 	u.log("Stopping backend services...", "info")
@@ -236,12 +237,7 @@ func (u *BackendUpdater) cleanBackendPreservingData(backendPath string) error {
 		return err
 	}
 
-	preserveList := []string{
-		"db.",
-		"media",
-		"backups",
-		".env",
-	}
+	preserveList := PreservedBackendEntries(backendPath)
 
 	for _, entry := range entries {
 		name := entry.Name()
@@ -326,4 +322,16 @@ func (u *BackendUpdater) Rollback(backupPath string) error {
 
 	u.log("Rollback completed successfully", "success")
 	return nil
+}
+
+// PreservedBackendEntries are the names in the backend folder that an update keeps: the data folder with the
+// database, uploaded files and signing key, the backups, and local settings.
+func PreservedBackendEntries(backendPath string) []string {
+	return []string{
+		filepath.Base(BackendDataDir(backendPath)),
+		"db.",
+		"media",
+		"backups",
+		".env",
+	}
 }

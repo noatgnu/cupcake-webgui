@@ -85,6 +85,7 @@ type ReleaseInfo struct {
 type ProcessTracking struct {
 	PID       int       `json:"pid"`
 	Type      string    `json:"type"`
+	Marker    string    `json:"marker"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -97,19 +98,19 @@ type CommandHistory struct {
 }
 
 type OntologyCounts struct {
-	Mondo              int `json:"mondo"`
-	Uberon             int `json:"uberon"`
-	NCBI               int `json:"ncbi"`
-	ChEBI              int `json:"chebi"`
-	PSIMS              int `json:"psims"`
-	Cell               int `json:"cell"`
-	Species            int `json:"species"`
-	Unimod             int `json:"unimod"`
-	Tissue             int `json:"tissue"`
-	MSVocab            int `json:"msVocab"`
-	HumanDisease       int `json:"humanDisease"`
-	SubcellularLoc     int `json:"subcellularLoc"`
-	Total              int `json:"total"`
+	Mondo          int `json:"mondo"`
+	Uberon         int `json:"uberon"`
+	NCBI           int `json:"ncbi"`
+	ChEBI          int `json:"chebi"`
+	PSIMS          int `json:"psims"`
+	Cell           int `json:"cell"`
+	Species        int `json:"species"`
+	Unimod         int `json:"unimod"`
+	Tissue         int `json:"tissue"`
+	MSVocab        int `json:"msVocab"`
+	HumanDisease   int `json:"humanDisease"`
+	SubcellularLoc int `json:"subcellularLoc"`
+	Total          int `json:"total"`
 }
 
 type SyncSchemasOptions struct {
@@ -174,4 +175,26 @@ type UpdateResult struct {
 	PreviousVersion string `json:"previousVersion"`
 	NewVersion      string `json:"newVersion"`
 	BackupCreated   bool   `json:"backupCreated"`
+}
+
+type SignInMode string
+
+const (
+	SignInAutomatic SignInMode = "automatic"
+	SignInLogin     SignInMode = "login"
+)
+
+// SignInSettings is how the app signs its user in: automatically as Username, or through the login screen with a
+// sign-in that lasts SessionDays.
+type SignInSettings struct {
+	Mode        SignInMode `json:"mode"`
+	Username    string     `json:"username"`
+	SessionDays int        `json:"sessionDays"`
+}
+
+// AutomaticSignIn is the account signed in by the launcher, in the shape of the backend's login response.
+type AutomaticSignIn struct {
+	AccessToken  string                 `json:"access_token"`
+	RefreshToken string                 `json:"refresh_token"`
+	User         map[string]interface{} `json:"user"`
 }

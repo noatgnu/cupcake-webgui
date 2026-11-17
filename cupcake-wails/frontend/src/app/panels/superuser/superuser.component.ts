@@ -1,7 +1,7 @@
 import { Component, signal, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { WailsService } from '../../core/services/wails.service';
+import { SignInMode, SignInSettings, WailsService } from '../../core/services/wails.service';
 
 @Component({
   selector: 'app-superuser',
@@ -18,6 +18,7 @@ export class SuperuserComponent {
   email = '';
   password = '';
   confirmPassword = '';
+  signInAutomatically = false;
 
   creating = signal(false);
   error = signal<string | null>(null);
@@ -39,6 +40,11 @@ export class SuperuserComponent {
 
     try {
       await this.wails.createSuperuser(this.username, this.email, this.password);
+      if (this.signInAutomatically) {
+        await this.wails.saveSignInSettings(
+          new SignInSettings({ mode: SignInMode.SignInAutomatic, username: this.username, sessionDays: 30 })
+        );
+      }
       this.success.set(true);
       setTimeout(() => this.wails.dismissSuperuserCreation(), 1500);
     } catch (err) {

@@ -2,6 +2,8 @@ package services
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -13,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/noatgnu/cupcake-webgui/cupcake-wails/backend/models"
 )
 
 type BackendManager struct {
@@ -24,14 +28,54 @@ type BackendManager struct {
 	rqProcess      *os.Process
 	logCallback    func(message string, msgType string)
 	statusCallback func(service, status, message string)
+	tracker        *ProcessTracker
+	launcherSecret string
+	signIn         models.SignInSettings
 }
 
 func NewBackendManager(userDataPath string, isDev bool, redisManager *RedisManager) *BackendManager {
 	return &BackendManager{
-		userDataPath: userDataPath,
-		isDev:        isDev,
-		redisManager: redisManager,
-		backendPort:  8000,
+		userDataPath:   userDataPath,
+		isDev:          isDev,
+		redisManager:   redisManager,
+		backendPort:    8000,
+		launcherSecret: newLauncherSecret(),
+		signIn:         DefaultSignInSettings(),
+	}
+}
+
+func newLauncherSecret() string {
+	buffer := make([]byte, 32)
+	if _, err := rand.Read(buffer); err != nil {
+		panic(fmt.Sprintf("no randomness for the launcher secret: %v", err))
+	}
+	return hex.EncodeToString(buffer)
+}
+
+// SetProcessTracker records every process the manager starts in tracker.
+func (b *BackendManager) SetProcessTracker(tracker *ProcessTracker) {
+	b.tracker = tracker
+}
+
+// SetSignInSettings sets the sign-in settings the backend is started with.
+func (b *BackendManager) SetSignInSettings(settings models.SignInSettings) {
+	b.signIn = settings
+}
+
+// LauncherSecret is the secret the backend accepts for the launcher's automatic sign-in during this launch.
+func (b *BackendManager) LauncherSecret() string {
+	return b.launcherSecret
+}
+
+func (b *BackendManager) track(process *os.Process, processType, executable string) {
+	if b.tracker != nil {
+		b.tracker.TrackProcess(process.Pid, processType, executable)
+	}
+}
+
+func (b *BackendManager) untrack(process *os.Process) {
+	if b.tracker != nil {
+		b.tracker.UntrackProcess(process.Pid)
 	}
 }
 
@@ -179,7 +223,7 @@ multiprocessing.get_context = _patched_get_context
 import uvicorn
 uvicorn.run(
     'cupcake_vanilla.asgi_wails:application',
-    host='0.0.0.0',
+    host='127.0.0.1',
     port=%d,
     workers=1,
 )
@@ -188,7 +232,7 @@ uvicorn.run(
 	} else {
 		cmd = exec.Command(pythonPath, "-m", "uvicorn",
 			"cupcake_vanilla.asgi_wails:application",
-			"--host", "0.0.0.0",
+			"--host", "127.0.0.1",
 			"--port", fmt.Sprintf("%d", availablePort),
 			"--workers", "1",
 		)
@@ -206,6 +250,8 @@ uvicorn.run(
 	}
 
 	b.djangoProcess = cmd.Process
+	djangoProcess := cmd.Process
+	b.track(djangoProcess, "django", pythonPath)
 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
@@ -223,6 +269,7 @@ uvicorn.run(
 
 	go func() {
 		cmd.Wait()
+		b.untrack(djangoProcess)
 		b.djangoProcess = nil
 	}()
 
@@ -282,6 +329,8 @@ runpy.run_path('manage.py', run_name='__main__')
 	}
 
 	b.rqProcess = cmd.Process
+	rqProcess := cmd.Process
+	b.track(rqProcess, "rqworker", pythonPath)
 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
@@ -299,6 +348,7 @@ runpy.run_path('manage.py', run_name='__main__')
 
 	go func() {
 		cmd.Wait()
+		b.untrack(rqProcess)
 		b.rqProcess = nil
 	}()
 
@@ -373,8 +423,6 @@ func (b *BackendManager) findAvailablePort(startPort int) int {
 func (b *BackendManager) getBackendEnv(backendDir string) []string {
 	env := os.Environ()
 
-	secretKey := "development-secret-key-change-in-production"
-	dbPath := filepath.Join(backendDir, "db.sqlite3")
 	mediaPath := MediaRoot(backendDir)
 	backupPath := filepath.Join(backendDir, "backups")
 
@@ -385,11 +433,9 @@ func (b *BackendManager) getBackendEnv(backendDir string) []string {
 
 	customEnv := map[string]string{
 		"DJANGO_SETTINGS_MODULE":        "cupcake_vanilla.settings_wails",
-		"SECRET_KEY":                    secretKey,
 		"DEBUG":                         debugValue,
 		"WAILS_DEBUG":                   debugValue,
 		"ALLOWED_HOSTS":                 "localhost,127.0.0.1",
-		"DATABASE_URL":                  fmt.Sprintf("sqlite:///%s", dbPath),
 		"REDIS_URL":                     b.redisManager.GetRedisURL(),
 		"REDIS_HOST":                    "localhost",
 		"REDIS_PORT":                    fmt.Sprintf("%d", b.redisManager.GetRedisPort()),
@@ -403,6 +449,9 @@ func (b *BackendManager) getBackendEnv(backendDir string) []string {
 		"ENABLE_CUPCAKE_SALTED_CARAMEL": "true",
 		"PYTHONDONTWRITEBYTECODE":       "1",
 		"PYTHONUNBUFFERED":              "1",
+	}
+	for key, value := range signInEnvironment(b.signIn, b.launcherSecret) {
+		customEnv[key] = value
 	}
 
 	for key, value := range customEnv {
@@ -511,25 +560,31 @@ runpy.run_path('manage.py', run_name='__main__')
 	return nil
 }
 
+// KillOrphanedProcesses stops the backend, worker and Redis processes a previous run of the app left behind;
+// no other process on the computer is touched.
 func (b *BackendManager) KillOrphanedProcesses() {
-	b.log("Cleaning up orphaned processes...", "info")
-
-	if b.redisManager != nil {
-		b.redisManager.KillOrphanedRedisProcesses()
+	if b.tracker == nil {
+		return
 	}
-
-	if runtime.GOOS == "windows" {
-		cmd := exec.Command("taskkill", "/F", "/IM", "python.exe")
-		hideWindow(cmd)
-		cmd.Run()
-	} else {
-		cmd1 := exec.Command("pkill", "-f", "uvicorn cupcake_vanilla.asgi_wails")
-		hideWindow(cmd1)
-		cmd1.Run()
-		cmd2 := exec.Command("pkill", "-f", "rqworker")
-		hideWindow(cmd2)
-		cmd2.Run()
+	if stopped := b.tracker.KillOrphanedProcesses(); stopped > 0 {
+		b.log(fmt.Sprintf("Stopped %d process(es) left behind by the previous run", stopped), "info")
 	}
+}
+
+// RestartWebServer restarts the web server and worker, which picks up changed sign-in settings.
+func (b *BackendManager) RestartWebServer(backendDir, pythonPath string) error {
+	if b.rqProcess != nil {
+		b.stopProcess(b.rqProcess, "RQ worker")
+		b.rqProcess = nil
+	}
+	if b.djangoProcess != nil {
+		b.stopProcess(b.djangoProcess, "Django server")
+		b.djangoProcess = nil
+	}
+	if err := b.StartDjangoServer(backendDir, pythonPath); err != nil {
+		return err
+	}
+	return b.StartRQWorker(backendDir, pythonPath)
 }
 
 func (b *BackendManager) GetSchemaCount(backendDir, pythonPath string) (int, error) {

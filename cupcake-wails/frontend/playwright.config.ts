@@ -4,7 +4,7 @@ const E2E_PORT = 4210;
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['**/integration/**', '**/ui/**'],
+  testIgnore: ['**/integration/**', '**/ui/**', '**/screens/**'],
   fullyParallel: false,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,

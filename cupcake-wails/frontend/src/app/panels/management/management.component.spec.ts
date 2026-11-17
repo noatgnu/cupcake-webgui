@@ -1,13 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ManagementComponent } from './management.component';
-import { WailsService, CommandOutput, SyncSchemasOptions, LoadColumnTemplatesOptions, LoadOntologiesOptions, BackupInfo } from '../../core/services/wails.service';
+import { WailsService, NumberedCommandOutput, SyncSchemasOptions, LoadColumnTemplatesOptions, LoadOntologiesOptions, BackupInfo } from '../../core/services/wails.service';
 import { signal, WritableSignal } from '@angular/core';
 
 describe('ManagementComponent', () => {
   let component: ManagementComponent;
   let fixture: ComponentFixture<ManagementComponent>;
   let mockWailsService: jasmine.SpyObj<WailsService>;
-  let commandOutputSignal: WritableSignal<CommandOutput | null>;
+  let commandOutputSignal: WritableSignal<NumberedCommandOutput[]>;
 
   const mockOntologyCounts = {
     psims: 100,
@@ -23,7 +23,7 @@ describe('ManagementComponent', () => {
   ];
 
   beforeEach(async () => {
-    commandOutputSignal = signal<CommandOutput | null>(null);
+    commandOutputSignal = signal<NumberedCommandOutput[]>([]);
 
     mockWailsService = jasmine.createSpyObj('WailsService', [
       'getSchemaCount',
@@ -42,7 +42,7 @@ describe('ManagementComponent', () => {
       'openBackupFolder',
       'importInitialDatabase'
     ], {
-      commandOutput: commandOutputSignal.asReadonly(),
+      commandOutputs: commandOutputSignal.asReadonly(),
       isWails: false
     });
 
@@ -244,16 +244,41 @@ describe('ManagementComponent', () => {
   describe('command output signal', () => {
     it('should add output from service', () => {
       fixture.detectChanges();
-      commandOutputSignal.set({ command: 'test', output: 'Test output', type: 'info' });
+      commandOutputSignal.set([{ command: 'test', output: 'Test output', type: 'info', sequence: 1 }]);
       fixture.detectChanges();
 
       const lines = component.outputLines();
       expect(lines.some(l => l.text === 'Test output')).toBeTrue();
     });
 
+    it('keeps every line that arrives at once, in order, and shows each only once', () => {
+      fixture.detectChanges();
+      commandOutputSignal.set([
+        { command: 'sync-schemas', output: 'first', type: 'info', sequence: 1 },
+        { command: 'sync-schemas', output: 'second', type: 'info', sequence: 2 },
+        { command: 'sync-schemas', output: 'third', type: 'info', sequence: 3 },
+      ]);
+      fixture.detectChanges();
+      commandOutputSignal.update(lines => [...lines, { command: 'sync-schemas', output: 'fourth', type: 'info', sequence: 4 }]);
+      fixture.detectChanges();
+
+      const texts = component.outputLines().map(line => line.text);
+      expect(texts.filter(text => ['first', 'second', 'third', 'fourth'].includes(text))).toEqual(['first', 'second', 'third', 'fourth']);
+    });
+
+    it('keeps the terminal to its last 1000 lines', () => {
+      fixture.detectChanges();
+      commandOutputSignal.set(Array.from({ length: 1200 }, (_, i) => ({ command: 'load', output: `line ${i + 1}`, type: 'info', sequence: i + 1 })));
+      fixture.detectChanges();
+
+      const lines = component.outputLines();
+      expect(lines.length).toBe(1000);
+      expect(lines[lines.length - 1].text).toBe('line 1200');
+    });
+
     it('should handle error type output', () => {
       fixture.detectChanges();
-      commandOutputSignal.set({ command: 'test', output: 'Error message', type: 'error' });
+      commandOutputSignal.set([{ command: 'test', output: 'Error message', type: 'error', sequence: 1 }]);
       fixture.detectChanges();
 
       const lines = component.outputLines();
