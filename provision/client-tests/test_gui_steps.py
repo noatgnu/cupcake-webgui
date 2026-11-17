@@ -7,7 +7,9 @@ steps-cupcake/, named <task>-<number>-<step>. Anything a test creates is removed
 CUPCAKE_ALLOW_WRITES=1 and Chromium for Playwright.
 """
 
+import csv
 import re
+from pathlib import Path
 
 import pytest
 from browser_support import Screen
@@ -243,9 +245,33 @@ def test_writing_a_protocol_and_running_it_as_a_session(owner_cupcake, lab, api_
                 owner.delete(api_url + f"protocols/{protocol['id']}/", timeout=60)
 
 
+EXAMPLE_SDRF = Path(__file__).parent / "examples" / "PXD019185_PXD018883.sdrf.tsv"
+PER_SAMPLE_COLUMNS = {"source name", "assay name", "comment[data file]"}
+STAFF_ONLY_COLUMNS = {"comment[instrument]", "comment[data file]", "comment[fraction identifier]", "comment[technical replicate]"}
+
+
+def example_sdrf_columns():
+    """The columns of the example SDRF file, named and typed as the SDRF import does, with its first sample's values."""
+    with EXAMPLE_SDRF.open(newline="") as handle:
+        rows = csv.reader(handle, delimiter="\t")
+        headers, first = next(rows), next(rows)
+    columns = []
+    for header, value in zip(headers, first):
+        name = header.strip().lower()
+        if "[" in name and "]" in name:
+            kind = name.split("[")[0].strip()
+        else:
+            kind = "source_name" if name == "source name" else "special"
+        column = {"name": name, "type": kind, "staff_only": name in STAFF_ONLY_COLUMNS}
+        if name not in PER_SAMPLE_COLUMNS:
+            column["value"] = value.strip()
+        columns.append(column)
+    return columns
+
+
 @pytest.fixture
 def job_setup(lab, api_url, cleanup):
-    """A lab group the session owner manages, with a metadata table template for its jobs."""
+    """A lab group the session owner manages, with a metadata table template made from an example SDRF file."""
     owner = lab["owner"]
     group = created(owner.post(api_url + "lab-groups/", json={"name": unique("proteomics core")}, timeout=30), "lab group")
     cleanup(f"lab-groups/{group['id']}/", owner)
@@ -258,6 +284,9 @@ def job_setup(lab, api_url, cleanup):
         "table template",
     )
     cleanup(f"metadata-table-templates/{template['id']}/", owner)
+    for column in example_sdrf_columns():
+        added = owner.post(api_url + f"metadata-table-templates/{template['id']}/add_column/", json={"column_data": column}, timeout=30)
+        assert added.status_code == 200, f"adding {column['name']} to the template failed: {added.status_code} {added.text[:200]}"
     return {"group": group, "template": template}
 
 
@@ -315,6 +344,13 @@ def test_submitting_an_instrument_job_through_the_wizard(owner_cupcake, lab, job
             tab.page.wait_for_timeout(500)
         assert jobs and jobs[0].get("status") == "submitted", f"the job was not submitted: {jobs}"
         tab.step("job-07-submitted", "The job after it was submitted", keep_notifications=True)
+        table_title = tab.page.get_by_text(f"{job_title} - Metadata").filter(visible=True).last
+        table_title.evaluate("element => element.scrollIntoView({block: 'start'})")
+        tab.page.locator("label[for='filterStaff']").filter(visible=True).first.click()
+        expect(tab.page.locator("th", has_text="comment[instrument]").filter(visible=True)).to_have_count(1)
+        expect(tab.page.locator("th", has_text="characteristics[organism]").filter(visible=True)).to_have_count(0)
+        table_title.evaluate("element => element.scrollIntoView({block: 'start'})")
+        tab.step("job-08-staff-columns", "The submitted job's metadata table showing only the columns staff fill in")
     finally:
         for job in results(owner.get(api_url + "instrument-jobs/", params={"search": job_title, "limit": 10}, timeout=30)):
             if job.get("job_name") == job_title:

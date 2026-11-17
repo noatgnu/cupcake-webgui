@@ -42,7 +42,7 @@ def test_restarting_the_backend_brings_it_back(api, api_url):
     deadline = time.monotonic() + RESTART_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         try:
-            answer = requests.get(api_url + "appliance/network-info/", timeout=5)
+            answer = requests.get(api_url + "appliance/network-info/", timeout=3)
             up = answer.status_code == 200
             if answer.status_code == 503 and answer.headers.get("content-type", "").startswith("application/json"):
                 maintenance_reply = maintenance_reply or answer.json().get("maintenance") is True
@@ -51,7 +51,7 @@ def test_restarting_the_backend_brings_it_back(api, api_url):
         went_down = went_down or not up
         if up and went_down:
             break
-        time.sleep(2)
+        time.sleep(0.5)
     assert went_down, "the backend never stopped answering, so it did not restart"
     assert up, f"the backend did not answer again within {RESTART_TIMEOUT_SECONDS} s"
     assert maintenance_reply, "while the backend was down, nginx did not answer with the maintenance reply"

@@ -2,9 +2,25 @@
 
 import json
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import expect
 
 TIMEOUT_MS = 30000
+NETWORK_IDLE_MS = 10000
+LOADING_INDICATORS = ".spinner-border, .spinner-grow, [aria-busy='true']"
+
+PAINTED_SCRIPT = """
+async () => {
+  await document.fonts.ready;
+  const images = [...document.images].filter(image => image.offsetParent !== null && !image.complete);
+  await Promise.all(images.map(image => new Promise(done => { image.onload = image.onerror = done; })));
+  const finite = document.getAnimations().filter(
+    animation => animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity
+  );
+  await Promise.all(finite.map(animation => animation.finished.catch(() => undefined)));
+  await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+}
+"""
 VIEWPORT = {"width": 1440, "height": 900}
 
 TOKENS_SCRIPT = """
@@ -13,6 +29,20 @@ localStorage.setItem('ccvRefreshToken', %s);
 """
 
 expect.set_options(timeout=TIMEOUT_MS)
+
+
+def settle(page, busy_ok=False):
+    """
+    Wait until the page has finished loading: requests answered, loading indicators gone, images and fonts loaded
+    and transitions finished. With busy_ok, loading indicators may stay on screen.
+    """
+    try:
+        page.wait_for_load_state("networkidle", timeout=NETWORK_IDLE_MS)
+    except PlaywrightError:
+        pass
+    if not busy_ok:
+        expect(page.locator(LOADING_INDICATORS).filter(visible=True)).to_have_count(0)
+    page.evaluate(PAINTED_SCRIPT)
 
 
 class Screen:
@@ -46,23 +76,25 @@ class Screen:
         self.page.wait_for_load_state("networkidle")
         assert not self.failures, f"/{path} had failed requests: {self.failures}"
 
-    def screenshot(self, name, caption):
-        """Save the screen for the manual after closing notifications, when screenshots are turned on."""
+    def screenshot(self, name, caption, busy_ok=False):
+        """Save the screen for the manual once it has loaded and its notifications are closed."""
         notifications = self.page.locator(".toast-container ngb-toast")
         for close in notifications.locator(".btn-close").all():
             if close.is_visible():
                 close.click()
         expect(notifications).to_have_count(0)
+        settle(self.page, busy_ok)
         self.screenshots(self.page, self.folder, name, caption)
 
     def close(self):
         self.context.close()
 
-    def step(self, name, caption, keep_notifications=False):
+    def step(self, name, caption, keep_notifications=False, busy_ok=False):
         """Save one step of a workflow for the manual; notifications are closed unless the step is about them."""
         if keep_notifications:
             expect(self.page.locator(".toast-container ngb-toast.showing")).to_have_count(0)
+            settle(self.page, busy_ok)
             self.screenshots(self.page, self.folder, name, caption)
         else:
-            self.screenshot(name, caption)
+            self.screenshot(name, caption, busy_ok)
 

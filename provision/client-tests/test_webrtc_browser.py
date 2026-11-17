@@ -25,6 +25,7 @@ import struct
 from urllib.parse import urlsplit
 
 import pytest
+from browser_support import settle
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect, sync_playwright
 from support import created, lab, unique  # noqa: F401
@@ -198,6 +199,7 @@ class Person:
             expect(notifications).to_have_count(0)
         else:
             expect(self.page.locator(".toast-container ngb-toast.showing")).to_have_count(0)
+        settle(self.page)
         self.screenshots(self.page, self.folder, name, caption)
 
     def _record_failure(self, response):
