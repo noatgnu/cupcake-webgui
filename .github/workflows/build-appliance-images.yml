@@ -2347,12 +2347,10 @@ jobs:
           fi
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 
-          provision/mirror/mirror-rsync.sh mirror/cupcake/ cupcake/
-
           if [ "$PRERELEASE" != "true" ]; then
-            echo "$TAG" > mirror/LATEST
-            provision/mirror/mirror-rsync.sh mirror/LATEST cupcake/LATEST
+            echo "$TAG" > mirror/cupcake/LATEST
           fi
+          provision/mirror/mirror-rsync.sh mirror/cupcake/ cupcake/
 
           if [ -z "$MIRROR_URL" ]; then
             echo "Uploaded $TAG to the mirror; set the MIRROR_URL variable to verify and link it" >> "$GITHUB_STEP_SUMMARY"
