@@ -5,11 +5,18 @@
 # Reads MIRROR_SSH_HOST, MIRROR_SSH_KEY and MIRROR_HOST_KEY, and optionally MIRROR_PORT, from the
 # environment. Files arrive world-readable so the nginx container can serve them.
 #
-# Usage: mirror-rsync.sh <source> <destination>
+# SOURCE must be a folder: replacing a single file on the mirror fails, so files are uploaded inside a
+# folder whose layout matches DESTINATION.
+#
+# Usage: mirror-rsync.sh <source folder>/ <destination folder>/
 set -euo pipefail
 
 SOURCE="${1:?source required}"
 DESTINATION="${2:?destination required}"
+if [ ! -d "$SOURCE" ]; then
+    echo "mirror-rsync.sh: $SOURCE is not a folder; upload files inside a folder" >&2
+    exit 2
+fi
 : "${MIRROR_SSH_HOST:?MIRROR_SSH_HOST required}"
 : "${MIRROR_SSH_KEY:?MIRROR_SSH_KEY required}"
 : "${MIRROR_HOST_KEY:?MIRROR_HOST_KEY required}"
