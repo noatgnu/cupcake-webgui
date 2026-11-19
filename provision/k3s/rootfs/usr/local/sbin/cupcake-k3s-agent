@@ -1,0 +1,24 @@
+#!/bin/bash
+# Finds the control plane named in cupcake-k3s.txt and runs the k3s agent against it.
+set -euo pipefail
+
+SERVER=$(sed -n 's/^SERVER=//p' /var/lib/cupcake-k3s/agent.conf)
+mapfile -t NODE_ARGS < <(/usr/local/sbin/cupcake-k3s-node-args)
+WAIT="${CUPCAKE_K3S_RESOLVE_SECONDS:-600}"
+
+if [[ "$SERVER" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+  ADDRESS="$SERVER"
+else
+  ADDRESS=""
+  deadline=$(( $(date +%s) + WAIT ))
+  until ADDRESS=$(getent ahostsv4 "$SERVER" | awk 'NR == 1 { print $1 }') && [ -n "$ADDRESS" ]; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "cupcake-k3s: cannot find the control plane $SERVER"
+      exit 1
+    fi
+    sleep 5
+  done
+fi
+
+echo "cupcake-k3s: joining the control plane $SERVER at $ADDRESS"
+exec /usr/local/bin/k3s agent --server "https://$ADDRESS:6443" "${NODE_ARGS[@]}"

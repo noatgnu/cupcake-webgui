@@ -1,0 +1,325 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cupcake-master
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cupcake-master
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: cupcake-master
+  namespace: cupcake-master
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+type: Opaque
+stringData:
+  SECRET_KEY: '@@SECRET_KEY@@'
+  FERNET_KEY: '@@FERNET_KEY@@'
+  HASH_KEY: '@@HASH_KEY@@'
+  POSTGRES_PASSWORD: '@@POSTGRES_PASSWORD@@'
+  REDIS_PASSWORD: '@@REDIS_PASSWORD@@'
+  SUPERUSER_EMAIL: '@@ADMIN_EMAIL@@'
+  SUPERUSER_PASSWORD: '@@ADMIN_PASSWORD@@'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+data:
+  ALLOWED_HOSTS: '@@HOST@@,localhost,127.0.0.1'
+  CSRF_TRUSTED_ORIGINS: https://@@HOST@@
+  USE_X_FORWARDED_PROTO: 'True'
+  BASE_DOMAIN: local
+  REDIS_HOST: valkey
+  STORAGE_CLASS: local-path
+  BACKUP_ROOT: /backups
+  INSTANCE_DEFAULT_IMAGE_TAG: '@@IMAGE_TAG@@'
+  MODEL_CACHE_NFS_IMAGE: ghcr.io/noatgnu/cupcake-nfs-server:@@IMAGE_TAG@@
+  MODEL_CACHE_SIZE_GI: '10'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: cupcake-master
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backups
+  namespace: cupcake-master
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: cupcake-master
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: 'true'
+      containers:
+      - name: postgres
+        image: docker.io/library/postgres:17-alpine
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_DB
+          value: cupcake_master
+        - name: POSTGRES_USER
+          value: cupcake_master
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cupcake-master
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - cupcake_master
+            - -d
+            - cupcake_master
+          periodSeconds: 5
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: cupcake-master
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valkey
+  namespace: cupcake-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: valkey
+  template:
+    metadata:
+      labels:
+        app: valkey
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: 'true'
+      containers:
+      - name: valkey
+        image: docker.io/valkey/valkey:8-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - exec valkey-server --requirepass "$REDIS_PASSWORD"
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cupcake-master
+              key: REDIS_PASSWORD
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey
+  namespace: cupcake-master
+spec:
+  selector:
+    app: valkey
+  ports:
+  - port: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: cupcake-master
+  template:
+    metadata:
+      labels:
+        app: cupcake-master
+    spec:
+      serviceAccountName: cupcake-master
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: 'true'
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: wait-for-postgres
+        image: docker.io/library/postgres:17-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - until pg_isready -h postgres -U cupcake_master; do sleep 2; done
+      - name: migrate
+        image: '@@MASTER_IMAGE@@'
+        imagePullPolicy: Never
+        args:
+        - migrate
+        envFrom:
+        - configMapRef:
+            name: cupcake-master
+        - secretRef:
+            name: cupcake-master
+        env:
+        - name: DATABASE_URL
+          value: postgres://cupcake_master:$(POSTGRES_PASSWORD)@postgres:5432/cupcake_master
+      containers:
+      - name: web
+        image: '@@MASTER_IMAGE@@'
+        imagePullPolicy: Never
+        args:
+        - web
+        envFrom:
+        - configMapRef:
+            name: cupcake-master
+        - secretRef:
+            name: cupcake-master
+        env:
+        - name: DATABASE_URL
+          value: postgres://cupcake_master:$(POSTGRES_PASSWORD)@postgres:5432/cupcake_master
+        ports:
+        - containerPort: 8000
+        readinessProbe:
+          tcpSocket:
+            port: 8000
+          periodSeconds: 5
+        volumeMounts:
+        - name: backups
+          mountPath: /backups
+      - name: worker
+        image: '@@MASTER_IMAGE@@'
+        imagePullPolicy: Never
+        args:
+        - worker
+        envFrom:
+        - configMapRef:
+            name: cupcake-master
+        - secretRef:
+            name: cupcake-master
+        env:
+        - name: DATABASE_URL
+          value: postgres://cupcake_master:$(POSTGRES_PASSWORD)@postgres:5432/cupcake_master
+        volumeMounts:
+        - name: backups
+          mountPath: /backups
+      - name: scheduler
+        image: '@@MASTER_IMAGE@@'
+        imagePullPolicy: Never
+        args:
+        - scheduler
+        envFrom:
+        - configMapRef:
+            name: cupcake-master
+        - secretRef:
+            name: cupcake-master
+        env:
+        - name: DATABASE_URL
+          value: postgres://cupcake_master:$(POSTGRES_PASSWORD)@postgres:5432/cupcake_master
+      volumes:
+      - name: backups
+        persistentVolumeClaim:
+          claimName: backups
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+spec:
+  selector:
+    app: cupcake-master
+  ports:
+  - port: 80
+    targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cupcake-master
+  namespace: cupcake-master
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - '@@HOST@@'
+  rules:
+  - host: '@@HOST@@'
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: cupcake-master
+            port:
+              number: 80

@@ -1,0 +1,13 @@
+#!/bin/bash
+# On a network without a default route, routes multicast for mDNS and prints the k3s arguments that name this node's address.
+set -euo pipefail
+
+if [ -n "$(ip -4 route show default)" ]; then
+  exit 0
+fi
+read -r IFACE ADDRESS < <(ip -4 -o addr show scope global | awk '{ split($4, a, "/"); print $2, a[1]; exit }') || true
+if [ -z "${ADDRESS:-}" ]; then
+  exit 0
+fi
+ip route replace 224.0.0.0/4 dev "$IFACE" >&2 || true
+printf -- '--node-ip=%s\n--flannel-iface=%s\n' "$ADDRESS" "$IFACE"

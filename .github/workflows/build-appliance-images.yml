@@ -7,7 +7,7 @@ on:
         description: 'Image type'
         type: choice
         default: 'both'
-        options: [vm, rpi, both]
+        options: [vm, rpi, both, k3s]
       backend_ref:
         description: 'Backend branch/tag (cupcake_vanilla)'
         type: string
@@ -24,6 +24,18 @@ on:
         description: 'Build the RPi image natively on an ARM runner; untick to build under QEMU on x86'
         type: boolean
         default: true
+      k3s_version:
+        description: 'k3s release for the k3s node image'
+        type: string
+        default: 'v1.36.6+k3s1'
+      k3s_preload_tag:
+        description: 'Cupcake container image tag to preload into the k3s node image: latest, a release tag, or none'
+        type: string
+        default: 'latest'
+      master_ref:
+        description: 'cupcake-master branch or tag (GitLab) to run on the k3s control plane'
+        type: string
+        default: 'main'
   workflow_call:
     inputs:
       image_type:
@@ -41,6 +53,15 @@ on:
       native_arm:
         type: boolean
         default: true
+      k3s_version:
+        type: string
+        default: 'v1.36.6+k3s1'
+      k3s_preload_tag:
+        type: string
+        default: 'latest'
+      master_ref:
+        type: string
+        default: 'main'
   release:
     types: [published]
 
@@ -51,7 +72,7 @@ permissions:
 jobs:
   build-frontend:
     name: Pre-build Frontends
-    if: github.event_name == 'release' || inputs.image_type != 'vm'
+    if: github.event_name == 'release' || (inputs.image_type != 'vm' && inputs.image_type != 'k3s')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,6 +127,7 @@ jobs:
 
   build-db:
     name: Build seeded database
+    if: github.event_name == 'release' || inputs.image_type != 'k3s'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -289,7 +311,7 @@ jobs:
   build-vm:
     name: VM Image (${{ matrix.distro }}, amd64)
     if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.image_type != 'rpi') ||
+      (github.event_name == 'workflow_dispatch' && inputs.image_type != 'rpi' && inputs.image_type != 'k3s') ||
       (github.event_name == 'release' && needs.mirror-check.outputs.available == 'true')
     needs: [build-db, mirror-check]
     runs-on: ubuntu-24.04
@@ -1121,7 +1143,7 @@ jobs:
 
   build-rpi:
     name: RPi Image
-    if: github.event_name == 'release' || inputs.image_type != 'vm'
+    if: github.event_name == 'release' || (inputs.image_type != 'vm' && inputs.image_type != 'k3s')
     needs: [build-frontend, build-db]
     runs-on: ${{ (github.event_name == 'release' || inputs.native_arm) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     env:
@@ -2044,6 +2066,165 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+  build-k3s-rpi:
+    name: RPi k3s node image
+    if: github.event_name == 'release' || inputs.image_type == 'k3s'
+    runs-on: ${{ (github.event_name == 'release' || inputs.native_arm) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 150
+    env:
+      NATIVE_ARM: ${{ (github.event_name == 'release' || inputs.native_arm) && 'true' || 'false' }}
+      K3S_VERSION: ${{ inputs.k3s_version || 'v1.36.6+k3s1' }}
+      PRELOAD_TAG: ${{ inputs.k3s_preload_tag || 'latest' }}
+      MASTER_REF: ${{ inputs.master_ref || 'main' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/lib/python*
+          sudo apt-get clean
+          df -h
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          if [ "$NATIVE_ARM" = "true" ]; then
+            ARCH_PACKAGES=""
+          else
+            ARCH_PACKAGES="qemu-user-static binfmt-support"
+          fi
+          sudo apt-get install -y \
+            coreutils quilt debootstrap zerofree zip dosfstools \
+            libarchive-tools rsync xz-utils file git curl bc gpg pigz zstd \
+            arch-test debian-archive-keyring qemu-utils $ARCH_PACKAGES
+
+      - name: Enable ARM64 emulation
+        if: env.NATIVE_ARM != 'true'
+        run: |
+          sudo modprobe binfmt_misc
+          sudo update-binfmts --enable qemu-aarch64 || true
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Download k3s and the images to preload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$PRELOAD_TAG" = latest ]; then
+            PRELOAD_TAG=$(gh api repos/noatgnu/cupcake_vanilla/releases/latest --jq .tag_name)
+          fi
+          echo "k3s ${K3S_VERSION}; Cupcake images ${PRELOAD_TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
+          provision/k3s/fetch-k3s.sh "$K3S_VERSION" arm64 k3s-build/k3s
+          provision/k3s/fetch-images.sh "$PRELOAD_TAG" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$PRELOAD_TAG" != none ]; then
+            provision/k3s/build-master-image.sh "$MASTER_REF" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          cat k3s-build/images/versions.env 2>/dev/null || true
+          du -sh k3s-build/*
+
+      - name: Clone pi-gen
+        run: git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Patch pi-gen for the build host
+        run: |
+          if [ "$NATIVE_ARM" = "true" ]; then
+            sed -i -E '/^qemu-[a-z0-9_]+:qemu-user-(binfmt|static)$/d' pi-gen/depends
+          else
+            sed -i -E 's/^qemu-[a-z0-9_]+:qemu-user-binfmt$/qemu-aarch64-static:qemu-user-static/' pi-gen/depends
+          fi
+          if grep -q "qemu-user-binfmt" pi-gen/depends; then
+            echo "pi-gen/depends still requires qemu-user-binfmt; update the patch:"
+            grep -n "qemu" pi-gen/depends
+            exit 1
+          fi
+          cat >> pi-gen/stage0/prerun.sh << 'SCRIPT'
+          mkdir -p "${ROOTFS_DIR}/usr/share/keyrings"
+          cp /usr/share/keyrings/debian-archive-keyring.gpg \
+            "${ROOTFS_DIR}/usr/share/keyrings/debian-archive-keyring.pgp"
+          SCRIPT
+
+      - name: Create the k3s stage
+        run: |
+          mkdir -p pi-gen/stage2k/00-install-k3s
+          cat > pi-gen/stage2k/prerun.sh << 'EOF'
+          #!/bin/bash -e
+          if [ ! -d "${ROOTFS_DIR}" ]; then
+            copy_previous
+          fi
+          EOF
+          cat > pi-gen/stage2k/00-install-k3s/00-run.sh << EOF
+          #!/bin/bash -e
+          "$GITHUB_WORKSPACE/provision/k3s/install-rootfs.sh" "\${ROOTFS_DIR}" "$GITHUB_WORKSPACE/k3s-build/k3s" "$GITHUB_WORKSPACE/k3s-build/images"
+          CMDLINE="\${ROOTFS_DIR}/boot/firmware/cmdline.txt"
+          grep -q cgroup_enable=memory "\$CMDLINE" || sed -i '1 s/\$/ cgroup_memory=1 cgroup_enable=memory/' "\$CMDLINE"
+          cat "\$CMDLINE"
+          on_chroot < "$GITHUB_WORKSPACE/provision/k3s/configure-chroot.sh"
+          EOF
+          chmod +x pi-gen/stage2k/prerun.sh pi-gen/stage2k/00-install-k3s/00-run.sh
+          cat pi-gen/stage2k/00-install-k3s/00-run.sh
+          echo "IMG_SUFFIX=-k3s" > pi-gen/stage2k/EXPORT_IMAGE
+          rm -f pi-gen/stage2/EXPORT_IMAGE
+          touch pi-gen/stage3/SKIP pi-gen/stage4/SKIP pi-gen/stage5/SKIP
+          cat > pi-gen/config << 'CFGEOF'
+          IMG_NAME=cupcake-pi
+          RELEASE=trixie
+          DEPLOY_COMPRESSION=xz
+          COMPRESSION_LEVEL=9
+          LOCALE_DEFAULT=en_US.UTF-8
+          TARGET_HOSTNAME=cupcake-k3s
+          KEYBOARD_KEYMAP=gb
+          KEYBOARD_LAYOUT="English (UK)"
+          TIMEZONE_DEFAULT=UTC
+          FIRST_USER_NAME=cupcake
+          FIRST_USER_PASS=cupcake123
+          ENABLE_SSH=1
+          STAGE_LIST="stage0 stage1 stage2 stage2k"
+          BOOTSTRAP_KEYRING=debian-archive-keyring
+          CFGEOF
+
+      - name: Build
+        timeout-minutes: 120
+        run: |
+          cd pi-gen
+          if [ "$NATIVE_ARM" != "true" ]; then
+            export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
+          fi
+          sudo -E USE_DOCKER=0 ./build.sh
+
+      - name: Check the image contents
+        run: |
+          ROOTFS=$(find pi-gen/work -name rootfs -path "*/stage2k/rootfs" | head -1)
+          echo "ROOTFS=$ROOTFS" >> "$GITHUB_ENV"
+          fail() { echo "FAIL: $*"; exit 1; }
+          sudo test -x "$ROOTFS/usr/local/bin/k3s" || fail "k3s is missing"
+          sudo ls -la "$ROOTFS/var/lib/rancher/k3s/agent/images/"
+          sudo test -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/cupcake-k3s-setup.service" || fail "the setup service is not enabled"
+          sudo test ! -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/k3s.service" || fail "k3s starts before it is configured"
+          sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
+          sudo test ! -d "$ROOTFS/var/lib/rancher/k3s/server" || fail "the image ships k3s server state"
+          grep -q cgroup_enable=memory "$ROOTFS/boot/firmware/cmdline.txt" || fail "the memory cgroup is not enabled"
+          if sudo sh -c "ls $ROOTFS/lib/modules/*/kernel/fs/nfsd/nfsd.ko* >/dev/null 2>&1"; then
+            echo "nfsd kernel module present"
+          else
+            echo "::warning::The Raspberry Pi kernel has no nfsd module; the shared model cache cannot be served from these nodes"
+          fi
+
+      - name: Pair a control plane and a worker from the image
+        timeout-minutes: 60
+        run: |
+          sudo modprobe br_netfilter overlay
+          sudo tar -C "$ROOTFS" --exclude=./proc --exclude=./sys --exclude=./dev -c . \
+            | docker import -c 'CMD ["/sbin/init"]' -c 'STOPSIGNAL SIGRTMIN+3' --platform linux/arm64 - cupcake-k3s-pi:test
+          PAIR_TENANT=$([ "$PRELOAD_TAG" != none ] && echo 1 || echo 0) PAIR_TIMEOUT=2400 \
+            provision/k3s/test/pair-test.sh cupcake-k3s-pi:test docker.io/library/alpine:3.20
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cupcake-k3s-pi-arm64
+          path: pi-gen/deploy/*.img.xz
+          retention-days: 30
+          compression-level: 0
+
   test-rpi-firstboot:
     name: RPi first boot (systemd-nspawn, arm64)
     needs: build-rpi
@@ -2308,11 +2489,12 @@ jobs:
 
   publish-release:
     name: Publish release
-    needs: [build-rpi, build-db, test-rpi-firstboot, build-vm]
+    needs: [build-rpi, build-db, test-rpi-firstboot, build-vm, build-k3s-rpi]
     if: >-
       !cancelled() &&
       github.event_name == 'release' &&
       needs.build-rpi.result == 'success' &&
+      needs.build-k3s-rpi.result == 'success' &&
       needs.build-db.result == 'success' &&
       needs.test-rpi-firstboot.result == 'success' &&
       (needs.build-vm.result == 'success' || needs.build-vm.result == 'skipped')
@@ -2328,6 +2510,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           .github/scripts/download-artifact-verified.sh cupcake-pi-arm64 release-assets
+          .github/scripts/download-artifact-verified.sh cupcake-k3s-pi-arm64 release-assets
           .github/scripts/download-artifact-verified.sh cupcake-mobile-snapshot release-assets
 
       - name: Download VM images
@@ -2378,7 +2561,7 @@ jobs:
           RELEASE_DIR="mirror/cupcake/$TAG"
           mkdir -p "$RELEASE_DIR"
           cp -l release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
-          CONTENTS="Raspberry Pi image and reference databases"
+          CONTENTS="Raspberry Pi images and reference databases"
           if ls vm-assets/*.xz >/dev/null 2>&1; then
             cp -l vm-assets/*.xz "$RELEASE_DIR/"
             CONTENTS="Raspberry Pi, x86 and VM images, and reference databases"
@@ -2408,7 +2591,7 @@ jobs:
 
   summary:
     name: Summary
-    needs: [build-db, build-frontend, mirror-check, build-vm, build-rpi]
+    needs: [build-db, build-frontend, mirror-check, build-vm, build-rpi, build-k3s-rpi]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -2422,3 +2605,4 @@ jobs:
           echo "| VM ubuntu (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| VM debian (amd64) | ${{ needs.build-vm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| RPi (arm64) | ${{ needs.build-rpi.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RPi k3s node (arm64) | ${{ needs.build-k3s-rpi.result }} |" >> $GITHUB_STEP_SUMMARY

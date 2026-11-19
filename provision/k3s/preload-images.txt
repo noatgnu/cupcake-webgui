@@ -1,0 +1,8 @@
+ghcr.io/noatgnu/cupcake-vanilla:{tag}
+ghcr.io/noatgnu/cupcake-vanilla-ng:{tag}
+ghcr.io/noatgnu/cupcake-webgui:{tag}
+ghcr.io/noatgnu/cupcake-transcribe-worker:{tag}
+?ghcr.io/noatgnu/cupcake-nfs-server:{tag}
+docker.io/library/postgres:17-alpine
+docker.io/valkey/valkey:8-alpine
+docker.io/library/alpine:3.20

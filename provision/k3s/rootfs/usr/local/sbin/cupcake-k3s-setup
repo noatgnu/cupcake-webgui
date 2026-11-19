@@ -1,0 +1,172 @@
+#!/bin/bash
+# Configures this Pi as a k3s control plane or worker from cupcake-k3s.txt on the boot partition, once. The control
+# plane also runs cupcake-master. New passwords are written to cupcake-k3s-credentials.txt next to the configuration.
+set -euo pipefail
+
+CONFIG="${CUPCAKE_K3S_CONFIG:-/boot/firmware/cupcake-k3s.txt}"
+STATE_DIR=/var/lib/cupcake-k3s
+K3S_DIR=/etc/rancher/k3s
+SHARE=/usr/share/cupcake-k3s
+MANIFESTS=/var/lib/rancher/k3s/server/manifests
+
+BOOT_DIR="$(dirname "$CONFIG")"
+ERROR_FILE="$BOOT_DIR/cupcake-k3s-error.txt"
+CREDENTIALS_FILE="$BOOT_DIR/cupcake-k3s-credentials.txt"
+
+log() { echo "cupcake-k3s: $*"; }
+fail() {
+  log "$*"
+  printf '%s\nFix cupcake-k3s.txt and restart the Pi.\n' "$*" > "$ERROR_FILE" || true
+  exit 1
+}
+
+value() {
+  local line
+  line=$(tr -d '\r' < "$CONFIG" | grep -E "^[[:space:]]*$1[[:space:]]*=" | tail -1 || true)
+  line="${line#*=}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  line="${line#\"}"; line="${line%\"}"
+  line="${line#\'}"; line="${line%\'}"
+  printf '%s' "$line"
+}
+
+secret() {
+  od -An -N"$1" -tx1 /dev/urandom | tr -d ' \n'
+}
+
+password() {
+  local value=""
+  while [ "${#value}" -lt 16 ]; do
+    value+=$(head -c 64 /dev/urandom | tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789' || true)
+  done
+  printf '%s' "${value:0:16}"
+}
+
+if [ -e "$STATE_DIR/configured" ]; then
+  exit 0
+fi
+if [ ! -f "$CONFIG" ]; then
+  log "no $CONFIG; k3s stays off until one is added and the Pi restarted"
+  exit 0
+fi
+
+ROLE=$(value ROLE)
+TOKEN=$(value TOKEN)
+SERVER=$(value SERVER)
+NAME=$(value HOSTNAME)
+MANAGER=$(value MANAGER)
+ADMIN_EMAIL=$(value ADMIN_EMAIL)
+
+case "$ROLE" in
+  server|agent) ;;
+  *) fail "ROLE must be server or agent, not '${ROLE}'" ;;
+esac
+[[ "$TOKEN" =~ ^[A-Za-z0-9._-]{16,}$ ]] || fail "TOKEN must be at least 16 letters, digits, '.', '_' or '-'"
+SERVER="${SERVER:-cupcake-k3s.local}"
+[[ "$SERVER" =~ ^[A-Za-z0-9.-]+$ ]] || fail "SERVER must be a host name or IPv4 address"
+if [ -z "$NAME" ]; then
+  if [ "$ROLE" = server ]; then
+    NAME=cupcake-k3s
+  else
+    NAME="cupcake-k3s-worker-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"
+  fi
+fi
+[[ "$NAME" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || fail "HOSTNAME must be lower-case letters, digits and '-'"
+MANAGER="${MANAGER:-yes}"
+case "$MANAGER" in
+  yes|no) ;;
+  *) fail "MANAGER must be yes or no, not '${MANAGER}'" ;;
+esac
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@$NAME.local}"
+[[ "$ADMIN_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || fail "ADMIN_EMAIL must be an email address"
+RUN_MANAGER=no
+if [ "$ROLE" = server ] && [ "$MANAGER" = yes ]; then
+  [ -f "$SHARE/versions.env" ] && [ -f "$SHARE/cupcake-master.yaml" ] || fail "this image has no cupcake-master; set MANAGER=no"
+  RUN_MANAGER=yes
+fi
+
+echo "$NAME" > /etc/hostname
+hostname "$NAME" || true
+HOSTS=$(grep -v '^127\.0\.1\.1' /etc/hosts || true)
+printf '%s\n127.0.1.1\t%s %s.local\n' "$HOSTS" "$NAME" "$NAME" > /etc/hosts
+systemctl try-restart avahi-daemon.service || true
+
+install -d -m 700 "$K3S_DIR" "$STATE_DIR"
+umask 077
+if [ "$ROLE" = server ]; then
+  cat > "$K3S_DIR/config.yaml" <<YAML
+token: "$TOKEN"
+node-name: "$NAME"
+tls-san:
+  - "$NAME.local"
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+YAML
+else
+  cat > "$K3S_DIR/config.yaml" <<YAML
+token: "$TOKEN"
+node-name: "$NAME"
+YAML
+  printf 'SERVER=%s\n' "$SERVER" > "$STATE_DIR/agent.conf"
+fi
+
+OS_USER=$(getent passwd 1000 | cut -d: -f1 || true)
+OS_PASSWORD=""
+if [ -n "$OS_USER" ]; then
+  OS_PASSWORD=$(password)
+  printf '%s:%s\n' "$OS_USER" "$OS_PASSWORD" | chpasswd
+fi
+
+ADMIN_PASSWORD=""
+if [ "$RUN_MANAGER" = yes ]; then
+  . "$SHARE/versions.env"
+  ADMIN_PASSWORD=$(password)
+  install -d -m 700 "$MANIFESTS"
+  sed -e "s|@@SECRET_KEY@@|$(secret 32)|" \
+      -e "s|@@FERNET_KEY@@|$(head -c 32 /dev/urandom | base64 | tr '+/' '-_')|" \
+      -e "s|@@HASH_KEY@@|$(secret 32)|" \
+      -e "s|@@POSTGRES_PASSWORD@@|$(secret 24)|" \
+      -e "s|@@REDIS_PASSWORD@@|$(secret 24)|" \
+      -e "s|@@ADMIN_EMAIL@@|$ADMIN_EMAIL|" \
+      -e "s|@@ADMIN_PASSWORD@@|$ADMIN_PASSWORD|" \
+      -e "s|@@HOST@@|$NAME.local|g" \
+      -e "s|@@IMAGE_TAG@@|$CUPCAKE_IMAGE_TAG|g" \
+      -e "s|@@MASTER_IMAGE@@|$MASTER_IMAGE|g" \
+      "$SHARE/cupcake-master.yaml" > "$MANIFESTS/cupcake-master.yaml"
+  chmod 600 "$MANIFESTS/cupcake-master.yaml"
+  systemctl enable cupcake-k3s-mdns-aliases.service
+  systemctl start --no-block cupcake-k3s-mdns-aliases.service
+fi
+
+{
+  echo "Passwords for $NAME, set when it was first configured."
+  if [ -n "$OS_USER" ]; then
+    echo
+    echo "Log in to the Pi (console or ssh $OS_USER@$NAME.local)"
+    echo "  user:     $OS_USER"
+    echo "  password: $OS_PASSWORD"
+  fi
+  if [ "$RUN_MANAGER" = yes ]; then
+    echo
+    echo "cupcake-master: https://$NAME.local (the certificate is self-signed)"
+    echo "  email:    $ADMIN_EMAIL"
+    echo "  password: $ADMIN_PASSWORD"
+    echo "Instances it creates are reached at https://<name>.local."
+  fi
+} > "$CREDENTIALS_FILE.new"
+mv -f "$CREDENTIALS_FILE.new" "$CREDENTIALS_FILE"
+
+tmp="$CONFIG.new"
+tr -d '\r' < "$CONFIG" | grep -vE '^[[:space:]]*TOKEN[[:space:]]*=' > "$tmp" || true
+printf '# TOKEN was removed after this Pi joined; it is kept in %s\n' "$K3S_DIR/config.yaml" >> "$tmp"
+mv -f "$tmp" "$CONFIG"
+sync
+
+rm -f "$ERROR_FILE"
+touch "$STATE_DIR/configured"
+UNIT=k3s.service
+[ "$ROLE" = agent ] && UNIT=k3s-agent.service
+systemctl enable "$UNIT"
+systemctl start --no-block "$UNIT"
+log "configured $NAME as k3s ${ROLE}$([ "$ROLE" = agent ] && echo " joining $SERVER")"

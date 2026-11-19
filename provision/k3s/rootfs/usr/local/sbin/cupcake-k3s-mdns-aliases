@@ -1,0 +1,40 @@
+#!/bin/bash
+# Publishes every single-label .local host of the cluster's ingresses over mDNS, pointing at this control plane.
+set -euo pipefail
+
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+OWN="$(hostname).local"
+declare -A PUBLISHED=()
+
+address() {
+  ip -4 -o addr show scope global | awk '{ split($4, a, "/"); print a[1]; exit }'
+}
+
+trap 'kill "${PUBLISHED[@]}" 2>/dev/null || true' EXIT
+
+while true; do
+  ADDRESS=$(address || true)
+  mapfile -t HOSTS < <(/usr/local/bin/kubectl get ingress -A -o jsonpath='{range .items[*].spec.rules[*]}{.host}{"\n"}{end}' 2>/dev/null \
+    | grep -E '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.local$' | grep -vxF "$OWN" | sort -u || true)
+  declare -A WANTED=()
+  for host in "${HOSTS[@]}"; do
+    [ -n "$host" ] && WANTED["$host@$ADDRESS"]=1
+  done
+  for key in "${!PUBLISHED[@]}"; do
+    if [ -z "${WANTED[$key]:-}" ] || ! kill -0 "${PUBLISHED[$key]}" 2>/dev/null; then
+      kill "${PUBLISHED[$key]}" 2>/dev/null || true
+      unset "PUBLISHED[$key]"
+    fi
+  done
+  if [ -n "$ADDRESS" ]; then
+    for key in "${!WANTED[@]}"; do
+      if [ -z "${PUBLISHED[$key]:-}" ]; then
+        avahi-publish -a -R "${key%@*}" "$ADDRESS" >/dev/null 2>&1 &
+        PUBLISHED["$key"]=$!
+        echo "cupcake-k3s: published ${key%@*} at $ADDRESS"
+      fi
+    done
+  fi
+  unset WANTED
+  sleep 15
+done

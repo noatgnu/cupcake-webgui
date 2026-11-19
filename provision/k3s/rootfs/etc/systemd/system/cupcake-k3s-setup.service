@@ -1,0 +1,13 @@
+[Unit]
+Description=Configure k3s from cupcake-k3s.txt on the boot partition
+After=local-fs.target boot-firmware.mount systemd-machine-id-commit.service
+Before=k3s.service k3s-agent.service
+ConditionPathExists=!/var/lib/cupcake-k3s/configured
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/cupcake-k3s-setup
+
+[Install]
+WantedBy=multi-user.target

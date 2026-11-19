@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish the cluster's .local instance addresses over mDNS
+After=k3s.service avahi-daemon.service
+Wants=avahi-daemon.service
+
+[Service]
+ExecStart=/usr/local/sbin/cupcake-k3s-mdns-aliases
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

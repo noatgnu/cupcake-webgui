@@ -1,0 +1,13 @@
+# Copy to the boot partition as cupcake-k3s.txt, or create a matching set with make-k3s-config.sh.
+# ROLE: server for the control plane, agent for a worker.
+ROLE=server
+# TOKEN: the same secret on every Pi in the cluster; at least 16 letters, digits, '.', '_' or '-'.
+TOKEN=change-me-to-a-long-random-secret
+# SERVER: the control plane's name or IPv4 address, used by workers.
+SERVER=cupcake-k3s.local
+# MANAGER: control plane only; yes (default) runs cupcake-master on it, no leaves it a bare k3s control plane.
+MANAGER=yes
+# ADMIN_EMAIL: control plane only; the cupcake-master admin login, default admin@<hostname>.local.
+ADMIN_EMAIL=
+# HOSTNAME: optional; defaults to cupcake-k3s for the control plane and cupcake-k3s-worker-<4 random hex digits> for workers.
+HOSTNAME=

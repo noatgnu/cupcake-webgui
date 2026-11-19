@@ -1,0 +1,6 @@
+#!/bin/bash
+# Runs the k3s control plane.
+set -euo pipefail
+
+mapfile -t NODE_ARGS < <(/usr/local/sbin/cupcake-k3s-node-args)
+exec /usr/local/bin/k3s server "${NODE_ARGS[@]}"
