@@ -2113,10 +2113,10 @@ jobs:
             PRELOAD_TAG=$(gh api repos/noatgnu/cupcake_vanilla/releases/latest --jq .tag_name)
           fi
           echo "k3s ${K3S_VERSION}; Cupcake images ${PRELOAD_TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
-          provision/k3s/fetch-k3s.sh "$K3S_VERSION" arm64 k3s-build/k3s
-          provision/k3s/fetch-images.sh "$PRELOAD_TAG" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
+          bash provision/k3s/fetch-k3s.sh "$K3S_VERSION" arm64 k3s-build/k3s
+          bash provision/k3s/fetch-images.sh "$PRELOAD_TAG" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "$PRELOAD_TAG" != none ]; then
-            provision/k3s/build-master-image.sh "$MASTER_REF" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
+            bash provision/k3s/build-master-image.sh "$MASTER_REF" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
           fi
           cat k3s-build/images/versions.env 2>/dev/null || true
           du -sh k3s-build/*
@@ -2153,7 +2153,7 @@ jobs:
           EOF
           cat > pi-gen/stage2k/00-install-k3s/00-run.sh << EOF
           #!/bin/bash -e
-          "$GITHUB_WORKSPACE/provision/k3s/install-rootfs.sh" "\${ROOTFS_DIR}" "$GITHUB_WORKSPACE/k3s-build/k3s" "$GITHUB_WORKSPACE/k3s-build/images"
+          bash "$GITHUB_WORKSPACE/provision/k3s/install-rootfs.sh" "\${ROOTFS_DIR}" "$GITHUB_WORKSPACE/k3s-build/k3s" "$GITHUB_WORKSPACE/k3s-build/images"
           CMDLINE="\${ROOTFS_DIR}/boot/firmware/cmdline.txt"
           grep -q cgroup_enable=memory "\$CMDLINE" || sed -i '1 s/\$/ cgroup_memory=1 cgroup_enable=memory/' "\$CMDLINE"
           cat "\$CMDLINE"
@@ -2215,7 +2215,7 @@ jobs:
           sudo tar -C "$ROOTFS" --exclude=./proc --exclude=./sys --exclude=./dev -c . \
             | docker import -c 'CMD ["/sbin/init"]' -c 'STOPSIGNAL SIGRTMIN+3' --platform linux/arm64 - cupcake-k3s-pi:test
           PAIR_TENANT=$([ "$PRELOAD_TAG" != none ] && echo 1 || echo 0) PAIR_TIMEOUT=2400 \
-            provision/k3s/test/pair-test.sh cupcake-k3s-pi:test docker.io/library/alpine:3.20
+            bash provision/k3s/test/pair-test.sh cupcake-k3s-pi:test docker.io/library/alpine:3.20
 
       - name: Upload
         uses: actions/upload-artifact@v4
