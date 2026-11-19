@@ -1,0 +1,33 @@
+name: Test RPi Image (native ARM)
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: 'Backend branch/tag (cupcake_vanilla)'
+        type: string
+        default: 'master'
+      webgui_ref:
+        description: 'WebGUI branch/tag (cupcake-webgui)'
+        type: string
+        default: 'master'
+      vanilla_ng_ref:
+        description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
+        type: string
+        default: 'master'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  rpi:
+    name: Build and test the RPi image on an ARM runner
+    uses: ./.github/workflows/build-appliance-images.yml
+    with:
+      image_type: rpi
+      native_arm: true
+      backend_ref: ${{ inputs.backend_ref }}
+      webgui_ref: ${{ inputs.webgui_ref }}
+      vanilla_ng_ref: ${{ inputs.vanilla_ng_ref }}
+    secrets: inherit
