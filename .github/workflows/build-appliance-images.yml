@@ -20,6 +20,27 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
+      native_arm:
+        description: 'Build the RPi image natively on an ARM runner instead of under QEMU'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      image_type:
+        type: string
+        default: 'both'
+      backend_ref:
+        type: string
+        default: 'master'
+      webgui_ref:
+        type: string
+        default: 'master'
+      vanilla_ng_ref:
+        type: string
+        default: 'master'
+      native_arm:
+        type: boolean
+        default: false
   release:
     types: [published]
 
@@ -1102,7 +1123,9 @@ jobs:
     name: RPi Image
     if: github.event_name == 'release' || inputs.image_type != 'vm'
     needs: [build-frontend, build-db]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.native_arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    env:
+      NATIVE_ARM: ${{ inputs.native_arm && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -1132,13 +1155,18 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
+          if [ "$NATIVE_ARM" = "true" ]; then
+            ARCH_PACKAGES="gcc g++"
+          else
+            ARCH_PACKAGES="qemu-user-static binfmt-support gcc-aarch64-linux-gnu g++-aarch64-linux-gnu"
+          fi
           sudo apt-get install -y \
             coreutils quilt debootstrap zerofree zip dosfstools \
             libarchive-tools rsync xz-utils file git curl bc gpg pigz \
-            qemu-user-static binfmt-support arch-test debian-archive-keyring \
-            cmake gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            arch-test debian-archive-keyring qemu-utils cmake $ARCH_PACKAGES
 
       - name: Enable ARM64 emulation
+        if: ${{ !inputs.native_arm }}
         run: |
           sudo modprobe binfmt_misc
           sudo update-binfmts --enable qemu-aarch64 || true
@@ -1147,9 +1175,13 @@ jobs:
       - name: Clone pi-gen
         run: git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git
 
-      - name: Patch pi-gen for qemu-user-static compatibility
+      - name: Patch pi-gen for the build host
         run: |
-          sed -i -E 's/^qemu-[a-z0-9_]+:qemu-user-binfmt$/qemu-aarch64-static:qemu-user-static/' pi-gen/depends
+          if [ "$NATIVE_ARM" = "true" ]; then
+            sed -i -E '/^qemu-[a-z0-9_]+:qemu-user-(binfmt|static)$/d' pi-gen/depends
+          else
+            sed -i -E 's/^qemu-[a-z0-9_]+:qemu-user-binfmt$/qemu-aarch64-static:qemu-user-static/' pi-gen/depends
+          fi
           if grep -q "qemu-user-binfmt" pi-gen/depends; then
             echo "pi-gen/depends still requires qemu-user-binfmt; update the patch:"
             grep -n "qemu" pi-gen/depends
@@ -1257,11 +1289,15 @@ jobs:
 
           git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper-build
           cd /tmp/whisper-build
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_SYSTEM_NAME=Linux \
-            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          if [ "$(uname -m)" = "aarch64" ]; then
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+              -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+              -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          fi
           cmake --build build --config Release -j"$(nproc)"
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/build/bin"
           mkdir -p "${ROOTFS_DIR}/opt/cupcake/whisper.cpp/models"
@@ -1898,7 +1934,9 @@ jobs:
         timeout-minutes: 180
         run: |
           cd pi-gen
-          export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
+          if [ "$NATIVE_ARM" != "true" ]; then
+            export DEBOOTSTRAP_QEMU_USER_STATIC=/usr/bin/qemu-aarch64-static
+          fi
           sudo -E USE_DOCKER=0 ./build.sh
 
       - name: Post-build RPi image test
