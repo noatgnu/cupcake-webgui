@@ -21,9 +21,9 @@ on:
         type: string
         default: 'master'
       native_arm:
-        description: 'Build the RPi image natively on an ARM runner instead of under QEMU'
+        description: 'Build the RPi image natively on an ARM runner; untick to build under QEMU on x86'
         type: boolean
-        default: false
+        default: true
   workflow_call:
     inputs:
       image_type:
@@ -40,7 +40,7 @@ on:
         default: 'master'
       native_arm:
         type: boolean
-        default: false
+        default: true
   release:
     types: [published]
 
@@ -1123,9 +1123,9 @@ jobs:
     name: RPi Image
     if: github.event_name == 'release' || inputs.image_type != 'vm'
     needs: [build-frontend, build-db]
-    runs-on: ${{ inputs.native_arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ (github.event_name == 'release' || inputs.native_arm) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     env:
-      NATIVE_ARM: ${{ inputs.native_arm && 'true' || 'false' }}
+      NATIVE_ARM: ${{ (github.event_name == 'release' || inputs.native_arm) && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -1166,7 +1166,7 @@ jobs:
             arch-test debian-archive-keyring qemu-utils cmake $ARCH_PACKAGES
 
       - name: Enable ARM64 emulation
-        if: ${{ !inputs.native_arm }}
+        if: env.NATIVE_ARM != 'true'
         run: |
           sudo modprobe binfmt_misc
           sudo update-binfmts --enable qemu-aarch64 || true

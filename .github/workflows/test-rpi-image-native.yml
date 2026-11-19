@@ -1,4 +1,4 @@
-name: Test RPi Image (native ARM)
+name: Test RPi Image
 
 on:
   workflow_dispatch:
@@ -15,6 +15,10 @@ on:
         description: 'Vanilla NG branch/tag (cupcake-vanilla-ng)'
         type: string
         default: 'master'
+      native_arm:
+        description: 'Build natively on an ARM runner; untick to test the QEMU fallback on x86'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -22,11 +26,11 @@ permissions:
 
 jobs:
   rpi:
-    name: Build and test the RPi image on an ARM runner
+    name: Build and test the RPi image
     uses: ./.github/workflows/build-appliance-images.yml
     with:
       image_type: rpi
-      native_arm: true
+      native_arm: ${{ inputs.native_arm }}
       backend_ref: ${{ inputs.backend_ref }}
       webgui_ref: ${{ inputs.webgui_ref }}
       vanilla_ng_ref: ${{ inputs.vanilla_ng_ref }}
