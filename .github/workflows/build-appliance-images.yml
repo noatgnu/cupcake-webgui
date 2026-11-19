@@ -127,7 +127,6 @@ jobs:
 
   build-db:
     name: Build seeded database
-    if: github.event_name == 'release' || inputs.image_type != 'k3s'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -2069,6 +2068,7 @@ jobs:
   build-k3s-rpi:
     name: RPi k3s node image
     if: github.event_name == 'release' || inputs.image_type == 'k3s'
+    needs: build-db
     runs-on: ${{ (github.event_name == 'release' || inputs.native_arm) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 150
     env:
@@ -2104,6 +2104,12 @@ jobs:
           sudo modprobe binfmt_misc
           sudo update-binfmts --enable qemu-aarch64 || true
           docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Download the reference data snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: cupcake-mobile-snapshot
+          path: k3s-build/snapshot
 
       - name: Download k3s and the images to preload
         env:
@@ -2153,7 +2159,7 @@ jobs:
           EOF
           cat > pi-gen/stage2k/00-install-k3s/00-run.sh << EOF
           #!/bin/bash -e
-          bash "$GITHUB_WORKSPACE/provision/k3s/install-rootfs.sh" "\${ROOTFS_DIR}" "$GITHUB_WORKSPACE/k3s-build/k3s" "$GITHUB_WORKSPACE/k3s-build/images"
+          bash "$GITHUB_WORKSPACE/provision/k3s/install-rootfs.sh" "\${ROOTFS_DIR}" "$GITHUB_WORKSPACE/k3s-build/k3s" "$GITHUB_WORKSPACE/k3s-build/images" "$GITHUB_WORKSPACE/k3s-build/snapshot"
           CMDLINE="\${ROOTFS_DIR}/boot/firmware/cmdline.txt"
           grep -q cgroup_enable=memory "\$CMDLINE" || sed -i '1 s/\$/ cgroup_memory=1 cgroup_enable=memory/' "\$CMDLINE"
           cat "\$CMDLINE"

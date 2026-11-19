@@ -122,6 +122,12 @@ ADMIN_PASSWORD=""
 if [ "$RUN_MANAGER" = yes ]; then
   . "$SHARE/versions.env"
   ADMIN_PASSWORD=$(password)
+  SNAPSHOT_PATH=""
+  SNAPSHOT_ON_PROVISION=False
+  if ls "$SHARE/reference-snapshot"/manifest*.json >/dev/null 2>&1; then
+    SNAPSHOT_PATH="$SHARE/reference-snapshot"
+    SNAPSHOT_ON_PROVISION=True
+  fi
   install -d -m 700 "$MANIFESTS"
   sed -e "s|@@SECRET_KEY@@|$(secret 32)|" \
       -e "s|@@FERNET_KEY@@|$(head -c 32 /dev/urandom | base64 | tr '+/' '-_')|" \
@@ -133,6 +139,8 @@ if [ "$RUN_MANAGER" = yes ]; then
       -e "s|@@HOST@@|$NAME.local|g" \
       -e "s|@@IMAGE_TAG@@|$CUPCAKE_IMAGE_TAG|g" \
       -e "s|@@MASTER_IMAGE@@|$MASTER_IMAGE|g" \
+      -e "s|@@SNAPSHOT_PATH@@|$SNAPSHOT_PATH|" \
+      -e "s|@@SNAPSHOT_ON_PROVISION@@|$SNAPSHOT_ON_PROVISION|" \
       "$SHARE/cupcake-master.yaml" > "$MANIFESTS/cupcake-master.yaml"
   chmod 600 "$MANIFESTS/cupcake-master.yaml"
   systemctl enable cupcake-k3s-mdns-aliases.service

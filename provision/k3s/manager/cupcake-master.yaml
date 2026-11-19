@@ -53,6 +53,8 @@ data:
   INSTANCE_DEFAULT_IMAGE_TAG: '@@IMAGE_TAG@@'
   MODEL_CACHE_NFS_IMAGE: ghcr.io/noatgnu/cupcake-nfs-server:@@IMAGE_TAG@@
   MODEL_CACHE_SIZE_GI: '10'
+  REFERENCE_SNAPSHOT_HOST_PATH: '@@SNAPSHOT_PATH@@'
+  REFERENCE_SNAPSHOT_ON_PROVISION: '@@SNAPSHOT_ON_PROVISION@@'
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
