@@ -298,12 +298,12 @@ jobs:
           MIRROR_PORT: ${{ secrets.MIRROR_PORT }}
         run: |
           if [ -z "$MIRROR_SSH_HOST" ]; then
-            echo "::notice::No download mirror is configured; VM images are only built for manual runs"
+            echo "::notice::No download mirror is configured; VM and k3s node images are only built for manual runs"
             echo "available=false" >> "$GITHUB_OUTPUT"
           elif timeout 15 bash -c "</dev/tcp/$MIRROR_SSH_HOST/${MIRROR_PORT:-22}" 2>/dev/null; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::The download mirror is not reachable over SSH; VM images are skipped for this release"
+            echo "::warning::The download mirror is not reachable over SSH; VM and k3s node images are skipped for this release"
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -2067,8 +2067,10 @@ jobs:
 
   build-k3s-rpi:
     name: RPi k3s node image
-    if: github.event_name == 'release' || inputs.image_type == 'k3s'
-    needs: build-db
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.image_type == 'k3s') ||
+      (github.event_name == 'release' && needs.mirror-check.outputs.available == 'true')
+    needs: [build-db, mirror-check]
     runs-on: ${{ (github.event_name == 'release' || inputs.native_arm) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 150
     env:
@@ -2507,10 +2509,10 @@ jobs:
       !cancelled() &&
       github.event_name == 'release' &&
       needs.build-rpi.result == 'success' &&
-      needs.build-k3s-rpi.result == 'success' &&
       needs.build-db.result == 'success' &&
       needs.test-rpi-firstboot.result == 'success' &&
-      (needs.build-vm.result == 'success' || needs.build-vm.result == 'skipped')
+      (needs.build-vm.result == 'success' || needs.build-vm.result == 'skipped') &&
+      (needs.build-k3s-rpi.result == 'success' || needs.build-k3s-rpi.result == 'skipped')
     runs-on: ubuntu-latest
     environment: MIRROR_HOST
     env:
@@ -2523,7 +2525,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           .github/scripts/download-artifact-verified.sh cupcake-pi-arm64 release-assets
-          .github/scripts/download-artifact-verified.sh cupcake-k3s-pi-arm64 release-assets
           .github/scripts/download-artifact-verified.sh cupcake-mobile-snapshot release-assets
 
       - name: Download VM images
@@ -2534,6 +2535,21 @@ jobs:
           .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-ubuntu vm-assets
           .github/scripts/download-artifact-verified.sh cupcake-vm-amd64-debian vm-assets
           .github/scripts/download-artifact-verified.sh cupcake-x86-amd64 vm-assets
+
+      - name: Download the k3s node image
+        if: needs.build-k3s-rpi.result == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/download-artifact-verified.sh cupcake-k3s-pi-arm64 k3s-assets
+
+      - name: Check the GitHub release files fit its 2 GiB limit
+        run: |
+          TOO_BIG=$(find release-assets -type f -size +2047M)
+          if [ -n "$TOO_BIG" ]; then
+            echo "These files are over GitHub's 2 GiB release asset limit; publish them through the mirror only:"
+            ls -la $TOO_BIG
+            exit 1
+          fi
 
       - name: Publish to GitHub release
         uses: softprops/action-gh-release@v2
@@ -2574,10 +2590,15 @@ jobs:
           RELEASE_DIR="mirror/cupcake/$TAG"
           mkdir -p "$RELEASE_DIR"
           cp -l release-assets/*.img.xz release-assets/*.sqlite.gz release-assets/manifest-*.json "$RELEASE_DIR/"
-          CONTENTS="Raspberry Pi images and reference databases"
+          CONTENTS="Raspberry Pi image and reference databases"
           if ls vm-assets/*.xz >/dev/null 2>&1; then
             cp -l vm-assets/*.xz "$RELEASE_DIR/"
             CONTENTS="Raspberry Pi, x86 and VM images, and reference databases"
+          fi
+          if ls k3s-assets/*.img.xz >/dev/null 2>&1; then
+            cp -l k3s-assets/*.img.xz "$RELEASE_DIR/"
+            CONTENTS="${CONTENTS%, and reference databases}"
+            CONTENTS="${CONTENTS% and reference databases}, the Raspberry Pi k3s node image, and reference databases"
           fi
           (cd "$RELEASE_DIR" && sha256sum -- * > SHA256SUMS)
 
