@@ -34,6 +34,8 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 mkdir -p "$WORK/server" "$WORK/agent"
 printf 'ROLE=server\nTOKEN=%s\nHOSTNAME=cupcake-k3s\n' "$TOKEN" > "$WORK/server/cupcake-k3s.txt"
+TUNNEL_TOKEN=$(printf '{"a":"test-account","t":"00000000-0000-0000-0000-000000000000","s":"%s"}' "$TOKEN" | base64 -w0)
+printf 'TUNNEL_TOKEN=%s\n' "$TUNNEL_TOKEN" > "$WORK/server/cupcake-cloudflared.txt"
 printf 'ROLE=agent\r\nTOKEN = "%s"\r\nSERVER=cupcake-k3s.local\r\n' "$TOKEN" > "$WORK/agent/cupcake-k3s.txt"
 
 docker network create -o com.docker.network.bridge.enable_ip_masquerade=false "$NETWORK" >/dev/null
@@ -128,6 +130,21 @@ if in_server grep -q '^MASTER_IMAGE=' /usr/share/cupcake-k3s/versions.env 2>/dev
     *) fail "signing in returned $STATUS" ;;
   esac
 
+  echo "--- the tunnel token from the boot partition reaches cupcake-master ---"
+  until in_server kubectl -n cupcake-remote-access get deployment cloudflared >/dev/null 2>&1; do
+    [ "$(date +%s)" -lt "$deadline" ] || { in_server journalctl -u cupcake-k3s-remote-access --no-pager | tail -20; fail "cloudflared was not set up"; }
+    sleep 10
+  done
+  STORED=$(in_server kubectl -n cupcake-remote-access get secret cloudflared-token -o jsonpath='{.data.token}' | base64 -d)
+  [ "$STORED" = "$TUNNEL_TOKEN" ] || fail "the stored tunnel token differs from the one on the boot partition"
+  if in_server grep -q "$TUNNEL_TOKEN" /boot/firmware/cupcake-cloudflared.txt; then
+    fail "the tunnel token was left on the boot partition"
+  fi
+  in_server sh -c '! ls /var/lib/cupcake-k3s/remote-access-* 2>/dev/null' || fail "the tunnel token was left in the setup folder"
+  in_server kubectl -n kube-system get helmchartconfig traefik -o jsonpath='{.spec.valuesContent}' | grep -q '10.42.0.0/16' \
+    || fail "Traefik does not trust forwarded headers from the cluster"
+  echo "cloudflared is set up and the token is off the boot partition"
+
   if [ "${PAIR_TENANT:-0}" = 1 ]; then
     echo "--- creating an instance through cupcake-master, without internet ---"
     in_server kubectl -n cupcake-master exec deploy/cupcake-master -c web -- python manage.py shell -c "
@@ -165,6 +182,28 @@ print(Instance.objects.get(slug='demo').tasks.order_by('-created_at').first().an
     in_agent curl -sk https://demo.local/ | grep -o '<title>[^<]*</title>'
     in_agent curl -sk -o /dev/null -w 'api: %{http_code}\n' https://demo.local/api/v1/site-config/current/
     in_server kubectl -n tenant-demo get pods -o jsonpath='{range .items[*]}{.spec.containers[0].image}{"\n"}{end}' | sort -u
+
+    echo "--- a second domain for the instance, and one for cupcake-master ---"
+    in_server kubectl -n cupcake-master exec deploy/cupcake-master -c web -- python manage.py shell -c "
+from accounts.models import User
+from instances.domains import apply_domains
+from instances.models import Domain, Instance
+owner = User.objects.filter(is_superuser=True).first()
+instance = Instance.objects.get(slug='demo')
+for domain in (Domain(instance=instance, hostname='demo-lab.local', access='local'), Domain(hostname='cupcake-admin.local', access='local')):
+    domain.full_clean()
+    domain.save()
+    apply_domains(domain.instance, owner)
+print('added')"
+    for url in https://demo-lab.local/ https://cupcake-admin.local/accounts/login/; do
+      until in_agent curl -skf "$url" 2>/dev/null | grep -qE '<title>|csrfmiddlewaretoken'; do
+        [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl get ingress -A 2>&1 || true; fail "$url is not served"; }
+        sleep 10
+      done
+      echo "$url is served"
+    done
+    in_server kubectl -n tenant-demo get configmap demo-config -o jsonpath='{.data.ALLOWED_HOSTS}' | grep -qx 'demo.local,demo-lab.local' \
+      || fail "the instance does not accept both of its domains"
   fi
 fi
 

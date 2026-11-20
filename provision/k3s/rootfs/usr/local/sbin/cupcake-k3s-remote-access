@@ -1,0 +1,29 @@
+#!/bin/bash
+# Hands the Cloudflare tunnel token and Tailscale OAuth client from the boot partition to cupcake-master once it runs.
+set -euo pipefail
+
+STATE_DIR=/var/lib/cupcake-k3s
+BOOT_DIR="${CUPCAKE_K3S_BOOT_DIR:-/boot/firmware}"
+ERROR_FILE="$BOOT_DIR/cupcake-k3s-error.txt"
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+manage() {
+  /usr/local/bin/kubectl -n cupcake-master exec -i deploy/cupcake-master -c web -- python manage.py remote_access "$@"
+}
+
+until /usr/local/bin/kubectl -n cupcake-master rollout status deployment/cupcake-master --timeout=60s >/dev/null 2>&1; do
+  sleep 15
+done
+
+for service in cloudflare tailscale; do
+  file="$STATE_DIR/remote-access-$service"
+  [ -f "$file" ] || continue
+  if output=$(manage "$service" < "$file" 2>&1); then
+    rm -f "$file"
+    echo "cupcake-k3s: $output"
+  else
+    echo "cupcake-k3s: setting up $service failed: $output"
+    printf 'Setting up %s failed: %s\nAdd it again on the Remote access page of cupcake-master.\n' "$service" "$output" > "$ERROR_FILE"
+    rm -f "$file"
+  fi
+done

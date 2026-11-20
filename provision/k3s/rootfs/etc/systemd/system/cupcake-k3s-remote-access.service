@@ -1,0 +1,12 @@
+[Unit]
+Description=Hand the Cloudflare tunnel and Tailscale settings from the boot partition to cupcake-master
+After=k3s.service
+ConditionPathExistsGlob=/var/lib/cupcake-k3s/remote-access-*
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-k3s-remote-access
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

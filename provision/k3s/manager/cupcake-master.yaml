@@ -47,6 +47,8 @@ data:
   CSRF_TRUSTED_ORIGINS: https://@@HOST@@
   USE_X_FORWARDED_PROTO: 'True'
   BASE_DOMAIN: local
+  CONTROL_PLANE_NAMESPACE: cupcake-master
+  REMOTE_ACCESS_ENABLED: 'True'
   REDIS_HOST: valkey
   STORAGE_CLASS: local-path
   BACKUP_ROOT: /backups

@@ -2211,7 +2211,7 @@ jobs:
           for unit in cupcake-k3s-setup.service avahi-daemon.service; do
             sudo test -L "$WANTS/$unit" || fail "$unit is not enabled"
           done
-          for unit in k3s.service k3s-agent.service cupcake-k3s-preloaded.service cupcake-k3s-mdns-aliases.service; do
+          for unit in k3s.service k3s-agent.service cupcake-k3s-preloaded.service cupcake-k3s-mdns-aliases.service cupcake-k3s-remote-access.service; do
             sudo test ! -L "$WANTS/$unit" || fail "$unit starts before the Pi is configured"
           done
           sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
