@@ -15,9 +15,9 @@ install -D -m 755 "$K3S/k3s" "$ROOT/usr/local/bin/k3s"
 for tool in kubectl crictl ctr; do
   ln -sf k3s "$ROOT/usr/local/bin/$tool"
 done
-install -D -m 644 "$K3S"/k3s-airgap-images-*.tar.zst -t "$ROOT/var/lib/rancher/k3s/agent/images/"
+install -D -m 644 "$K3S"/k3s-airgap-images-*.tar.zst -t "$ROOT/var/lib/cupcake-k3s/preload/"
 if [ -n "$IMAGES" ] && ls "$IMAGES"/*.tar.zst >/dev/null 2>&1; then
-  install -m 644 "$IMAGES"/*.tar.zst -t "$ROOT/var/lib/rancher/k3s/agent/images/"
+  install -m 644 "$IMAGES"/*.tar.zst -t "$ROOT/var/lib/cupcake-k3s/preload/"
 fi
 
 cp -r "$HERE/rootfs/." "$ROOT/"

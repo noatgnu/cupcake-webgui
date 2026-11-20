@@ -5,7 +5,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -yq --no-install-recommends \
-  avahi-daemon avahi-utils libnss-mdns nfs-common iproute2 iptables ca-certificates curl kmod systemd-timesyncd
+  avahi-daemon avahi-utils libnss-mdns zstd nfs-common iproute2 iptables ca-certificates curl kmod systemd-timesyncd
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 

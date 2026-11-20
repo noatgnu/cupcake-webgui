@@ -7,6 +7,8 @@ CONFIG="${CUPCAKE_K3S_CONFIG:-/boot/firmware/cupcake-k3s.txt}"
 STATE_DIR=/var/lib/cupcake-k3s
 K3S_DIR=/etc/rancher/k3s
 SHARE=/usr/share/cupcake-k3s
+PRELOAD="$STATE_DIR/preload"
+K3S_IMAGES=/var/lib/rancher/k3s/agent/images
 MANIFESTS=/var/lib/rancher/k3s/server/manifests
 
 BOOT_DIR="$(dirname "$CONFIG")"
@@ -165,6 +167,12 @@ fi
 } > "$CREDENTIALS_FILE.new"
 mv -f "$CREDENTIALS_FILE.new" "$CREDENTIALS_FILE"
 
+install -d -m 755 "$K3S_IMAGES"
+for archive in "$PRELOAD"/*.tar.zst; do
+  [ -e "$archive" ] || continue
+  ln -f "$archive" "$K3S_IMAGES/" 2>/dev/null || cp "$archive" "$K3S_IMAGES/"
+done
+
 tmp="$CONFIG.new"
 tr -d '\r' < "$CONFIG" | grep -vE '^[[:space:]]*TOKEN[[:space:]]*=' > "$tmp" || true
 printf '# TOKEN was removed after this Pi joined; it is kept in %s\n' "$K3S_DIR/config.yaml" >> "$tmp"
@@ -175,6 +183,6 @@ rm -f "$ERROR_FILE"
 touch "$STATE_DIR/configured"
 UNIT=k3s.service
 [ "$ROLE" = agent ] && UNIT=k3s-agent.service
-systemctl enable "$UNIT"
-systemctl start --no-block "$UNIT"
+systemctl enable "$UNIT" cupcake-k3s-preloaded.service
+systemctl start --no-block "$UNIT" cupcake-k3s-preloaded.service
 log "configured $NAME as k3s ${ROLE}$([ "$ROLE" = agent ] && echo " joining $SERVER")"

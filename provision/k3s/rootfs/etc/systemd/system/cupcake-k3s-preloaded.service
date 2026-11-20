@@ -1,0 +1,13 @@
+[Unit]
+Description=Stop k3s re-importing the preloaded images once they are imported
+After=k3s.service k3s-agent.service
+ConditionPathExistsGlob=/var/lib/rancher/k3s/agent/images/*.tar.zst
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-k3s-preloaded
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

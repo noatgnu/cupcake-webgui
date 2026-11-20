@@ -2198,13 +2198,20 @@ jobs:
 
       - name: Check the image contents
         run: |
-          ROOTFS=$(find pi-gen/work -name rootfs -path "*/stage2k/rootfs" | head -1)
+          ROOTFS=$(sudo find pi-gen/work -maxdepth 3 -type d -name rootfs -path "*/stage2k/rootfs" | head -1)
+          [ -n "$ROOTFS" ] || { echo "FAIL: no stage2k root file system"; exit 1; }
           echo "ROOTFS=$ROOTFS" >> "$GITHUB_ENV"
           fail() { echo "FAIL: $*"; exit 1; }
           sudo test -x "$ROOTFS/usr/local/bin/k3s" || fail "k3s is missing"
-          sudo ls -la "$ROOTFS/var/lib/rancher/k3s/agent/images/"
-          sudo test -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/cupcake-k3s-setup.service" || fail "the setup service is not enabled"
-          sudo test ! -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/k3s.service" || fail "k3s starts before it is configured"
+          sudo ls -la "$ROOTFS/var/lib/cupcake-k3s/preload/"
+          sudo test -f "$ROOTFS/usr/share/cupcake-k3s/reference-snapshot/$(cd k3s-build/snapshot && ls manifest*.json | head -1)" || fail "the reference snapshot is missing"
+          WANTS="$ROOTFS/etc/systemd/system/multi-user.target.wants"
+          for unit in cupcake-k3s-setup.service avahi-daemon.service; do
+            sudo test -L "$WANTS/$unit" || fail "$unit is not enabled"
+          done
+          for unit in k3s.service k3s-agent.service cupcake-k3s-preloaded.service cupcake-k3s-mdns-aliases.service; do
+            sudo test ! -L "$WANTS/$unit" || fail "$unit starts before the Pi is configured"
+          done
           sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
           sudo test ! -d "$ROOTFS/var/lib/rancher/k3s/server" || fail "the image ships k3s server state"
           grep -q cgroup_enable=memory "$ROOTFS/boot/firmware/cmdline.txt" || fail "the memory cgroup is not enabled"

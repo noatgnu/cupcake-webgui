@@ -1,0 +1,26 @@
+#!/bin/bash
+# Hands each preloaded image archive back once k3s has imported it, so k3s stops re-importing them on every start.
+set -euo pipefail
+
+K3S_IMAGES=/var/lib/rancher/k3s/agent/images
+PRELOAD=/var/lib/cupcake-k3s/preload
+deadline=$(( $(date +%s) + ${CUPCAKE_K3S_IMPORT_SECONDS:-14400} ))
+
+while true; do
+  remaining=0
+  imported=$(journalctl -b -u k3s -u k3s-agent -o cat --no-pager 2>/dev/null | grep -o "Imported [0-9]* images from $K3S_IMAGES/[^ ]*" || true)
+  for archive in "$PRELOAD"/*.tar.zst; do
+    [ -e "$archive" ] || continue
+    name=$(basename "$archive")
+    [ -e "$K3S_IMAGES/$name" ] || continue
+    if grep -qF "from $K3S_IMAGES/$name" <<< "$imported"; then
+      rm -f "$K3S_IMAGES/$name"
+      echo "cupcake-k3s: $name is imported"
+    else
+      remaining=$((remaining + 1))
+    fi
+  done
+  [ "$remaining" -eq 0 ] && exit 0
+  [ "$(date +%s)" -lt "$deadline" ] || { echo "cupcake-k3s: $remaining preloaded archives were not imported"; exit 1; }
+  sleep 15
+done

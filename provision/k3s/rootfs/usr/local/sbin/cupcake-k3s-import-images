@@ -1,0 +1,9 @@
+#!/bin/bash
+# Imports the images preloaded in this image into k3s again, for when the kubelet has removed unused ones.
+set -euo pipefail
+
+for archive in /var/lib/cupcake-k3s/preload/*.tar.zst; do
+  [ -e "$archive" ] || continue
+  echo "Importing $(basename "$archive")"
+  zstd -dc "$archive" | /usr/local/bin/k3s ctr -n k8s.io images import -
+done

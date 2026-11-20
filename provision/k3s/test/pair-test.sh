@@ -175,6 +175,15 @@ until [ "$(in_server kubectl get nodes --no-headers 2>/dev/null | grep -c ' Read
   [ "$(date +%s)" -lt "$deadline" ] || fail "the worker did not come back after a restart"
   sleep 10
 done
-docker exec "$PREFIX-agent" systemctl is-active k3s-agent >/dev/null || fail "k3s-agent is not running after a restart"
+until docker exec "$PREFIX-agent" systemctl is-active k3s-agent >/dev/null; do
+  [ "$(date +%s)" -lt "$deadline" ] || fail "k3s-agent is not running after a restart"
+  sleep 5
+done
+RESTARTED=$(docker exec "$PREFIX-agent" systemctl show k3s-agent -p ActiveEnterTimestampMonotonic --value)
+STARTING=$(docker exec "$PREFIX-agent" systemctl show k3s-agent -p InactiveExitTimestampMonotonic --value)
+echo "k3s-agent took $(( (RESTARTED - STARTING) / 1000000 ))s to start after a restart"
+if docker exec "$PREFIX-agent" sh -c 'ls /var/lib/rancher/k3s/agent/images/*.tar.zst' >/dev/null 2>&1; then
+  fail "the preloaded images are imported again on every start"
+fi
 
 echo "PASS: control plane and worker paired over mDNS and ran a preloaded image offline${PAIR_TENANT:+; cupcake-master created an instance}"
