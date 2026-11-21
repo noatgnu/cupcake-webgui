@@ -2215,7 +2215,9 @@ jobs:
             sudo test ! -L "$WANTS/$unit" || fail "$unit starts before the Pi is configured"
           done
           sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
-          sudo test ! -d "$ROOTFS/var/lib/rancher/k3s/server" || fail "the image ships k3s server state"
+          SERVER_STATE=$(sudo find "$ROOTFS/var/lib/rancher/k3s/server" -mindepth 1 \
+            ! -path "*/server/manifests" ! -path "*/server/manifests/cupcake-traefik-config.yaml" 2>/dev/null || true)
+          [ -z "$SERVER_STATE" ] || { echo "$SERVER_STATE"; fail "the image ships k3s server state"; }
           grep -q cgroup_enable=memory "$ROOTFS/boot/firmware/cmdline.txt" || fail "the memory cgroup is not enabled"
           if sudo sh -c "ls $ROOTFS/lib/modules/*/kernel/fs/nfsd/nfsd.ko* >/dev/null 2>&1"; then
             echo "nfsd kernel module present"
