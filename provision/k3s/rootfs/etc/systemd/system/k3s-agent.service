@@ -4,6 +4,7 @@ Documentation=https://docs.k3s.io
 Wants=network-online.target time-sync.target
 After=network-online.target time-sync.target cupcake-k3s-setup.service
 ConditionPathExists=/etc/rancher/k3s/config.yaml
+RequiresMountsFor=/var/lib/rancher
 
 [Install]
 WantedBy=multi-user.target

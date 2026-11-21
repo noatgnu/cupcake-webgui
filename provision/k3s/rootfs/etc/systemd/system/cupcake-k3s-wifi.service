@@ -1,0 +1,13 @@
+[Unit]
+Description=Connect to the Wi-Fi network in cupcake-wifi.txt
+After=NetworkManager.service boot-firmware.mount
+Wants=NetworkManager.service
+Before=cupcake-k3s-setup.service k3s.service k3s-agent.service
+ConditionPathExists=/boot/firmware/cupcake-wifi.txt
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-wifi-setup /boot/firmware/cupcake-wifi.txt
+
+[Install]
+WantedBy=multi-user.target

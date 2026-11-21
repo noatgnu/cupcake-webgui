@@ -1,0 +1,72 @@
+#!/bin/bash
+# Puts /var/lib/rancher (k3s, its images and the volumes it provides) on the USB drive named in cupcake-storage.txt.
+set -euo pipefail
+
+CONFIG="${CUPCAKE_K3S_STORAGE_CONFIG:-/boot/firmware/cupcake-storage.txt}"
+ERROR_FILE="$(dirname "$CONFIG")/cupcake-k3s-error.txt"
+DATA=/srv/cupcake-data
+RANCHER=/var/lib/rancher
+
+log() { echo "cupcake-k3s: $*"; }
+fail() {
+  log "$*"
+  printf '%s\nFix cupcake-storage.txt and restart the Pi.\n' "$*" > "$ERROR_FILE" || true
+  exit 1
+}
+
+value() {
+  local line
+  line=$(tr -d '\r' < "$CONFIG" | grep -E "^[[:space:]]*$1[[:space:]]*=" | tail -1 || true)
+  line="${line#*=}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  printf '%s' "$line"
+}
+
+[ -f "$CONFIG" ] || exit 0
+if mountpoint -q "$RANCHER"; then
+  log "$RANCHER is already on the USB drive"
+  exit 0
+fi
+if [ -e /var/lib/cupcake-k3s/configured ]; then
+  fail "Storage can only be chosen before the Pi is first configured; flash the card again to use a USB drive"
+fi
+
+TYPE=$(value TYPE)
+LABEL=$(value LABEL)
+LABEL="${LABEL:-CUPCAKEDATA}"
+[ "${TYPE:-usb}" = usb ] || fail "k3s nodes keep their data on a USB drive only (TYPE=usb), not ${TYPE}"
+
+DEVICE=""
+for _ in $(seq 1 30); do
+  DEVICE=$(blkid -L "$LABEL" 2>/dev/null || true)
+  [ -n "$DEVICE" ] && break
+  sleep 2
+done
+[ -n "$DEVICE" ] || fail "No drive labelled $LABEL is plugged in"
+
+FSTYPE=$(blkid -o value -s TYPE "$DEVICE")
+case "$FSTYPE" in
+  ext4|xfs|btrfs) ;;
+  *) fail "The drive labelled $LABEL is $FSTYPE; k3s needs ext4, for example: sudo mkfs.ext4 -L $LABEL $DEVICE" ;;
+esac
+UUID=$(blkid -o value -s UUID "$DEVICE")
+
+install -d -m 755 "$DATA"
+grep -q " $DATA " /etc/fstab 2>/dev/null || \
+  printf 'UUID=%s %s %s defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2\n' "$UUID" "$DATA" "$FSTYPE" >> /etc/fstab
+mount "$DATA"
+
+install -d -m 755 "$DATA/rancher"
+if [ -z "$(ls -A "$DATA/rancher")" ] && [ -d "$RANCHER" ]; then
+  cp -a "$RANCHER/." "$DATA/rancher/"
+fi
+install -d -m 755 "$RANCHER"
+grep -q " $RANCHER " /etc/fstab || \
+  printf '%s %s none bind,x-systemd.requires-mounts-for=%s 0 0\n' "$DATA/rancher" "$RANCHER" "$DATA" >> /etc/fstab
+systemctl daemon-reload
+mount "$RANCHER"
+
+printf '# %s (%s) holds this Pi'"'"'s k3s data at %s.\n' "$LABEL" "$DEVICE" "$RANCHER" > "$CONFIG"
+rm -f "$ERROR_FILE"
+log "k3s data is on $DEVICE ($LABEL, $FSTYPE)"

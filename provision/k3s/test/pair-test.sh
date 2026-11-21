@@ -1,7 +1,8 @@
 #!/bin/bash
 # Boots a control plane and a worker from a k3s node image on a network with a gateway but no internet, and checks that they pair
 # over mDNS and run a pod from a preloaded image: pair-test.sh <docker image> [preloaded test image].
-# PAIR_TENANT=1 also has cupcake-master create an instance; PAIR_KEEP=1 keeps the containers after a failure.
+# PAIR_TENANT=1 also has cupcake-master create an instance; PAIR_STORAGE=1 gives the control plane a USB drive;
+# PAIR_KEEP=1 keeps the containers after a failure.
 set -euo pipefail
 
 IMAGE="$1"
@@ -25,6 +26,9 @@ cleanup() {
   fi
   docker rm -f -v "$PREFIX-server" "$PREFIX-agent" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
+  if [ -n "${LOOP:-}" ]; then
+    docker run --rm --privileged --entrypoint losetup "$IMAGE" -d "$LOOP" >/dev/null 2>&1 || true
+  fi
   rm -rf "$WORK"
   exit "$status"
 }
@@ -38,6 +42,15 @@ TUNNEL_TOKEN=$(printf '{"a":"test-account","t":"00000000-0000-0000-0000-00000000
 printf 'TUNNEL_TOKEN=%s\n' "$TUNNEL_TOKEN" > "$WORK/server/cupcake-cloudflared.txt"
 printf 'ROLE=agent\r\nTOKEN = "%s"\r\nSERVER=cupcake-k3s.local\r\n' "$TOKEN" > "$WORK/agent/cupcake-k3s.txt"
 
+LOOP=""
+if [ "${PAIR_STORAGE:-0}" = 1 ]; then
+  truncate -s 12G "$WORK/usb-drive.img"
+  LOOP=$(docker run --rm --privileged -v "$WORK:/work" --entrypoint sh "$IMAGE" \
+    -c 'mkfs.ext4 -q -L CUPCAKEDATA /work/usb-drive.img && losetup -f --show /work/usb-drive.img')
+  printf 'TYPE=usb\r\nLABEL=CUPCAKEDATA\r\n' > "$WORK/server/cupcake-storage.txt"
+  echo "USB drive: $LOOP"
+fi
+
 docker network create -o com.docker.network.bridge.enable_ip_masquerade=false "$NETWORK" >/dev/null
 for node in server agent; do
   docker run -d --name "$PREFIX-$node" --hostname "unconfigured-$node" --network "$NETWORK" \
@@ -47,13 +60,20 @@ for node in server agent; do
 done
 
 in_server() { docker exec "$PREFIX-server" "$@"; }
+deadline=$(( $(date +%s) + ${PAIR_TIMEOUT:-900} ))
+
+if [ -n "$LOOP" ]; then
+  until in_server mountpoint -q /var/lib/rancher 2>/dev/null; do
+    [ "$(date +%s)" -lt "$deadline" ] || { in_server journalctl -u cupcake-k3s-storage --no-pager | tail -20; fail "the USB drive was not mounted"; }
+    sleep 5
+  done
+fi
 
 if in_server curl -fsS -m 10 -o /dev/null https://ghcr.io/v2/ 2>/dev/null; then
   fail "the test network reaches the internet"
 fi
 
 echo "=== waiting for both nodes ==="
-deadline=$(( $(date +%s) + ${PAIR_TIMEOUT:-900} ))
 until [ "$(in_server kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready')" = 2 ]; do
   [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl get nodes 2>&1 || true; fail "both nodes were not Ready in time"; }
   sleep 10
@@ -77,6 +97,15 @@ in_server grep -q 'server: https://cupcake-k3s.local:6443' "$FIRST_HOME/.kube/co
 FIRST_USER=$(in_server getent passwd 1000 | cut -d: -f1)
 in_server runuser -u "$FIRST_USER" -- kubectl get nodes --no-headers | grep -q cupcake-k3s \
   || fail "the first user cannot reach the control plane with that kubeconfig"
+
+if [ -n "$LOOP" ]; then
+  echo "=== k3s keeps its data on the USB drive ==="
+  in_server findmnt -n -o SOURCE,FSTYPE /srv/cupcake-data | grep -q "^$LOOP ext4" || fail "the drive is not mounted at /srv/cupcake-data"
+  [ "$(in_server stat -c %d /var/lib/rancher/k3s/server/db)" = "$(in_server stat -c %d /srv/cupcake-data)" ] \
+    || fail "the k3s datastore is not on the USB drive"
+  in_server grep -q 'holds this Pi' /boot/firmware/cupcake-storage.txt || fail "cupcake-storage.txt was not marked as applied"
+  echo "the datastore and images are on $LOOP"
+fi
 
 echo "=== running a pod from a preloaded image on the worker, without internet ==="
 in_server kubectl run preload-check --image="$TEST_IMAGE" --image-pull-policy=Never --restart=Never \

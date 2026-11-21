@@ -1,0 +1,13 @@
+[Unit]
+Description=Put k3s data on the USB drive named in cupcake-storage.txt
+After=local-fs.target boot-firmware.mount systemd-udev-settle.service
+Before=cupcake-k3s-setup.service k3s.service k3s-agent.service
+ConditionPathExists=/boot/firmware/cupcake-storage.txt
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/cupcake-k3s-storage
+
+[Install]
+WantedBy=multi-user.target
