@@ -1,7 +1,10 @@
 [Unit]
-Description=Hand the Cloudflare tunnel and Tailscale settings from the boot partition to cupcake-master
-After=k3s.service
-ConditionPathExistsGlob=/var/lib/cupcake-k3s/remote-access-*
+Description=Join the tailnet and hand the Cloudflare tunnel and Tailscale settings from the boot partition to cupcake-master
+After=boot-firmware.mount network-online.target tailscaled.service cupcake-k3s-setup.service k3s.service
+Wants=network-online.target
+ConditionPathExists=|/boot/firmware/cupcake-cloudflared.txt
+ConditionPathExists=|/boot/firmware/cupcake-tailscale.txt
+ConditionPathExistsGlob=|/var/lib/cupcake-k3s/remote-access-*
 
 [Service]
 Type=oneshot

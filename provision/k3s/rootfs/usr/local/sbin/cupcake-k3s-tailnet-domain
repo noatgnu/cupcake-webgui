@@ -1,0 +1,47 @@
+#!/bin/bash
+# Serves cupcake-master at this control plane's own tailnet name, such as cupcake-k3s.tail1234.ts.net, with the
+# certificate Tailscale issues for it, or a self-signed one while the tailnet issues none. Runs after the Pi joins the
+# tailnet and weekly to renew the certificate.
+set -euo pipefail
+
+BOOT_DIR="${CUPCAKE_K3S_BOOT_DIR:-/boot/firmware}"
+ERROR_FILE="$BOOT_DIR/cupcake-k3s-error.txt"
+MASTER_MANIFEST=/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+log() { echo "cupcake-k3s: $*"; }
+report() {
+  grep -qF "$1" "$ERROR_FILE" 2>/dev/null || (umask 022; printf '%s\n' "$1" >> "$ERROR_FILE") || true
+}
+
+[ -f "$MASTER_MANIFEST" ] || exit 0
+status=$(tailscale status --self --peers=false --json 2>/dev/null) || exit 0
+grep -q '"BackendState": *"Running"' <<< "$status" || exit 0
+name=$(grep -o '"DNSName": *"[^"]*"' <<< "$status" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+name="${name%.}"
+[ -n "$name" ] || exit 0
+
+until /usr/local/bin/kubectl -n cupcake-master rollout status deployment/cupcake-master --timeout=60s >/dev/null 2>&1; do
+  sleep 15
+done
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+chmod 700 "$work"
+node_domain() {
+  /usr/local/bin/kubectl -n cupcake-master exec -i deploy/cupcake-master -c web -- python manage.py node_domain "$@"
+}
+
+if tailscale cert --cert-file "$work/cert.pem" --key-file "$work/key.pem" "$name" >/dev/null 2>&1; then
+  output=$(cat "$work/cert.pem" "$work/key.pem" | node_domain "$name" 2>&1) && served=yes || served=no
+else
+  log "Tailscale gave no certificate for $name; serving it with a self-signed one"
+  report "https://$name uses a self-signed certificate. Turn on HTTPS Certificates on the DNS page of the Tailscale admin console for a trusted one; this is retried on restart and weekly."
+  output=$(node_domain "$name" --self-signed < /dev/null 2>&1) && served=yes || served=no
+fi
+if [ "$served" = yes ]; then
+  log "$output"
+else
+  log "serving $name failed: $output"
+  report "cupcake-master is not served at https://$name: $output"
+fi

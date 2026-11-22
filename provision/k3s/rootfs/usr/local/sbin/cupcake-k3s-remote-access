@@ -1,15 +1,89 @@
 #!/bin/bash
-# Hands the Cloudflare tunnel token and Tailscale OAuth client from the boot partition to cupcake-master once it runs.
+# Takes cupcake-cloudflared.txt and cupcake-tailscale.txt off the boot partition on every boot. AUTHKEY joins this Pi to
+# the tailnet on any node. The Cloudflare tunnel token and the Tailscale OAuth client (CLIENT_ID, CLIENT_SECRET) are
+# handed to cupcake-master once it runs, and only a control plane running cupcake-master uses them. Problems are written
+# to cupcake-k3s-error.txt.
 set -euo pipefail
 
 STATE_DIR=/var/lib/cupcake-k3s
 BOOT_DIR="${CUPCAKE_K3S_BOOT_DIR:-/boot/firmware}"
 ERROR_FILE="$BOOT_DIR/cupcake-k3s-error.txt"
+MASTER_MANIFEST=/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+log() { echo "cupcake-k3s: $*"; }
+problem() {
+  log "$*"
+  (umask 022; printf '%s\n' "$*" >> "$ERROR_FILE") || true
+}
+
+value() {
+  local line
+  line=$(tr -d '\r' < "$1" | grep -E "^[[:space:]]*$2[[:space:]]*=" | tail -1 || true)
+  line="${line#*=}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  line="${line#\"}"; line="${line%\"}"
+  line="${line#\'}"; line="${line%\'}"
+  printf '%s' "$line"
+}
 
 manage() {
   /usr/local/bin/kubectl -n cupcake-master exec -i deploy/cupcake-master -c web -- python manage.py remote_access "$@"
 }
+
+if [ ! -e "$STATE_DIR/configured" ]; then
+  log "this Pi is not set up yet; the remote access files stay until it is"
+  exit 0
+fi
+
+umask 077
+CLOUDFLARE_FILE="$BOOT_DIR/cupcake-cloudflared.txt"
+TAILSCALE_FILE="$BOOT_DIR/cupcake-tailscale.txt"
+forget() {
+  rm -f "$1"
+  sync -f "$BOOT_DIR" 2>/dev/null || sync
+}
+
+if [ -f "$CLOUDFLARE_FILE" ]; then
+  token=$(value "$CLOUDFLARE_FILE" TUNNEL_TOKEN)
+  if [ ! -f "$MASTER_MANIFEST" ]; then
+    problem "cupcake-cloudflared.txt was removed: only a control plane running cupcake-master uses it."
+  elif [ -z "$token" ]; then
+    problem "cupcake-cloudflared.txt was removed: it needs TUNNEL_TOKEN from a Cloudflare tunnel."
+  else
+    printf '%s\n' "$token" > "$STATE_DIR/remote-access-cloudflare"
+  fi
+  forget "$CLOUDFLARE_FILE"
+fi
+
+if [ -f "$TAILSCALE_FILE" ]; then
+  auth_key=$(value "$TAILSCALE_FILE" AUTHKEY)
+  client_id=$(value "$TAILSCALE_FILE" CLIENT_ID)
+  client_secret=$(value "$TAILSCALE_FILE" CLIENT_SECRET)
+  forget "$TAILSCALE_FILE"
+  if [ -z "$auth_key" ] && { [ -z "$client_id" ] || [ -z "$client_secret" ]; }; then
+    problem "cupcake-tailscale.txt was removed: it needs AUTHKEY, or CLIENT_ID and CLIENT_SECRET from a Tailscale OAuth client."
+  fi
+  if [ -n "$auth_key" ]; then
+    if output=$(tailscale up --authkey "$auth_key" --ssh --hostname "$(hostname)" --timeout=90s 2>&1); then
+      log "joined the tailnet as $(hostname)"
+      systemctl start --no-block cupcake-k3s-tailnet-domain.service || true
+    else
+      problem "This Pi did not join the tailnet: ${output:-tailscale up failed}
+Check the auth key and the network, then drop cupcake-tailscale.txt again or run sudo tailscale up."
+    fi
+  fi
+  if [ -n "$client_id" ] && [ -n "$client_secret" ]; then
+    if [ -f "$MASTER_MANIFEST" ]; then
+      printf '%s\n%s\n' "$client_id" "$client_secret" > "$STATE_DIR/remote-access-tailscale"
+    else
+      problem "The Tailscale OAuth client in cupcake-tailscale.txt was not used: only a control plane running cupcake-master uses it."
+    fi
+  fi
+fi
+
+ls "$STATE_DIR"/remote-access-* >/dev/null 2>&1 || exit 0
 
 until /usr/local/bin/kubectl -n cupcake-master rollout status deployment/cupcake-master --timeout=60s >/dev/null 2>&1; do
   sleep 15
@@ -19,11 +93,10 @@ for service in cloudflare tailscale; do
   file="$STATE_DIR/remote-access-$service"
   [ -f "$file" ] || continue
   if output=$(manage "$service" < "$file" 2>&1); then
-    rm -f "$file"
-    echo "cupcake-k3s: $output"
+    log "$output"
   else
-    echo "cupcake-k3s: setting up $service failed: $output"
-    printf 'Setting up %s failed: %s\nAdd it again on the Remote access page of cupcake-master.\n' "$service" "$output" > "$ERROR_FILE"
-    rm -f "$file"
+    problem "Setting up $service failed: $output
+Add it again on the Remote access page of cupcake-master."
   fi
+  rm -f "$file"
 done

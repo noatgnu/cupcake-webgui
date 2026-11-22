@@ -1,0 +1,10 @@
+[Unit]
+Description=Serve cupcake-master at this Pi's tailnet name with its Tailscale certificate
+After=network-online.target tailscaled.service k3s.service
+Wants=network-online.target
+ConditionPathExists=/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-k3s-tailnet-domain
+TimeoutStartSec=3600

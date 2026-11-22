@@ -182,9 +182,7 @@ if in_server grep -q '^MASTER_IMAGE=' /usr/share/cupcake-k3s/versions.env 2>/dev
   done
   STORED=$(in_server kubectl -n cupcake-remote-access get secret cloudflared-token -o jsonpath='{.data.token}' | base64 -d)
   [ "$STORED" = "$TUNNEL_TOKEN" ] || fail "the stored tunnel token differs from the one on the boot partition"
-  if in_server grep -q "$TUNNEL_TOKEN" /boot/firmware/cupcake-cloudflared.txt; then
-    fail "the tunnel token was left on the boot partition"
-  fi
+  [ ! -e "$WORK/server/cupcake-cloudflared.txt" ] || fail "cupcake-cloudflared.txt was left on the boot partition"
   in_server sh -c '! ls /var/lib/cupcake-k3s/remote-access-* 2>/dev/null' || fail "the tunnel token was left in the setup folder"
   in_server kubectl -n kube-system get helmchartconfig traefik -o jsonpath='{.spec.valuesContent}' | grep -q '10.42.0.0/16' \
     || fail "Traefik does not trust forwarded headers from the cluster"
@@ -253,6 +251,8 @@ print('added')"
 fi
 
 echo "=== restart: the setup does not run again and the nodes come back ==="
+TS_KEY="tskey-auth-pairtest-$TOKEN"
+printf 'AUTHKEY=%s\r\nCLIENT_ID=test-id\r\nCLIENT_SECRET=test-secret\r\n' "$TS_KEY" > "$WORK/agent/cupcake-tailscale.txt"
 docker restart "$PREFIX-agent" >/dev/null
 sleep 20
 until [ "$(in_server kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready')" = 2 ]; do
@@ -266,6 +266,24 @@ done
 RESTARTED=$(docker exec "$PREFIX-agent" systemctl show k3s-agent -p ActiveEnterTimestampMonotonic --value)
 STARTING=$(docker exec "$PREFIX-agent" systemctl show k3s-agent -p InactiveExitTimestampMonotonic --value)
 echo "k3s-agent took $(( (RESTARTED - STARTING) / 1000000 ))s to start after a restart"
+until [ ! -e "$WORK/agent/cupcake-tailscale.txt" ]; do
+  [ "$(date +%s)" -lt "$deadline" ] || fail "cupcake-tailscale.txt dropped on a set-up worker stayed on its boot partition"
+  sleep 5
+done
+ts_deadline=$(( $(date +%s) + 300 ))
+until grep -q "This Pi did not join the tailnet" "$WORK/agent/cupcake-k3s-error.txt" 2>/dev/null; do
+  [ "$(date +%s)" -lt "$ts_deadline" ] || { docker exec "$PREFIX-agent" systemctl status cupcake-k3s-remote-access --no-pager 2>&1 | tail -20; cat "$WORK/agent/cupcake-k3s-error.txt" 2>/dev/null; fail "the worker did not try to join the tailnet with AUTHKEY"; }
+  sleep 5
+done
+docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-remote-access --no-pager | grep -q "tailscale up\|tailnet" \
+  || fail "the attempt to join the tailnet was not logged"
+grep -q "only a control plane running cupcake-master uses it" "$WORK/agent/cupcake-k3s-error.txt" \
+  || fail "the worker did not say why it skipped the OAuth client"
+! grep -rq "$TS_KEY" "$WORK/agent" || fail "the auth key was left on the boot partition"
+docker exec "$PREFIX-agent" systemctl is-active tailscaled >/dev/null || fail "tailscaled is not running on the worker"
+docker exec "$PREFIX-agent" sh -c '! ls /var/lib/cupcake-k3s/remote-access-* 2>/dev/null' \
+  || fail "the worker kept the Tailscale client"
+echo "cupcake-tailscale.txt dropped on a set-up worker: tried AUTHKEY (offline), skipped the OAuth client, file removed"
 if docker exec "$PREFIX-agent" sh -c 'ls /var/lib/rancher/k3s/agent/images/*.tar.zst' >/dev/null 2>&1; then
   fail "the preloaded images are imported again on every start"
 fi

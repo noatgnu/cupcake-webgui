@@ -88,9 +88,6 @@ for extra in "${EXTRA_CA_NAMES[@]}"; do
     || fail "CA_NAMES must be domain names separated by commas, such as lab.example.org"
 done
 [[ "$ADMIN_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || fail "ADMIN_EMAIL must be an email address"
-if [ -f "$BOOT_DIR/cupcake-tailscale.txt" ] && [ -z "$(CONFIG="$BOOT_DIR/cupcake-tailscale.txt" value CLIENT_SECRET)" ]; then
-  fail "cupcake-tailscale.txt needs CLIENT_ID and CLIENT_SECRET from a Tailscale OAuth client"
-fi
 RUN_MANAGER=no
 if [ "$ROLE" = server ] && [ "$MANAGER" = yes ]; then
   [ -f "$SHARE/versions.env" ] && [ -f "$SHARE/cupcake-master.yaml" ] || fail "this image has no cupcake-master; set MANAGER=no"
@@ -157,26 +154,6 @@ if [ "$RUN_MANAGER" = yes ]; then
   /usr/local/sbin/cupcake-k3s-local-ca "$NAME" "$BOOT_DIR" "${EXTRA_CA_NAMES[@]}"
   systemctl enable cupcake-k3s-mdns-aliases.service
   systemctl start --no-block cupcake-k3s-mdns-aliases.service
-
-  REMOTE_FILES=0
-  CLOUDFLARE_FILE="$BOOT_DIR/cupcake-cloudflared.txt"
-  if [ -f "$CLOUDFLARE_FILE" ]; then
-    CONFIG="$CLOUDFLARE_FILE" value TUNNEL_TOKEN > "$STATE_DIR/remote-access-cloudflare"
-    printf '\n' >> "$STATE_DIR/remote-access-cloudflare"
-    printf '# The tunnel token was handed to cupcake-master; change it on its Remote access page.\n' > "$CLOUDFLARE_FILE"
-    REMOTE_FILES=1
-  fi
-  TAILSCALE_FILE="$BOOT_DIR/cupcake-tailscale.txt"
-  if [ -f "$TAILSCALE_FILE" ]; then
-    printf '%s\n%s\n' "$(CONFIG="$TAILSCALE_FILE" value CLIENT_ID)" "$(CONFIG="$TAILSCALE_FILE" value CLIENT_SECRET)" \
-      > "$STATE_DIR/remote-access-tailscale"
-    printf '# The OAuth client was handed to cupcake-master; change it on its Remote access page.\n' > "$TAILSCALE_FILE"
-    REMOTE_FILES=1
-  fi
-  if [ "$REMOTE_FILES" = 1 ]; then
-    systemctl enable cupcake-k3s-remote-access.service
-    systemctl start --no-block cupcake-k3s-remote-access.service
-  fi
 fi
 
 {
