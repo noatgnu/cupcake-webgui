@@ -2129,10 +2129,15 @@ jobs:
           sudo ls -la "$ROOTFS/var/lib/cupcake-k3s/preload/"
           sudo test -f "$ROOTFS/usr/share/cupcake-k3s/reference-snapshot/$(cd k3s-build/snapshot && ls manifest*.json | head -1)" || fail "the reference snapshot is missing"
           WANTS="$ROOTFS/etc/systemd/system/multi-user.target.wants"
-          for unit in cupcake-k3s-setup.service cupcake-k3s-storage.service cupcake-k3s-wifi.service avahi-daemon.service; do
+          for unit in cupcake-k3s-setup.service cupcake-k3s-storage.service cupcake-k3s-wifi.service avahi-daemon.service \
+              cupcake-k3s-remote-access.service tailscaled.service; do
             sudo test -L "$WANTS/$unit" || fail "$unit is not enabled"
           done
-          for unit in k3s.service k3s-agent.service cupcake-k3s-preloaded.service cupcake-k3s-mdns-aliases.service cupcake-k3s-remote-access.service; do
+          sudo test -L "$ROOTFS/etc/systemd/system/timers.target.wants/cupcake-k3s-tailnet-domain.timer" \
+            || fail "cupcake-k3s-tailnet-domain.timer is not enabled"
+          sudo test -x "$ROOTFS/usr/bin/tailscale" || fail "tailscale is not installed"
+          sudo test -f "$ROOTFS/usr/share/cupcake-k3s/cupcake-master-https.yaml" || fail "the HTTPS redirect manifest is missing"
+          for unit in k3s.service k3s-agent.service cupcake-k3s-preloaded.service cupcake-k3s-mdns-aliases.service; do
             sudo test ! -L "$WANTS/$unit" || fail "$unit starts before the Pi is configured"
           done
           sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
