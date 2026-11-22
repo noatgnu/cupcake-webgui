@@ -48,6 +48,7 @@ data:
   USE_X_FORWARDED_PROTO: 'True'
   BASE_DOMAIN: local
   CONTROL_PLANE_NAMESPACE: cupcake-master
+  LOCAL_CA_ISSUER: cupcake-local-ca
   REMOTE_ACCESS_ENABLED: 'True'
   REDIS_HOST: valkey
   STORAGE_CLASS: local-path
@@ -311,11 +312,15 @@ kind: Ingress
 metadata:
   name: cupcake-master
   namespace: cupcake-master
+  annotations:
+    cert-manager.io/cluster-issuer: cupcake-local-ca
+    cert-manager.io/duration: 8760h
 spec:
   ingressClassName: traefik
   tls:
   - hosts:
     - '@@HOST@@'
+    secretName: cupcake-master-local-tls
   rules:
   - host: '@@HOST@@'
     http:

@@ -1,0 +1,64 @@
+#!/bin/bash
+# Creates this cluster's certificate authority, limited to .local and the given names, and the cert-manager issuer
+# that signs local domains with it: cupcake-k3s-local-ca <name> <boot dir> [extra name]...
+set -euo pipefail
+
+NAME="$1"
+BOOT_DIR="$2"
+shift 2
+STATE_DIR=/var/lib/cupcake-k3s/local-ca
+MANIFEST=/var/lib/rancher/k3s/server/manifests/cupcake-local-ca.yaml
+
+install -d -m 700 "$STATE_DIR"
+if [ ! -s "$STATE_DIR/ca.key" ]; then
+  PERMITTED="permitted;DNS:local"
+  for extra in "$@"; do
+    [ -n "$extra" ] && PERMITTED="$PERMITTED,permitted;DNS:$extra"
+  done
+  cat > "$STATE_DIR/ca.cnf" <<CNF
+[req]
+distinguished_name = dn
+x509_extensions = ca
+prompt = no
+[dn]
+CN = Cupcake $NAME local certificate authority
+O = Cupcake
+[ca]
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage = critical, keyCertSign, cRLSign
+nameConstraints = critical, $PERMITTED
+subjectKeyIdentifier = hash
+CNF
+  openssl ecparam -name prime256v1 -genkey -noout -out "$STATE_DIR/ca.key"
+  chmod 600 "$STATE_DIR/ca.key"
+  BACKDATE=()
+  if openssl req -help 2>&1 | grep -q -- "-not_before"; then
+    BACKDATE=(-not_before "$(date -u -d '-1 day' +%Y%m%d%H%M%SZ)" -not_after "$(date -u -d '+3651 days' +%Y%m%d%H%M%SZ)")
+  else
+    BACKDATE=(-days 3650)
+  fi
+  openssl req -x509 -new -key "$STATE_DIR/ca.key" -sha256 "${BACKDATE[@]}" -config "$STATE_DIR/ca.cnf" -out "$STATE_DIR/ca.crt"
+fi
+
+umask 077
+cat > "$MANIFEST" <<YAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cupcake-local-ca
+  namespace: cert-manager
+type: kubernetes.io/tls
+data:
+  tls.crt: $(base64 -w0 "$STATE_DIR/ca.crt")
+  tls.key: $(base64 -w0 "$STATE_DIR/ca.key")
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cupcake-local-ca
+spec:
+  ca:
+    secretName: cupcake-local-ca
+YAML
+install -m 644 "$STATE_DIR/ca.crt" "$BOOT_DIR/cupcake-k3s-ca.crt"
+openssl x509 -in "$STATE_DIR/ca.crt" -noout -fingerprint -sha256

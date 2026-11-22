@@ -59,6 +59,7 @@ SERVER=$(value SERVER)
 NAME=$(value HOSTNAME)
 MANAGER=$(value MANAGER)
 ADMIN_EMAIL=$(value ADMIN_EMAIL)
+CA_NAMES=$(value CA_NAMES)
 
 case "$ROLE" in
   server|agent) ;;
@@ -81,6 +82,11 @@ case "$MANAGER" in
   *) fail "MANAGER must be yes or no, not '${MANAGER}'" ;;
 esac
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@$NAME.local}"
+IFS=',' read -r -a EXTRA_CA_NAMES <<< "${CA_NAMES// /}"
+for extra in "${EXTRA_CA_NAMES[@]}"; do
+  [[ "$extra" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] \
+    || fail "CA_NAMES must be domain names separated by commas, such as lab.example.org"
+done
 [[ "$ADMIN_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || fail "ADMIN_EMAIL must be an email address"
 if [ -f "$BOOT_DIR/cupcake-tailscale.txt" ] && [ -z "$(CONFIG="$BOOT_DIR/cupcake-tailscale.txt" value CLIENT_SECRET)" ]; then
   fail "cupcake-tailscale.txt needs CLIENT_ID and CLIENT_SECRET from a Tailscale OAuth client"
@@ -148,6 +154,7 @@ if [ "$RUN_MANAGER" = yes ]; then
       -e "s|@@SNAPSHOT_ON_PROVISION@@|$SNAPSHOT_ON_PROVISION|" \
       "$SHARE/cupcake-master.yaml" > "$MANIFESTS/cupcake-master.yaml"
   chmod 600 "$MANIFESTS/cupcake-master.yaml"
+  /usr/local/sbin/cupcake-k3s-local-ca "$NAME" "$BOOT_DIR" "${EXTRA_CA_NAMES[@]}"
   systemctl enable cupcake-k3s-mdns-aliases.service
   systemctl start --no-block cupcake-k3s-mdns-aliases.service
 

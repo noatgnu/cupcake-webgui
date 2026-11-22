@@ -2042,6 +2042,7 @@ jobs:
           fi
           echo "k3s ${K3S_VERSION}; Cupcake images ${PRELOAD_TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
           bash provision/k3s/fetch-k3s.sh "$K3S_VERSION" arm64 k3s-build/k3s
+          bash provision/k3s/fetch-cert-manager.sh k3s-build/k3s
           bash provision/k3s/fetch-images.sh "$PRELOAD_TAG" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "$PRELOAD_TAG" != none ]; then
             bash provision/k3s/build-master-image.sh "$MASTER_REF" arm64 k3s-build/images | tee -a "$GITHUB_STEP_SUMMARY"
@@ -2136,7 +2137,12 @@ jobs:
           done
           sudo test ! -e "$ROOTFS/etc/rancher/k3s/config.yaml" || fail "the image ships a k3s configuration"
           SERVER_STATE=$(sudo find "$ROOTFS/var/lib/rancher/k3s/server" -mindepth 1 \
-            ! -path "*/server/manifests" ! -path "*/server/manifests/cupcake-traefik-config.yaml" 2>/dev/null || true)
+            ! -path "*/server/manifests" ! -path "*/server/manifests/*.yaml" 2>/dev/null || true)
+          for manifest in cupcake-traefik-config.yaml cert-manager.yaml; do
+            sudo test -f "$ROOTFS/var/lib/rancher/k3s/server/manifests/$manifest" || fail "$manifest is missing"
+          done
+          sudo test ! -e "$ROOTFS/var/lib/rancher/k3s/server/manifests/cupcake-local-ca.yaml" \
+            || fail "the image ships a certificate authority"
           [ -z "$SERVER_STATE" ] || { echo "$SERVER_STATE"; fail "the image ships k3s server state"; }
           grep -q cgroup_enable=memory "$ROOTFS/boot/firmware/cmdline.txt" || fail "the memory cgroup is not enabled"
           if sudo sh -c "ls $ROOTFS/lib/modules/*/kernel/fs/nfsd/nfsd.ko* >/dev/null 2>&1"; then

@@ -21,6 +21,9 @@ if [ -n "$IMAGES" ] && ls "$IMAGES"/*.tar.zst >/dev/null 2>&1; then
 fi
 
 cp -r "$HERE/rootfs/." "$ROOT/"
+if [ -f "$K3S/cert-manager.yaml" ]; then
+  install -D -m 600 "$K3S/cert-manager.yaml" "$ROOT/var/lib/rancher/k3s/server/manifests/cert-manager.yaml"
+fi
 install -D -m 755 "$HERE/../scripts/cupcake-wifi-setup" "$ROOT/usr/local/sbin/cupcake-wifi-setup"
 chmod 755 "$ROOT"/usr/local/sbin/cupcake-k3s-*
 install -D -m 644 "$HERE/cupcake-k3s.txt.example" "$ROOT/usr/share/cupcake-k3s/cupcake-k3s.txt.example"

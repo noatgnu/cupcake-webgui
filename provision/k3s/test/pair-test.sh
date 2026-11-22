@@ -159,6 +159,22 @@ if in_server grep -q '^MASTER_IMAGE=' /usr/share/cupcake-k3s/versions.env 2>/dev
     *) fail "signing in returned $STATUS" ;;
   esac
 
+  echo "--- cupcake-master's address has a certificate from the cluster's own authority ---"
+  docker cp "$PREFIX-server:/boot/firmware/cupcake-k3s-ca.crt" "$WORK/ca.crt"
+  docker cp "$WORK/ca.crt" "$PREFIX-agent:/root/cupcake-ca.crt"
+  until in_agent curl -sf --cacert /root/cupcake-ca.crt -o /dev/null https://cupcake-k3s.local/accounts/login/; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      in_server kubectl get certificates,certificaterequests -A 2>&1 || true
+      in_server kubectl get clusterissuer cupcake-local-ca -o yaml 2>&1 | tail -15 || true
+      fail "https://cupcake-k3s.local is not signed by the cluster's certificate authority"
+    fi
+    sleep 10
+  done
+  echo "https://cupcake-k3s.local verifies against cupcake-k3s-ca.crt"
+  in_agent curl -s -o /dev/null -w 'trust page: %{http_code}\n' --cacert /root/cupcake-ca.crt https://cupcake-k3s.local/trust/
+  [ "$(in_agent curl -s --cacert /root/cupcake-ca.crt https://cupcake-k3s.local/trust/cupcake-ca.crt)" = "$(cat "$WORK/ca.crt")" ] \
+    || fail "the trust page does not offer the cluster's certificate authority"
+
   echo "--- the tunnel token from the boot partition reaches cupcake-master ---"
   until in_server kubectl -n cupcake-remote-access get deployment cloudflared >/dev/null 2>&1; do
     [ "$(date +%s)" -lt "$deadline" ] || { in_server journalctl -u cupcake-k3s-remote-access --no-pager | tail -20; fail "cloudflared was not set up"; }
@@ -204,12 +220,12 @@ print(Instance.objects.get(slug='demo').tasks.order_by('-created_at').first().an
       [ "$(date +%s)" -lt "$deadline" ] || fail "demo.local is not published over mDNS"
       sleep 5
     done
-    until in_agent curl -skf https://demo.local/ 2>/dev/null | grep -q '<title>'; do
+    until in_agent curl -sf --cacert /root/cupcake-ca.crt https://demo.local/ 2>/dev/null | grep -q '<title>'; do
       [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl -n tenant-demo get pods 2>&1 || true; fail "https://demo.local does not serve the web app"; }
       sleep 10
     done
-    in_agent curl -sk https://demo.local/ | grep -o '<title>[^<]*</title>'
-    in_agent curl -sk -o /dev/null -w 'api: %{http_code}\n' https://demo.local/api/v1/site-config/current/
+    in_agent curl -s --cacert /root/cupcake-ca.crt https://demo.local/ | grep -o '<title>[^<]*</title>'
+    in_agent curl -s --cacert /root/cupcake-ca.crt -o /dev/null -w 'api: %{http_code}\n' https://demo.local/api/v1/site-config/current/
     in_server kubectl -n tenant-demo get pods -o jsonpath='{range .items[*]}{.spec.containers[0].image}{"\n"}{end}' | sort -u
 
     echo "--- a second domain for the instance, and one for cupcake-master ---"
@@ -225,7 +241,7 @@ for domain in (Domain(instance=instance, hostname='demo-lab.local', access='loca
     apply_domains(domain.instance, owner)
 print('added')"
     for url in https://demo-lab.local/ https://cupcake-admin.local/accounts/login/; do
-      until in_agent curl -skf "$url" 2>/dev/null | grep -qE '<title>|csrfmiddlewaretoken'; do
+      until in_agent curl -sf --cacert /root/cupcake-ca.crt "$url" 2>/dev/null | grep -qE '<title>|csrfmiddlewaretoken'; do
         [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl get ingress -A 2>&1 || true; fail "$url is not served"; }
         sleep 10
       done

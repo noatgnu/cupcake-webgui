@@ -8,6 +8,7 @@ BUILD="$HERE/build"
 TAG="${3:-none}"
 rm -rf "$BUILD"
 "$HERE/fetch-k3s.sh" "$1" amd64 "$BUILD/k3s"
+"$HERE/fetch-cert-manager.sh" "$BUILD/k3s"
 "$HERE/fetch-images.sh" "$TAG" amd64 "$BUILD/images"
 if [ "$TAG" != none ]; then
   "$HERE/build-master-image.sh" "${CUPCAKE_MASTER_REF:-main}" amd64 "$BUILD/images"

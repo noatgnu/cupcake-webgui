@@ -9,5 +9,8 @@ SERVER=cupcake-k3s.local
 MANAGER=yes
 # ADMIN_EMAIL: control plane only; the cupcake-master admin login, default admin@<hostname>.local.
 ADMIN_EMAIL=
+# CA_NAMES: control plane only; domain names, separated by commas, that this cluster's certificate authority may
+# sign besides .local names, such as lab.example.org.
+CA_NAMES=
 # HOSTNAME: optional; defaults to cupcake-k3s for the control plane and cupcake-k3s-worker-<4 random hex digits> for workers.
 HOSTNAME=
