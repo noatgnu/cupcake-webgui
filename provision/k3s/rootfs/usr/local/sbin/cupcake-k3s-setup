@@ -151,6 +151,7 @@ if [ "$RUN_MANAGER" = yes ]; then
       -e "s|@@SNAPSHOT_ON_PROVISION@@|$SNAPSHOT_ON_PROVISION|" \
       "$SHARE/cupcake-master.yaml" > "$MANIFESTS/cupcake-master.yaml"
   chmod 600 "$MANIFESTS/cupcake-master.yaml"
+  install -m 600 "$SHARE/cupcake-master-https.yaml" "$MANIFESTS/cupcake-master-https.yaml"
   /usr/local/sbin/cupcake-k3s-local-ca "$NAME" "$BOOT_DIR" "${EXTRA_CA_NAMES[@]}"
   systemctl enable cupcake-k3s-mdns-aliases.service
   systemctl start --no-block cupcake-k3s-mdns-aliases.service

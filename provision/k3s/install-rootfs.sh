@@ -28,6 +28,7 @@ install -D -m 755 "$HERE/../scripts/cupcake-wifi-setup" "$ROOT/usr/local/sbin/cu
 chmod 755 "$ROOT"/usr/local/sbin/cupcake-k3s-*
 install -D -m 644 "$HERE/cupcake-k3s.txt.example" "$ROOT/usr/share/cupcake-k3s/cupcake-k3s.txt.example"
 install -D -m 644 "$HERE/manager/cupcake-master.yaml" "$ROOT/usr/share/cupcake-k3s/cupcake-master.yaml"
+install -D -m 644 "$HERE/manager/cupcake-master-https.yaml" "$ROOT/usr/share/cupcake-k3s/cupcake-master-https.yaml"
 if [ -n "$IMAGES" ] && [ -f "$IMAGES/versions.env" ]; then
   install -m 644 "$IMAGES/versions.env" "$ROOT/usr/share/cupcake-k3s/versions.env"
 fi

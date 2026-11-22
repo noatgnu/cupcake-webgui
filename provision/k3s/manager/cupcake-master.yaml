@@ -315,6 +315,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: cupcake-local-ca
     cert-manager.io/duration: 8760h
+    traefik.ingress.kubernetes.io/router.middlewares: cupcake-master-cupcake-master-https@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:

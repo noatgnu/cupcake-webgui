@@ -247,6 +247,13 @@ print('added')"
     done
     in_server kubectl -n tenant-demo get configmap demo-config -o jsonpath='{.data.ALLOWED_HOSTS}' | grep -qx 'demo.local,demo-lab.local' \
       || fail "the instance does not accept both of its domains"
+    for url in http://cupcake-k3s.local/accounts/login/ http://demo.local/ http://cupcake-admin.local/accounts/login/; do
+      until [ "$(in_agent curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url")" = "301 ${url/http:/https:}" ]; do
+        [ "$(date +%s)" -lt "$deadline" ] || fail "$url is not redirected to HTTPS: $(in_agent curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url")"
+        sleep 10
+      done
+    done
+    echo "plain HTTP is redirected to HTTPS"
   fi
 fi
 
@@ -279,7 +286,8 @@ docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-remote-access --no-pager |
   || fail "the attempt to join the tailnet was not logged"
 grep -q "only a control plane running cupcake-master uses it" "$WORK/agent/cupcake-k3s-error.txt" \
   || fail "the worker did not say why it skipped the OAuth client"
-! grep -rq "$TS_KEY" "$WORK/agent" || fail "the auth key was left on the boot partition"
+docker exec "$PREFIX-agent" sh -c "! grep -rqF '$TS_KEY' /boot/firmware /var/lib/cupcake-k3s" \
+  || fail "the auth key was left on the Pi"
 docker exec "$PREFIX-agent" systemctl is-active tailscaled >/dev/null || fail "tailscaled is not running on the worker"
 docker exec "$PREFIX-agent" sh -c '! ls /var/lib/cupcake-k3s/remote-access-* 2>/dev/null' \
   || fail "the worker kept the Tailscale client"
