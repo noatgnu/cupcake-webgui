@@ -303,6 +303,7 @@ fi
 
 echo "=== self-test on both nodes ==="
 docker exec "$PREFIX-agent" unlink /boot/firmware/cupcake-k3s-error.txt
+in_server kubectl -n cupcake-master exec deploy/cupcake-master -c web -- python manage.py remote_access cloudflare --remove
 for node in server agent; do
   docker exec "$PREFIX-$node" touch /boot/firmware/cupcake-selftest.txt
   docker exec "$PREFIX-$node" systemctl start cupcake-selftest.service
