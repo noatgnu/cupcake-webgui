@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""Setup progress page of a k3s node at http://<host name>.local:8080.
+
+Each step's state is read live from the node: its files, services and, on the control plane, Kubernetes. The page
+shows no passwords or tokens. It runs while the node sets up, keeps showing the finished state for an hour, then stops;
+on later boots it only serves when a step fails or the node is not ready within 15 minutes.
+"""
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+PORT = 8080
+BOOT = Path("/boot/firmware")
+STATE = Path("/var/lib/cupcake-k3s")
+DONE_MARKER = STATE / "progress-done"
+PAGE = Path(os.environ.get("CUPCAKE_K3S_PROGRESS_PAGE", "/usr/share/cupcake-k3s/progress.html"))
+K3S_CONFIG = Path("/etc/rancher/k3s/config.yaml")
+AGENT_CONF = STATE / "agent.conf"
+PRELOAD = STATE / "preload"
+K3S_IMAGES = Path("/var/lib/rancher/k3s/agent/images")
+MASTER_MANIFEST = Path("/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml")
+KUBECONFIG = "/etc/rancher/k3s/k3s.yaml"
+FINISHED_SECONDS = 3600
+LATER_BOOT_WAIT_SECONDS = 900
+CACHE_SECONDS = 5
+
+DONE, RUNNING, WAITING, FAILED, SKIPPED = "done", "running", "waiting", "failed", "skipped"
+
+
+def run(*command, timeout=15):
+    """The stripped stdout of command, or None when it fails or cannot run."""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def active(unit):
+    return run("systemctl", "is-active", unit) == "active"
+
+
+def unit_failed(unit):
+    return run("systemctl", "is-failed", unit) == "failed"
+
+
+def kube(*args):
+    return run("/usr/local/bin/kubectl", "--kubeconfig", KUBECONFIG, *args)
+
+
+def step(key, title, state, detail=""):
+    return {"key": key, "title": title, "state": state, "detail": detail}
+
+
+def role():
+    if AGENT_CONF.exists():
+        return "worker"
+    if K3S_CONFIG.exists():
+        return "control plane"
+    return ""
+
+
+def wifi_step():
+    if (BOOT / "cupcake-wifi.txt").exists():
+        return step("wifi", "Wi-Fi", RUNNING, "Connecting with cupcake-wifi.txt")
+    state = run("nmcli", "-g", "GENERAL.STATE", "connection", "show", "cupcake-wifi")
+    if state is None:
+        return step("wifi", "Wi-Fi", SKIPPED, "Not set up; using the wired network")
+    if state == "activated":
+        return step("wifi", "Wi-Fi", DONE, "Connected")
+    return step("wifi", "Wi-Fi", RUNNING, f"Connection is {state or 'not active'}")
+
+
+def storage_step():
+    fstab = Path("/etc/fstab").read_text(errors="replace") if Path("/etc/fstab").exists() else ""
+    if " /var/lib/rancher " in fstab:
+        mounted = run("mountpoint", "-q", "/var/lib/rancher") is not None
+        return step("storage", "USB drive", DONE if mounted else FAILED,
+                    "k3s keeps its data on the USB drive" if mounted else "The USB drive is not mounted")
+    if (BOOT / "cupcake-storage.txt").exists():
+        if unit_failed("cupcake-k3s-storage.service"):
+            return step("storage", "USB drive", FAILED, "See cupcake-k3s-error.txt")
+        return step("storage", "USB drive", RUNNING, "Moving k3s data onto the drive")
+    return step("storage", "USB drive", SKIPPED, "Not set up; data stays on the SD card")
+
+
+def setup_step():
+    if (STATE / "configured").exists():
+        return step("setup", "Setup from cupcake-k3s.txt", DONE, f"Set up as a {role()} named {socket.gethostname()}")
+    if unit_failed("cupcake-k3s-setup.service"):
+        return step("setup", "Setup from cupcake-k3s.txt", FAILED, "See the problem below and cupcake-k3s-error.txt")
+    if not (BOOT / "cupcake-k3s.txt").exists():
+        return step("setup", "Setup from cupcake-k3s.txt", WAITING,
+                    "Add cupcake-k3s.txt to the boot partition and restart the Pi")
+    return step("setup", "Setup from cupcake-k3s.txt", RUNNING, "Reading cupcake-k3s.txt")
+
+
+def k3s_step(node_role):
+    unit = "k3s-agent.service" if node_role == "worker" else "k3s.service"
+    if active(unit):
+        return step("k3s", "k3s", DONE, "Running")
+    if unit_failed(unit):
+        return step("k3s", "k3s", FAILED, f"{unit} stopped with an error")
+    return step("k3s", "k3s", RUNNING, "Starting")
+
+
+def images_step():
+    total = len(list(PRELOAD.glob("*.tar.zst")))
+    if total == 0:
+        return step("images", "Preloaded images", SKIPPED, "This image preloads none")
+    waiting = len(list(K3S_IMAGES.glob("*.tar.zst")))
+    if waiting == 0:
+        return step("images", "Preloaded images", DONE, f"{total} of {total} imported")
+    return step("images", "Preloaded images", RUNNING, f"{total - waiting} of {total} imported; this takes a while on an SD card")
+
+
+def node_ready_step():
+    status = kube("get", "node", socket.gethostname(), "-o", "jsonpath={.status.conditions[?(@.type==\"Ready\")].status}")
+    nodes = kube("get", "nodes", "--no-headers")
+    count = len(nodes.splitlines()) if nodes else 0
+    if status == "True":
+        return step("node", "Control plane ready", DONE, f"{count} node{'s' if count != 1 else ''} in the cluster")
+    return step("node", "Control plane ready", RUNNING, "Waiting for the node to become Ready")
+
+
+def control_plane_reachable_step():
+    server = ""
+    for line in AGENT_CONF.read_text(errors="replace").splitlines():
+        if line.startswith("SERVER="):
+            server = line.split("=", 1)[1].strip()
+    reached = run("curl", "-sk", "--max-time", "5", "-o", "/dev/null", f"https://{server}:6443/cacerts") is not None
+    return step("join", f"Joined {server}", DONE if reached and active("k3s-agent.service") else RUNNING,
+                "The control plane answers" if reached else f"Looking for {server} on the network")
+
+
+def pods_running(namespace, selector):
+    phases = kube("-n", namespace, "get", "pods", "-l", selector, "-o", "jsonpath={.items[*].status.phase}")
+    return bool(phases) and "Running" in phases.split()
+
+
+def master_steps():
+    if not MASTER_MANIFEST.exists():
+        return []
+    steps = []
+    issuer = kube("get", "clusterissuer", "cupcake-local-ca",
+                  "-o", "jsonpath={.status.conditions[?(@.type==\"Ready\")].status}")
+    if issuer == "True":
+        steps.append(step("ca", "Certificate authority", DONE, "Download cupcake-k3s-ca.crt from the boot partition or /trust/"))
+    elif pods_running("cert-manager", "app.kubernetes.io/name=cert-manager"):
+        steps.append(step("ca", "Certificate authority", RUNNING, "cert-manager is setting it up"))
+    else:
+        steps.append(step("ca", "Certificate authority", RUNNING, "Starting cert-manager"))
+    ready = kube("-n", "cupcake-master", "get", "deployment", "cupcake-master", "-o", "jsonpath={.status.readyReplicas}")
+    address = f"https://{socket.gethostname()}.local"
+    if ready and ready != "0":
+        steps.append(step("master", "cupcake-master", DONE,
+                          f"Open {address}; the admin login is in cupcake-k3s-credentials.txt on the boot partition"))
+    else:
+        steps.append(step("master", "cupcake-master", RUNNING, "Starting its database and web server"))
+    return steps
+
+
+def tailscale_step():
+    if not shutil.which("tailscale"):
+        return None
+    raw = run("tailscale", "status", "--json", "--peers=false")
+    try:
+        status = json.loads(raw) if raw else {}
+    except ValueError:
+        status = {}
+    backend = status.get("BackendState", "")
+    name = (status.get("Self") or {}).get("DNSName", "").rstrip(".")
+    if backend == "Running":
+        return step("tailscale", "Tailscale", DONE, f"On the tailnet as {name}")
+    if (BOOT / "cupcake-tailscale.txt").exists() and "AUTHKEY" in (BOOT / "cupcake-tailscale.txt").read_text(errors="replace"):
+        return step("tailscale", "Tailscale", RUNNING, "Joining with cupcake-tailscale.txt")
+    return None
+
+
+def problems():
+    path = BOOT / "cupcake-k3s-error.txt"
+    if not path.exists():
+        return []
+    return [line for line in path.read_text(errors="replace").splitlines() if line.strip()]
+
+
+def status():
+    steps = [wifi_step(), storage_step(), setup_step()]
+    node_role = role()
+    if (STATE / "configured").exists():
+        steps.append(k3s_step(node_role))
+        steps.append(images_step())
+        if node_role == "worker":
+            steps.append(control_plane_reachable_step())
+        else:
+            steps.append(node_ready_step())
+            steps.extend(master_steps())
+    ts = tailscale_step()
+    if ts:
+        steps.append(ts)
+    issues = problems()
+    failed = any(s["state"] == FAILED for s in steps)
+    complete = all(s["state"] in (DONE, SKIPPED) for s in steps) and (STATE / "configured").exists()
+    return {
+        "host": socket.gethostname(),
+        "role": node_role,
+        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "steps": steps,
+        "problems": issues,
+        "result": FAILED if failed else DONE if complete else RUNNING,
+    }
+
+
+class Status:
+    """The node's status, computed at most every CACHE_SECONDS."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.value = None
+        self.at = 0.0
+
+    def get(self):
+        with self.lock:
+            if self.value is None or time.monotonic() - self.at > CACHE_SECONDS:
+                self.value = status()
+                self.at = time.monotonic()
+            return self.value
+
+
+STATUS = Status()
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/status.json":
+            body = json.dumps(STATUS.get()).encode()
+            content_type = "application/json"
+        elif self.path in ("/", "/index.html"):
+            try:
+                body = PAGE.read_bytes()
+            except OSError:
+                self.send_error(500, "The setup page is missing from this image")
+                return
+            content_type = "text/html; charset=utf-8"
+        else:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        return
+
+
+def later_boot_needs_page():
+    """On a node that finished setup before: whether a step fails or the node is not ready in time."""
+    deadline = time.monotonic() + LATER_BOOT_WAIT_SECONDS
+    while time.monotonic() < deadline:
+        current = status()
+        if current["result"] == FAILED:
+            return True
+        if current["result"] == DONE:
+            return False
+        time.sleep(15)
+    return True
+
+
+def main():
+    if DONE_MARKER.exists() and not later_boot_needs_page():
+        print("cupcake-k3s: the node is ready; the setup page is not needed on this boot", flush=True)
+        return 0
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"cupcake-k3s: setup progress at http://{socket.gethostname()}.local:{PORT}", flush=True)
+    finished_at = None
+    while True:
+        current = STATUS.get()
+        if current["result"] == DONE:
+            finished_at = finished_at or time.monotonic()
+            DONE_MARKER.touch()
+            if time.monotonic() - finished_at >= FINISHED_SECONDS:
+                print("cupcake-k3s: setup finished an hour ago; the setup page stops", flush=True)
+                server.shutdown()
+                return 0
+        else:
+            finished_at = None
+        time.sleep(30)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

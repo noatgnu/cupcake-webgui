@@ -194,4 +194,7 @@ UNIT=k3s.service
 [ "$ROLE" = agent ] && UNIT=k3s-agent.service
 systemctl enable "$UNIT" cupcake-k3s-preloaded.service
 systemctl start --no-block "$UNIT" cupcake-k3s-preloaded.service
+if [ "$RUN_MANAGER" = yes ]; then
+  systemctl start --no-block cupcake-k3s-tailnet-domain.service || true
+fi
 log "configured $NAME as k3s ${ROLE}$([ "$ROLE" = agent ] && echo " joining $SERVER")"

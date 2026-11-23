@@ -1,0 +1,13 @@
+[Unit]
+Description=Setup progress page of this k3s node on port 8080
+After=local-fs.target boot-firmware.mount
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/cupcake-k3s-progress
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

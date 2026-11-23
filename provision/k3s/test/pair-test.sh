@@ -97,6 +97,18 @@ for node in server agent; do
     || fail "$node: the token was not removed from the boot partition"
   [ "$(docker exec "$PREFIX-$node" stat -c %a /etc/rancher/k3s/config.yaml)" = 600 ] || fail "$node: config.yaml is readable by others"
 done
+for node in server agent; do
+  name=$(docker exec "$PREFIX-$node" hostname)
+  until docker exec "$PREFIX-agent" curl -sf --max-time 10 "http://$name.local:8080/status.json" > "$WORK/progress-$node.json" 2>/dev/null; do
+    [ "$(date +%s)" -lt "$deadline" ] || fail "$node: the setup page at http://$name.local:8080 does not answer"
+    sleep 5
+  done
+  python3 -c "import json,sys; s=json.load(open(sys.argv[1])); assert s['host']==sys.argv[2], s; assert any(x['key']=='setup' and x['state']=='done' for x in s['steps']), s" \
+    "$WORK/progress-$node.json" "$name" || fail "$node: the setup page does not show the finished setup"
+  docker exec "$PREFIX-agent" curl -sf --max-time 10 "http://$name.local:8080/" | contains "Cupcake k3s setup" || fail "$node: the setup page has no HTML"
+  ! contains -iE 'password|token|secret' < "$WORK/progress-$node.json" || fail "$node: the setup page shows a secret"
+done
+echo "both nodes show their setup progress on port 8080"
 FIRST_HOME=$(in_server getent passwd 1000 | cut -d: -f6)
 in_server grep -q 'server: https://cupcake-k3s.local:6443' "$FIRST_HOME/.kube/config" || fail "the first user did not get a kubeconfig for cupcake-k3s.local"
 FIRST_USER=$(in_server getent passwd 1000 | cut -d: -f1)

@@ -2,9 +2,8 @@
 Description=Renew the certificate of this Pi's tailnet name for cupcake-master
 
 [Timer]
-OnBootSec=5min
+OnBootSec=2min
 OnUnitActiveSec=7d
-RandomizedDelaySec=1h
 Persistent=true
 
 [Install]
