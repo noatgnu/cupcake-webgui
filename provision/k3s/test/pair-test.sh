@@ -35,6 +35,11 @@ cleanup() {
 trap cleanup EXIT
 
 fail() { echo "FAIL: $*"; exit 1; }
+contains() {
+  local output
+  output=$(cat)
+  grep -q "$@" <<< "$output"
+}
 
 mkdir -p "$WORK/server" "$WORK/agent"
 printf 'ROLE=server\nTOKEN=%s\nHOSTNAME=cupcake-k3s\n' "$TOKEN" > "$WORK/server/cupcake-k3s.txt"
@@ -95,12 +100,12 @@ done
 FIRST_HOME=$(in_server getent passwd 1000 | cut -d: -f6)
 in_server grep -q 'server: https://cupcake-k3s.local:6443' "$FIRST_HOME/.kube/config" || fail "the first user did not get a kubeconfig for cupcake-k3s.local"
 FIRST_USER=$(in_server getent passwd 1000 | cut -d: -f1)
-in_server runuser -u "$FIRST_USER" -- kubectl get nodes --no-headers | grep -q cupcake-k3s \
+in_server runuser -u "$FIRST_USER" -- kubectl get nodes --no-headers | contains cupcake-k3s \
   || fail "the first user cannot reach the control plane with that kubeconfig"
 
 if [ -n "$LOOP" ]; then
   echo "=== k3s keeps its data on the USB drive ==="
-  in_server findmnt -n -o SOURCE,FSTYPE /srv/cupcake-data | grep -q "^$LOOP ext4" || fail "the drive is not mounted at /srv/cupcake-data"
+  in_server findmnt -n -o SOURCE,FSTYPE /srv/cupcake-data | contains "^$LOOP ext4" || fail "the drive is not mounted at /srv/cupcake-data"
   [ "$(in_server stat -c %d /var/lib/rancher/k3s/server/db)" = "$(in_server stat -c %d /srv/cupcake-data)" ] \
     || fail "the k3s datastore is not on the USB drive"
   in_server grep -q 'holds this Pi' /boot/firmware/cupcake-storage.txt || fail "cupcake-storage.txt was not marked as applied"
@@ -184,7 +189,7 @@ if in_server grep -q '^MASTER_IMAGE=' /usr/share/cupcake-k3s/versions.env 2>/dev
   [ "$STORED" = "$TUNNEL_TOKEN" ] || fail "the stored tunnel token differs from the one on the boot partition"
   [ ! -e "$WORK/server/cupcake-cloudflared.txt" ] || fail "cupcake-cloudflared.txt was left on the boot partition"
   in_server sh -c '! ls /var/lib/cupcake-k3s/remote-access-* 2>/dev/null' || fail "the tunnel token was left in the setup folder"
-  in_server kubectl -n kube-system get helmchartconfig traefik -o jsonpath='{.spec.valuesContent}' | grep -q '10.42.0.0/16' \
+  in_server kubectl -n kube-system get helmchartconfig traefik -o jsonpath='{.spec.valuesContent}' | contains '10.42.0.0/16' \
     || fail "Traefik does not trust forwarded headers from the cluster"
   echo "cloudflared is set up and the token is off the boot partition"
 
@@ -218,7 +223,7 @@ print(Instance.objects.get(slug='demo').tasks.order_by('-created_at').first().an
       [ "$(date +%s)" -lt "$deadline" ] || fail "demo.local is not published over mDNS"
       sleep 5
     done
-    until in_agent curl -sf --cacert /root/cupcake-ca.crt https://demo.local/ 2>/dev/null | grep -q '<title>'; do
+    until in_agent curl -sf --cacert /root/cupcake-ca.crt https://demo.local/ 2>/dev/null | contains '<title>'; do
       [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl -n tenant-demo get pods 2>&1 || true; fail "https://demo.local does not serve the web app"; }
       sleep 10
     done
@@ -239,13 +244,13 @@ for domain in (Domain(instance=instance, hostname='demo-lab.local', access='loca
     apply_domains(domain.instance, owner)
 print('added')"
     for url in https://demo-lab.local/ https://cupcake-admin.local/accounts/login/; do
-      until in_agent curl -sf --cacert /root/cupcake-ca.crt "$url" 2>/dev/null | grep -qE '<title>|csrfmiddlewaretoken'; do
+      until in_agent curl -sf --cacert /root/cupcake-ca.crt "$url" 2>/dev/null | contains -E '<title>|csrfmiddlewaretoken'; do
         [ "$(date +%s)" -lt "$deadline" ] || { in_server kubectl get ingress -A 2>&1 || true; fail "$url is not served"; }
         sleep 10
       done
       echo "$url is served"
     done
-    in_server kubectl -n tenant-demo get configmap demo-config -o jsonpath='{.data.ALLOWED_HOSTS}' | grep -qx 'demo.local,demo-lab.local' \
+    in_server kubectl -n tenant-demo get configmap demo-config -o jsonpath='{.data.ALLOWED_HOSTS}' | contains -x 'demo.local,demo-lab.local' \
       || fail "the instance does not accept both of its domains"
     for url in http://cupcake-k3s.local/accounts/login/ http://demo.local/ http://cupcake-admin.local/accounts/login/; do
       until [ "$(in_agent curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$url")" = "301 ${url/http:/https:}" ]; do
@@ -282,7 +287,7 @@ until grep -q "This Pi did not join the tailnet" "$WORK/agent/cupcake-k3s-error.
   [ "$(date +%s)" -lt "$ts_deadline" ] || { docker exec "$PREFIX-agent" systemctl status cupcake-k3s-remote-access --no-pager 2>&1 | tail -20; cat "$WORK/agent/cupcake-k3s-error.txt" 2>/dev/null; fail "the worker did not try to join the tailnet with AUTHKEY"; }
   sleep 5
 done
-docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-remote-access --no-pager | grep -q "tailscale up\|tailnet" \
+docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-remote-access --no-pager | contains "tailscale up\|tailnet" \
   || fail "the attempt to join the tailnet was not logged"
 grep -q "only a control plane running cupcake-master uses it" "$WORK/agent/cupcake-k3s-error.txt" \
   || fail "the worker did not say why it skipped the OAuth client"
