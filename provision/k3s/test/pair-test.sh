@@ -301,4 +301,14 @@ if docker exec "$PREFIX-agent" sh -c 'ls /var/lib/rancher/k3s/agent/images/*.tar
   fail "the preloaded images are imported again on every start"
 fi
 
+echo "=== self-test on both nodes ==="
+docker exec "$PREFIX-agent" unlink /boot/firmware/cupcake-k3s-error.txt
+for node in server agent; do
+  docker exec "$PREFIX-$node" touch /boot/firmware/cupcake-selftest.txt
+  docker exec "$PREFIX-$node" systemctl start cupcake-selftest.service
+  [ ! -e "$WORK/$node/cupcake-selftest.txt" ] || fail "$node: the self-test request was not removed"
+  [ -s "$WORK/$node/cupcake-selftest-report.json" ] || fail "$node: the self-test wrote no report"
+  cat "$WORK/$node/cupcake-selftest-report.txt"
+  head -1 "$WORK/$node/cupcake-selftest-report.txt" | contains -x "Cupcake self-test: PASS" || fail "$node: the self-test did not pass"
+done
 echo "PASS: control plane and worker paired over mDNS and ran a preloaded image offline${PAIR_TENANT:+; cupcake-master created an instance}"

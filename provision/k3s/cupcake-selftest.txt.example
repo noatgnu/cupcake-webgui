@@ -1,0 +1,18 @@
+# k3s node self-test
+#
+# Copy as /boot/firmware/cupcake-selftest.txt on a control plane or a worker. Its contents are ignored; it is deleted
+# when the self-test starts, so each copy runs it once, on the next boot.
+#
+# It only reads, so the node can be used afterwards. It waits up to 15 minutes for k3s to settle, then checks:
+#   - setup from cupcake-k3s.txt, problems in cupcake-k3s-error.txt, mDNS
+#   - k3s, every node Ready, CoreDNS, Traefik and cert-manager, or a worker's control plane
+#   - the preloaded images, and the USB drive when cupcake-storage.txt chose one
+#   - on the control plane: cupcake-master, its certificate authority, HTTPS and the HTTP redirect, every instance
+#   - Tailscale and the Cloudflare tunnel
+#   - board, memory, temperature, throttling, SD card write speed, boot time and failed services
+#
+# Results are written next to this file:
+#   cupcake-selftest-report.txt   summary
+#   cupcake-selftest-report.json  full report
+#
+# The activity LED shows the outcome until the next reboot: a heartbeat for pass, a fast blink for failure.

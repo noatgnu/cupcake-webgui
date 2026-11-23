@@ -1,0 +1,14 @@
+[Unit]
+Description=k3s node self-test requested by cupcake-selftest.txt
+After=boot-firmware.mount network-online.target cupcake-k3s-setup.service k3s.service k3s-agent.service
+Wants=network-online.target
+ConditionPathExists=/boot/firmware/cupcake-selftest.txt
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-k3s-selftest
+TimeoutStartSec=90min
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

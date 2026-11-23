@@ -14,5 +14,6 @@ if [ "$TAG" != none ]; then
   "$HERE/build-master-image.sh" "${CUPCAKE_MASTER_REF:-main}" amd64 "$BUILD/images"
 fi
 install -D -m 755 "$HERE/../scripts/cupcake-wifi-setup" "$BUILD/scripts/cupcake-wifi-setup"
+install -D -m 755 "$HERE/../scripts/cupcake-selftest-report" "$BUILD/scripts/cupcake-selftest-report"
 docker build -q -f "$HERE/test/Dockerfile" -t "$2" "$HERE"
 rm -rf "$BUILD"

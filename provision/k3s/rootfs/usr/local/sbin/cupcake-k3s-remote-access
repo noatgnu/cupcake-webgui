@@ -1,6 +1,6 @@
 #!/bin/bash
 # Takes cupcake-cloudflared.txt and cupcake-tailscale.txt off the boot partition on every boot. AUTHKEY joins this Pi to
-# the tailnet on any node. The Cloudflare tunnel token and the Tailscale OAuth client (CLIENT_ID, CLIENT_SECRET) are
+# the tailnet on any node, set up as a k3s node or not. The Cloudflare tunnel token and the Tailscale OAuth client (CLIENT_ID, CLIENT_SECRET) are
 # handed to cupcake-master once it runs, and only a control plane running cupcake-master uses them. Problems are written
 # to cupcake-k3s-error.txt.
 set -euo pipefail
@@ -32,18 +32,54 @@ manage() {
   /usr/local/bin/kubectl -n cupcake-master exec -i deploy/cupcake-master -c web -- python manage.py remote_access "$@"
 }
 
-if [ ! -e "$STATE_DIR/configured" ]; then
-  log "this Pi is not set up yet; the remote access files stay until it is"
-  exit 0
-fi
-
 umask 077
 CLOUDFLARE_FILE="$BOOT_DIR/cupcake-cloudflared.txt"
 TAILSCALE_FILE="$BOOT_DIR/cupcake-tailscale.txt"
+CONFIGURED=no
+[ -e "$STATE_DIR/configured" ] && CONFIGURED=yes
+
 forget() {
   rm -f "$1"
   sync -f "$BOOT_DIR" 2>/dev/null || sync
 }
+
+if [ -f "$TAILSCALE_FILE" ]; then
+  auth_key=$(value "$TAILSCALE_FILE" AUTHKEY)
+  client_id=$(value "$TAILSCALE_FILE" CLIENT_ID)
+  client_secret=$(value "$TAILSCALE_FILE" CLIENT_SECRET)
+  if [ -z "$auth_key" ] && { [ -z "$client_id" ] || [ -z "$client_secret" ]; }; then
+    forget "$TAILSCALE_FILE"
+    problem "cupcake-tailscale.txt was removed: it needs AUTHKEY, or CLIENT_ID and CLIENT_SECRET from a Tailscale OAuth client."
+  elif [ "$CONFIGURED" = no ] && [ -n "$client_id" ] && [ -n "$client_secret" ]; then
+    printf 'CLIENT_ID=%s\nCLIENT_SECRET=%s\n' "$client_id" "$client_secret" > "$TAILSCALE_FILE.new"
+    mv -f "$TAILSCALE_FILE.new" "$TAILSCALE_FILE"
+    sync -f "$BOOT_DIR" 2>/dev/null || sync
+  else
+    forget "$TAILSCALE_FILE"
+  fi
+  if [ -n "$auth_key" ]; then
+    if output=$(tailscale up --authkey "$auth_key" --ssh --hostname "$(hostname)" --timeout=90s 2>&1); then
+      log "joined the tailnet as $(hostname)"
+      systemctl start --no-block cupcake-k3s-tailnet-domain.service || true
+    else
+      problem "This Pi did not join the tailnet: ${output:-tailscale up failed}
+Check the auth key and the network, then drop cupcake-tailscale.txt again or run sudo tailscale up."
+    fi
+  fi
+  if [ "$CONFIGURED" = yes ] && [ -n "$client_id" ] && [ -n "$client_secret" ]; then
+    if [ -f "$MASTER_MANIFEST" ]; then
+      printf '%s\n%s\n' "$client_id" "$client_secret" > "$STATE_DIR/remote-access-tailscale"
+    else
+      problem "The Tailscale OAuth client in cupcake-tailscale.txt was not used: only a control plane running cupcake-master uses it."
+    fi
+  fi
+fi
+
+if [ "$CONFIGURED" = no ]; then
+  [ -f "$CLOUDFLARE_FILE" ] || [ -f "$TAILSCALE_FILE" ] \
+    && log "k3s is not set up yet; the Cloudflare and Tailscale OAuth settings wait until it is"
+  exit 0
+fi
 
 if [ -f "$CLOUDFLARE_FILE" ]; then
   token=$(value "$CLOUDFLARE_FILE" TUNNEL_TOKEN)
@@ -55,32 +91,6 @@ if [ -f "$CLOUDFLARE_FILE" ]; then
     printf '%s\n' "$token" > "$STATE_DIR/remote-access-cloudflare"
   fi
   forget "$CLOUDFLARE_FILE"
-fi
-
-if [ -f "$TAILSCALE_FILE" ]; then
-  auth_key=$(value "$TAILSCALE_FILE" AUTHKEY)
-  client_id=$(value "$TAILSCALE_FILE" CLIENT_ID)
-  client_secret=$(value "$TAILSCALE_FILE" CLIENT_SECRET)
-  forget "$TAILSCALE_FILE"
-  if [ -z "$auth_key" ] && { [ -z "$client_id" ] || [ -z "$client_secret" ]; }; then
-    problem "cupcake-tailscale.txt was removed: it needs AUTHKEY, or CLIENT_ID and CLIENT_SECRET from a Tailscale OAuth client."
-  fi
-  if [ -n "$auth_key" ]; then
-    if output=$(tailscale up --authkey "$auth_key" --ssh --hostname "$(hostname)" --timeout=90s 2>&1); then
-      log "joined the tailnet as $(hostname)"
-      systemctl start --no-block cupcake-k3s-tailnet-domain.service || true
-    else
-      problem "This Pi did not join the tailnet: ${output:-tailscale up failed}
-Check the auth key and the network, then drop cupcake-tailscale.txt again or run sudo tailscale up."
-    fi
-  fi
-  if [ -n "$client_id" ] && [ -n "$client_secret" ]; then
-    if [ -f "$MASTER_MANIFEST" ]; then
-      printf '%s\n%s\n' "$client_id" "$client_secret" > "$STATE_DIR/remote-access-tailscale"
-    else
-      problem "The Tailscale OAuth client in cupcake-tailscale.txt was not used: only a control plane running cupcake-master uses it."
-    fi
-  fi
 fi
 
 ls "$STATE_DIR"/remote-access-* >/dev/null 2>&1 || exit 0

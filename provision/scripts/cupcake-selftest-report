@@ -297,7 +297,7 @@ def summary(report):
         f"Written: {report['written_at']}",
         "",
     ]
-    if report["result"] != "incomplete":
+    if report["result"] != "incomplete" and report.get("leaves_test_data", True):
         lines.append("This device ran tests that leave data behind; reflash it before real use.")
         lines.append("")
     lines.extend(f"Note: {note}" for note in report["notes"])
@@ -369,6 +369,7 @@ def write(state_dir, report_dir, completion):
         "format_version": 1,
         "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "result": "incomplete" if completion != "complete" else ("pass" if all_passed else "fail"),
+        "leaves_test_data": not (state_dir / "no-test-data").exists(),
         "sections": sections,
         "notes": notes,
         "metrics": metrics,

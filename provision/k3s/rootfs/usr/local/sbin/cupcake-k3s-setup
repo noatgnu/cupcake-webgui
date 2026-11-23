@@ -96,6 +96,7 @@ fi
 
 echo "$NAME" > /etc/hostname
 hostname "$NAME" || true
+tailscale set --hostname "$NAME" >/dev/null 2>&1 || true
 HOSTS=$(grep -v '^127\.0\.1\.1' /etc/hosts || true)
 printf '%s\n127.0.1.1\t%s %s.local\n' "$HOSTS" "$NAME" "$NAME" > /etc/hosts
 systemctl try-restart avahi-daemon.service || true

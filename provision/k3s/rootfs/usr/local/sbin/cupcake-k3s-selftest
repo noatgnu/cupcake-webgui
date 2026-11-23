@@ -1,0 +1,184 @@
+#!/bin/bash
+# Self-test of a k3s node, started on boot by cupcake-selftest.txt on the boot partition. It only reads: it checks the
+# setup, k3s, the preloaded images, the USB drive, cupcake-master and remote access, and writes
+# cupcake-selftest-report.txt and cupcake-selftest-report.json next to the request. The activity LED shows a heartbeat
+# for pass and a fast blink for failure until the next reboot.
+set -u
+
+BOOT_DIR="${CUPCAKE_K3S_BOOT_DIR:-/boot/firmware}"
+REQUEST="$BOOT_DIR/cupcake-selftest.txt"
+STATE_DIR=/var/lib/cupcake-selftest
+RESULTS="$STATE_DIR/results.txt"
+REPORT=/usr/local/sbin/cupcake-selftest-report
+K3S_STATE=/var/lib/cupcake-k3s
+MASTER_MANIFEST=/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml
+WAIT_SECONDS="${CUPCAKE_SELFTEST_WAIT:-900}"
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+section() { echo "## $1" >> "$RESULTS"; }
+note() { echo "NOTE: $*" >> "$RESULTS"; }
+metric() { echo "METRIC: $1=$2" >> "$RESULTS"; }
+
+check() {
+  local name="$1"
+  shift
+  if "$@" >/dev/null 2>&1; then
+    echo "PASS: $name" >> "$RESULTS"
+  else
+    echo "FAIL: $name" >> "$RESULTS"
+  fi
+}
+
+settled() {
+  local name="$1" deadline
+  shift
+  deadline=$(( $(date +%s) + WAIT_SECONDS ))
+  until "$@" >/dev/null 2>&1; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "FAIL: $name" >> "$RESULTS"
+      return 1
+    fi
+    sleep 10
+  done
+  echo "PASS: $name" >> "$RESULTS"
+}
+
+kube() { /usr/local/bin/kubectl "$@"; }
+
+role() {
+  if [ -f "$K3S_STATE/agent.conf" ]; then echo agent; elif [ -f /etc/rancher/k3s/config.yaml ]; then echo server; fi
+}
+
+nodes_ready() {
+  local status
+  status=$(kube get nodes --no-headers 2>/dev/null) || return 1
+  [ -n "$status" ] && ! awk '$2 != "Ready"' <<< "$status" | grep -q .
+}
+
+pod_running() {
+  local phases
+  phases=$(kube -n "$1" get pods -l "$2" -o jsonpath='{.items[*].status.phase}' 2>/dev/null) || return 1
+  grep -qw Running <<< "$phases"
+}
+
+no_preloaded_archives_left() {
+  ! ls /var/lib/rancher/k3s/agent/images/*.tar.zst >/dev/null 2>&1
+}
+
+issuer_ready() {
+  [ "$(kube get clusterissuer cupcake-local-ca -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" = True ]
+}
+
+signed_by_local_ca() {
+  curl -sf --max-time 20 --cacert "$BOOT_DIR/cupcake-k3s-ca.crt" -o /dev/null "https://$(hostname).local/accounts/login/"
+}
+
+http_redirects() {
+  [ "$(curl -s --max-time 20 -o /dev/null -w '%{http_code} %{redirect_url}' "http://$(hostname).local/accounts/login/")" \
+    = "301 https://$(hostname).local/accounts/login/" ]
+}
+
+setup_checks() {
+  section "Setup"
+  check "the node is set up from cupcake-k3s.txt" test -e "$K3S_STATE/configured"
+  if [ -f "$BOOT_DIR/cupcake-k3s-error.txt" ]; then
+    echo "FAIL: no setup problems in cupcake-k3s-error.txt" >> "$RESULTS"
+    while IFS= read -r line; do [ -n "$line" ] && note "cupcake-k3s-error.txt: $line"; done < "$BOOT_DIR/cupcake-k3s-error.txt"
+  else
+    echo "PASS: no setup problems in cupcake-k3s-error.txt" >> "$RESULTS"
+  fi
+  check "the k3s token is off the boot partition" \
+    bash -c "! grep -qE '^[[:space:]]*TOKEN[[:space:]]*=' '$BOOT_DIR/cupcake-k3s.txt'"
+  check "avahi announces $(hostname).local" systemctl is-active avahi-daemon
+  check "$(hostname).local resolves" getent hosts "$(hostname).local"
+  note "role: $(role || true), host name: $(hostname)"
+}
+
+k3s_checks() {
+  section "k3s"
+  case "$(role)" in
+    server)
+      settled "k3s is running" systemctl is-active k3s
+      settled "every node is Ready" nodes_ready
+      metric nodes "$(kube get nodes --no-headers 2>/dev/null | wc -l)"
+      settled "CoreDNS is running" pod_running kube-system k8s-app=kube-dns
+      settled "Traefik is running" pod_running kube-system app.kubernetes.io/name=traefik
+      settled "cert-manager is running" pod_running cert-manager app.kubernetes.io/name=cert-manager
+      ;;
+    agent)
+      settled "k3s-agent is running" systemctl is-active k3s-agent
+      local server
+      server=$(sed -n 's/^SERVER=//p' "$K3S_STATE/agent.conf")
+      settled "the control plane $server answers on port 6443" curl -sk --max-time 10 -o /dev/null "https://$server:6443/cacerts"
+      ;;
+    *)
+      echo "FAIL: k3s is configured as a control plane or a worker" >> "$RESULTS"
+      return
+      ;;
+  esac
+  settled "the preloaded images are imported" no_preloaded_archives_left
+}
+
+storage_checks() {
+  grep -q " /var/lib/rancher " /etc/fstab 2>/dev/null || { note "USB storage: not configured"; return; }
+  section "USB storage"
+  check "the USB drive is mounted at /srv/cupcake-data" mountpoint -q /srv/cupcake-data
+  check "k3s keeps its data on the USB drive" mountpoint -q /var/lib/rancher
+  metric usb_free_gb "$(df -BG --output=avail /srv/cupcake-data 2>/dev/null | tail -1 | tr -dc 0-9)"
+}
+
+master_checks() {
+  [ -f "$MASTER_MANIFEST" ] || return
+  section "cupcake-master"
+  settled "cupcake-master is running" kube -n cupcake-master rollout status deployment/cupcake-master --timeout=30s
+  settled "the cluster's certificate authority is ready" issuer_ready
+  check "cupcake-k3s-ca.crt is on the boot partition" test -s "$BOOT_DIR/cupcake-k3s-ca.crt"
+  settled "https://$(hostname).local is signed by the cluster's certificate authority" signed_by_local_ca
+  check "http://$(hostname).local redirects to HTTPS" http_redirects
+  local namespace
+  for namespace in $(kube get namespaces -o name 2>/dev/null | sed -n 's#^namespace/tenant-##p'); do
+    settled "instance $namespace: every pod is running" bash -c \
+      "! /usr/local/bin/kubectl -n tenant-$namespace get pods --no-headers 2>/dev/null | awk '\$3 != \"Running\" && \$3 != \"Completed\"' | grep -q ."
+  done
+}
+
+remote_access_checks() {
+  section "Remote access"
+  local state
+  state=$(tailscale status --json --peers=false 2>/dev/null | grep -o '"BackendState": *"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/')
+  check "tailscaled is running" systemctl is-active tailscaled
+  note "tailscale: ${state:-unknown}"
+  check "no remote access file is left on the boot partition" \
+    bash -c "[ ! -e '$BOOT_DIR/cupcake-cloudflared.txt' ] && ! grep -q AUTHKEY '$BOOT_DIR/cupcake-tailscale.txt' 2>/dev/null"
+  if [ -f "$MASTER_MANIFEST" ] && kube -n cupcake-remote-access get deployment cloudflared >/dev/null 2>&1; then
+    settled "cloudflared is running" kube -n cupcake-remote-access rollout status deployment/cloudflared --timeout=30s
+  fi
+}
+
+show_result() {
+  local led
+  led=$(ls -d /sys/class/leds/ACT /sys/class/leds/led0 2>/dev/null | head -1)
+  [ -n "$led" ] || return 0
+  if [ "$1" = pass ]; then
+    echo heartbeat > "$led/trigger" 2>/dev/null || true
+  else
+    echo timer > "$led/trigger" 2>/dev/null || true
+    echo 100 > "$led/delay_on" 2>/dev/null || true
+    echo 100 > "$led/delay_off" 2>/dev/null || true
+  fi
+}
+
+install -d -m 700 "$STATE_DIR"
+rm -f "$REQUEST" "$RESULTS" "$STATE_DIR"/facts-*.json "$BOOT_DIR/cupcake-selftest-report.txt" "$BOOT_DIR/cupcake-selftest-report.json"
+sync -f "$BOOT_DIR" 2>/dev/null || sync
+touch "$STATE_DIR/no-test-data"
+"$REPORT" facts "$STATE_DIR/facts-first-boot.json"
+setup_checks
+k3s_checks
+storage_checks
+master_checks
+remote_access_checks
+"$REPORT" facts "$STATE_DIR/facts-final.json"
+RESULT=$(umask 022; "$REPORT" write "$STATE_DIR" "$BOOT_DIR" complete)
+show_result "$RESULT"
+echo "Self-test finished: $RESULT"
