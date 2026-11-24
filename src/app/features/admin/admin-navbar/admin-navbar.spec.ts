@@ -33,7 +33,7 @@ describe('AdminNavbar', () => {
   });
 
   it('links to the power page only for superusers on an appliance', () => {
-    component.isAppliance = true;
+    component.isAppliance.set(true);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('a[href="/admin/power"]')).toBeNull();
 
@@ -41,7 +41,7 @@ describe('AdminNavbar', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('a[href="/admin/power"]')).not.toBeNull();
 
-    component.isAppliance = false;
+    component.isAppliance.set(false);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('a[href="/admin/power"]')).toBeNull();
   });

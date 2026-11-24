@@ -15,7 +15,7 @@ import { environment } from '../../../../environments/environment';
 export class AdminNavbar {
   private sidebarControl = inject(SidebarControl);
   private authService = inject(AuthService);
-  isAppliance = !!(environment as any).isAppliance;
+  isAppliance = signal(!!(environment as any).isAppliance);
   isSuperuser = computed(() => !!this.authService.currentUser()?.isSuperuser);
 
   isMenuCollapsed = signal(true);

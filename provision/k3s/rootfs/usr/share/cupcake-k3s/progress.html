@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cupcake k3s setup</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f5f6f8; --fg: #1f2933; --muted: #5f6b7a; --card: #fff; --line: #e1e5ea;
+            --done: #2e7d32; --running: #1976d2; --waiting: #b26a00; --failed: #c62828; --skipped: #8a96a3; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #12161c; --fg: #e8eef2; --muted: #8a96a3; --card: #1a2028; --line: #2a323d;
+              --done: #66bb6a; --running: #42a5f5; --waiting: #ffb74d; --failed: #ef5350; --skipped: #6b7682; }
+    }
+    body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+    main { max-width: 40rem; margin: 0 auto; padding: 1.25rem; }
+    h1 { font-size: 1.1rem; margin: 0; }
+    .sub { color: var(--muted); margin: 0.15rem 0 0.9rem; font-size: 0.85rem; }
+    ol { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+    li { display: grid; grid-template-columns: 1.25rem 1fr auto; gap: 0.6rem; align-items: start; padding: 0.5rem 0.75rem;
+         border-top: 1px solid var(--line); }
+    li:first-child { border-top: 0; }
+    .mark { width: 0.7rem; height: 0.7rem; margin-top: 0.3rem; border-radius: 50%; background: var(--skipped); }
+    .done .mark { background: var(--done); }
+    .failed .mark { background: var(--failed); }
+    .waiting .mark { background: var(--waiting); }
+    .running .mark { background: transparent; border: 2px solid var(--running); border-top-color: transparent;
+                     width: 0.55rem; height: 0.55rem; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .title { font-weight: 600; }
+    .detail { color: var(--muted); font-size: 0.85rem; word-break: break-word; }
+    .state { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); margin-top: 0.15rem; }
+    .skipped .title { color: var(--muted); font-weight: 400; }
+    .banner { margin-bottom: 0.9rem; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--line);
+              background: var(--card); }
+    .banner.failed { border-color: var(--failed); }
+    .banner.done { border-color: var(--done); }
+    .problems { margin-top: 0.9rem; }
+    .problems h2 { font-size: 0.9rem; margin: 0 0 0.35rem; }
+    .problems pre { margin: 0; padding: 0.5rem 0.75rem; white-space: pre-wrap; background: var(--card);
+                    border: 1px solid var(--failed); border-radius: 6px; font-size: 0.8rem; }
+    .offline { color: var(--waiting); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="host">Cupcake k3s node</h1>
+    <p class="sub" id="sub">Reading the node's state…</p>
+    <div class="banner" id="banner" hidden></div>
+    <ol id="steps"></ol>
+    <div class="problems" id="problems" hidden>
+      <h2>From cupcake-k3s-error.txt</h2>
+      <pre id="problem-text"></pre>
+    </div>
+  </main>
+  <script>
+    var STATES = { done: 'Done', running: 'In progress', waiting: 'Waiting for you', failed: 'Failed', skipped: 'Not used' };
+
+    function element(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) { node.className = className; }
+      if (text) { node.textContent = text; }
+      return node;
+    }
+
+    function render(status) {
+      document.getElementById('host').textContent = status.host + (status.role ? ' · ' + status.role : '');
+      document.title = status.host + ' setup';
+      document.getElementById('sub').textContent = 'Checked ' + new Date(status.checked_at).toLocaleTimeString() +
+        '; this page updates by itself.';
+      var banner = document.getElementById('banner');
+      banner.hidden = status.result === 'running';
+      banner.className = 'banner ' + status.result;
+      banner.textContent = status.result === 'done'
+        ? 'Setup is finished. This page stops an hour from now.'
+        : 'A step failed. Fix it as described below and restart the Pi.';
+      var list = document.getElementById('steps');
+      list.replaceChildren();
+      status.steps.forEach(function (step) {
+        var item = element('li', step.state);
+        item.appendChild(element('span', 'mark'));
+        var text = element('div');
+        text.appendChild(element('div', 'title', step.title));
+        if (step.detail) { text.appendChild(element('div', 'detail', step.detail)); }
+        item.appendChild(text);
+        item.appendChild(element('span', 'state', STATES[step.state] || step.state));
+        list.appendChild(item);
+      });
+      var problems = document.getElementById('problems');
+      problems.hidden = status.problems.length === 0;
+      document.getElementById('problem-text').textContent = status.problems.join('\n');
+    }
+
+    function refresh() {
+      fetch('/status.json', { cache: 'no-store' })
+        .then(function (response) { return response.json(); })
+        .then(render)
+        .catch(function () {
+          var sub = document.getElementById('sub');
+          sub.textContent = 'The node is not answering; it may be restarting or the setup page has stopped.';
+          sub.className = 'sub offline';
+        });
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
