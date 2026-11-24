@@ -25,7 +25,7 @@ import struct
 from urllib.parse import urlsplit
 
 import pytest
-from browser_support import settle
+from browser_support import engine_can_pin, launch_options, settle
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect, sync_playwright
 from support import created, lab, unique  # noqa: F401
@@ -345,7 +345,11 @@ def playwright():
 
 @pytest.fixture(scope="module")
 def browsers(playwright):
-    launched = {name: getattr(playwright, name).launch(**options) for name, options in LAUNCH_OPTIONS.items()}
+    launched = {
+        name: getattr(playwright, name).launch(**launch_options(name, options))
+        for name, options in LAUNCH_OPTIONS.items()
+        if engine_can_pin(name)
+    }
     yield launched
     for browser in launched.values():
         browser.close()
@@ -354,6 +358,8 @@ def browsers(playwright):
 @pytest.fixture(scope="module", params=sorted(LINEUPS))
 def lineup(request, browsers):
     """Each test runs with everyone in Chromium, everyone in Firefox, and with Chromium and Firefox mixed."""
+    if any(not engine_can_pin(name) for name in LINEUPS[request.param].values()):
+        pytest.skip("WebKit cannot be pointed at CUPCAKE_RESOLVE; run from a machine that resolves the instance's names")
     return request.param, {role: browsers[name] for role, name in LINEUPS[request.param].items()}
 
 
@@ -650,6 +656,8 @@ def test_calls_work_when_every_connection_must_go_through_turn(relay_room):
         for person in relay_room.values():
             person.expect_peers(1)
     except AssertionError:
+        if not any(url.startswith("turn:") for url in relay_room["owner"].page.evaluate(TURN_URLS)):
+            pytest.skip("this server offers no TURN relay")
         if transport == "udp" and not turn_receives_large_datagrams(relay_room["owner"]):
             pytest.skip(
                 f"UDP datagrams of {LARGE_DATAGRAM_BYTES} bytes do not reach the TURN server from this machine, "

@@ -1,6 +1,7 @@
 """A logged-in browser tab on one of the apps, shared by the browser tests of the screens and their workflows."""
 
 import json
+import os
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import expect
@@ -22,6 +23,27 @@ async () => {
 }
 """
 VIEWPORT = {"width": 1440, "height": 900}
+PINNED_ADDRESS = os.environ.get("CUPCAKE_RESOLVE", "")
+PINNED_HOSTS = []
+
+
+def engine_can_pin(engine):
+    """Whether a browser engine can be told where the pinned host names live; WebKit cannot."""
+    return not PINNED_ADDRESS or engine in ("chromium", "firefox")
+
+
+def launch_options(engine, options=None):
+    """Playwright launch options for engine, sending the pinned host names to CUPCAKE_RESOLVE when it is set."""
+    options = dict(options or {})
+    if not PINNED_ADDRESS:
+        return options
+    if engine == "chromium":
+        rules = ",".join(f"MAP {host} {PINNED_ADDRESS}" for host in PINNED_HOSTS)
+        options["args"] = [*options.get("args", []), f"--host-resolver-rules={rules}"]
+    elif engine == "firefox":
+        options["firefox_user_prefs"] = {**options.get("firefox_user_prefs", {}),
+                                         "network.dns.forceResolve": PINNED_ADDRESS}
+    return options
 
 TOKENS_SCRIPT = """
 localStorage.setItem('ccvAccessToken', %s);

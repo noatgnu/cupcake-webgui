@@ -46,6 +46,7 @@ printf 'ROLE=server\nTOKEN=%s\nHOSTNAME=cupcake-k3s\n' "$TOKEN" > "$WORK/server/
 TUNNEL_TOKEN=$(printf '{"a":"test-account","t":"00000000-0000-0000-0000-000000000000","s":"%s"}' "$TOKEN" | base64 -w0)
 printf 'TUNNEL_TOKEN=%s\n' "$TUNNEL_TOKEN" > "$WORK/server/cupcake-cloudflared.txt"
 printf 'ROLE=agent\r\nTOKEN = "%s"\r\nSERVER=cupcake-k3s.local\r\n' "$TOKEN" > "$WORK/agent/cupcake-k3s.txt"
+printf 'AUTHKEY=tskey-auth-firstboot-%s\r\n' "$TOKEN" > "$WORK/agent/cupcake-tailscale.txt"
 
 LOOP=""
 if [ "${PAIR_STORAGE:-0}" = 1 ]; then
@@ -109,6 +110,12 @@ for node in server agent; do
   ! contains -iE 'password|token|secret' < "$WORK/progress-$node.json" || fail "$node: the setup page shows a secret"
 done
 echo "both nodes show their setup progress on port 8080"
+JOIN_STARTED=$(docker exec "$PREFIX-agent" systemctl show cupcake-k3s-tailscale-join -p ExecMainStartTimestampMonotonic --value)
+K3S_READY=$(docker exec "$PREFIX-agent" systemctl show k3s-agent -p ActiveEnterTimestampMonotonic --value)
+[ "${JOIN_STARTED:-0}" -gt 0 ] && [ "$JOIN_STARTED" -lt "$K3S_READY" ] \
+  || fail "the worker did not try its first-boot AUTHKEY before k3s started (join $JOIN_STARTED, k3s $K3S_READY)"
+[ ! -e "$WORK/agent/cupcake-tailscale.txt" ] || fail "the first-boot AUTHKEY was left on the worker's boot partition"
+echo "the worker tried its first-boot AUTHKEY $(( (K3S_READY - JOIN_STARTED) / 1000000 ))s before k3s started"
 FIRST_HOME=$(in_server getent passwd 1000 | cut -d: -f6)
 in_server grep -q 'server: https://cupcake-k3s.local:6443' "$FIRST_HOME/.kube/config" || fail "the first user did not get a kubeconfig for cupcake-k3s.local"
 FIRST_USER=$(in_server getent passwd 1000 | cut -d: -f1)
@@ -275,6 +282,7 @@ print('added')"
 fi
 
 echo "=== restart: the setup does not run again and the nodes come back ==="
+docker exec "$PREFIX-agent" sh -c 'test ! -e /boot/firmware/cupcake-k3s-error.txt || truncate -s 0 /boot/firmware/cupcake-k3s-error.txt'
 TS_KEY="tskey-auth-pairtest-$TOKEN"
 printf 'AUTHKEY=%s\r\nCLIENT_ID=test-id\r\nCLIENT_SECRET=test-secret\r\n' "$TS_KEY" > "$WORK/agent/cupcake-tailscale.txt"
 docker restart "$PREFIX-agent" >/dev/null
@@ -299,7 +307,7 @@ until grep -q "This Pi did not join the tailnet" "$WORK/agent/cupcake-k3s-error.
   [ "$(date +%s)" -lt "$ts_deadline" ] || { docker exec "$PREFIX-agent" systemctl status cupcake-k3s-remote-access --no-pager 2>&1 | tail -20; cat "$WORK/agent/cupcake-k3s-error.txt" 2>/dev/null; fail "the worker did not try to join the tailnet with AUTHKEY"; }
   sleep 5
 done
-docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-remote-access --no-pager | contains "tailscale up\|tailnet" \
+docker exec "$PREFIX-agent" journalctl -u cupcake-k3s-tailscale-join --no-pager | contains "tailscale up\|tailnet" \
   || fail "the attempt to join the tailnet was not logged"
 grep -q "only a control plane running cupcake-master uses it" "$WORK/agent/cupcake-k3s-error.txt" \
   || fail "the worker did not say why it skipped the OAuth client"

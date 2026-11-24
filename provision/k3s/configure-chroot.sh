@@ -16,7 +16,7 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 
 systemctl enable tailscaled.service avahi-daemon.service systemd-timesyncd.service systemd-time-wait-sync.service cupcake-k3s-setup.service \
-  cupcake-k3s-storage.service cupcake-k3s-wifi.service cupcake-k3s-remote-access.service \
+  cupcake-k3s-storage.service cupcake-k3s-wifi.service cupcake-k3s-tailscale-join.service cupcake-k3s-remote-access.service \
   cupcake-k3s-tailnet-domain.timer cupcake-selftest.service cupcake-k3s-progress.service
 systemctl disable k3s.service k3s-agent.service 2>/dev/null || true
 

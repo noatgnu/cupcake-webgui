@@ -1,0 +1,14 @@
+[Unit]
+Description=Join the tailnet with the auth key in cupcake-tailscale.txt
+After=boot-firmware.mount network-online.target tailscaled.service cupcake-k3s-wifi.service
+Wants=network-online.target tailscaled.service
+Before=cupcake-k3s-remote-access.service
+ConditionPathExists=/boot/firmware/cupcake-tailscale.txt
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cupcake-k3s-tailscale-join
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=multi-user.target

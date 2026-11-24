@@ -246,7 +246,13 @@ def turn_allocate(address, username, password, timeout=5):
 def test_the_turn_server_is_reachable_and_accepts_the_credentials_it_hands_out(lab, call, cupcake_url):
     peer = Peer("owner", lab["owner"], cupcake_url, call["id"])
     peer.close()
-    turn = next(server for server in peer.hello["ice_servers"] if any(url.startswith("turn:") for url in server["urls"]))
+    turn = next(
+        (server for server in peer.hello["ice_servers"]
+         if any(url.startswith("turn:") for url in ([server["urls"]] if isinstance(server["urls"], str) else server["urls"]))),
+        None,
+    )
+    if turn is None:
+        pytest.skip("this server offers no TURN relay")
     url = next(url for url in turn["urls"] if url.startswith("turn:") and "transport=" not in url)
     location = urlsplit("//" + url.split(":", 1)[1])
     assert location.hostname == urlsplit(cupcake_url).hostname, f"the TURN server is offered as {url}, not by the name used"

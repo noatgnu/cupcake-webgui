@@ -2130,7 +2130,8 @@ jobs:
           sudo test -f "$ROOTFS/usr/share/cupcake-k3s/reference-snapshot/$(cd k3s-build/snapshot && ls manifest*.json | head -1)" || fail "the reference snapshot is missing"
           WANTS="$ROOTFS/etc/systemd/system/multi-user.target.wants"
           for unit in cupcake-k3s-setup.service cupcake-k3s-storage.service cupcake-k3s-wifi.service avahi-daemon.service \
-              cupcake-k3s-remote-access.service tailscaled.service cupcake-selftest.service cupcake-k3s-progress.service; do
+              cupcake-k3s-remote-access.service cupcake-k3s-tailscale-join.service tailscaled.service cupcake-selftest.service \
+              cupcake-k3s-progress.service; do
             sudo test -L "$WANTS/$unit" || fail "$unit is not enabled"
           done
           sudo test -L "$ROOTFS/etc/systemd/system/timers.target.wants/cupcake-k3s-tailnet-domain.timer" \

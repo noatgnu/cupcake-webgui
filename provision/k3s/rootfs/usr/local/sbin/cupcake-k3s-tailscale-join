@@ -1,0 +1,52 @@
+#!/bin/bash
+# Joins this Pi to the tailnet with AUTHKEY from cupcake-tailscale.txt on the boot partition as soon as the network is up,
+# before k3s is set up or started, then removes the key from the file. A Tailscale OAuth client in the same file is
+# left for cupcake-k3s-remote-access to hand to cupcake-master.
+set -euo pipefail
+
+BOOT_DIR="${CUPCAKE_K3S_BOOT_DIR:-/boot/firmware}"
+TAILSCALE_FILE="$BOOT_DIR/cupcake-tailscale.txt"
+ERROR_FILE="$BOOT_DIR/cupcake-k3s-error.txt"
+MASTER_MANIFEST=/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml
+
+log() { echo "cupcake-k3s: $*"; }
+problem() {
+  log "$*"
+  (umask 022; printf '%s\n' "$*" >> "$ERROR_FILE") || true
+}
+
+value() {
+  local line
+  line=$(tr -d '\r' < "$1" | grep -E "^[[:space:]]*$2[[:space:]]*=" | tail -1 || true)
+  line="${line#*=}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  line="${line#\"}"; line="${line%\"}"
+  line="${line#\'}"; line="${line%\'}"
+  printf '%s' "$line"
+}
+
+[ -f "$TAILSCALE_FILE" ] || exit 0
+auth_key=$(value "$TAILSCALE_FILE" AUTHKEY)
+[ -n "$auth_key" ] || exit 0
+client_id=$(value "$TAILSCALE_FILE" CLIENT_ID)
+client_secret=$(value "$TAILSCALE_FILE" CLIENT_SECRET)
+
+umask 077
+if [ -n "$client_id" ] && [ -n "$client_secret" ]; then
+  printf 'CLIENT_ID=%s\nCLIENT_SECRET=%s\n' "$client_id" "$client_secret" > "$TAILSCALE_FILE.new"
+  mv -f "$TAILSCALE_FILE.new" "$TAILSCALE_FILE"
+else
+  rm -f "$TAILSCALE_FILE"
+fi
+sync -f "$BOOT_DIR" 2>/dev/null || sync
+
+if output=$(tailscale up --authkey "$auth_key" --ssh --hostname "$(hostname)" --timeout=90s 2>&1); then
+  log "joined the tailnet as $(hostname)"
+  if [ -f "$MASTER_MANIFEST" ]; then
+    systemctl start --no-block cupcake-k3s-tailnet-domain.service || true
+  fi
+else
+  problem "This Pi did not join the tailnet: ${output:-tailscale up failed}
+Check the auth key and the network, then drop cupcake-tailscale.txt again or run sudo tailscale up."
+fi

@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 import pytest
-from browser_support import Screen
+from browser_support import Screen, launch_options
 from playwright.sync_api import expect, sync_playwright
 from support import created, lab, results, unique  # noqa: F401
 
@@ -31,7 +31,7 @@ STRAINS = "id,name,synonyms\nLAB:0001,K-12 MG1655,MG1655\nLAB:0002,BL21(DE3),BL2
 @pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
-        chromium = playwright.chromium.launch()
+        chromium = playwright.chromium.launch(**launch_options("chromium"))
         yield chromium
         chromium.close()
 

@@ -15,7 +15,7 @@ import os
 import re
 
 import pytest
-from browser_support import TIMEOUT_MS, Screen
+from browser_support import TIMEOUT_MS, Screen, launch_options
 from playwright.sync_api import expect, sync_playwright
 from support import created, lab, unique  # noqa: F401
 
@@ -33,7 +33,7 @@ SDRF = (
 @pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
-        chromium = playwright.chromium.launch()
+        chromium = playwright.chromium.launch(**launch_options("chromium"))
         yield chromium
         chromium.close()
 
@@ -181,9 +181,12 @@ def resolve(template, sample):
     return re.sub(r"\{([a-z]+\.[a-z_]+)\}", lambda match: lookup(match.group(1)), template)
 
 
+APPLIANCE_ONLY = {"admin/storage", "admin/backup", "admin/wifi", "admin/remote-access", "admin/plugins", "admin/power"}
+
+
 @pytest.mark.parametrize(
     "app, who, path, marker, texts, name, caption",
-    SCREENS,
+    [pytest.param(*screen, marks=pytest.mark.appliance) if screen[2] in APPLIANCE_ONLY else screen for screen in SCREENS],
     ids=[screen[5] for screen in SCREENS],
 )
 def test_screen_opens_with_its_content(tabs, sample, app, who, path, marker, texts, name, caption):

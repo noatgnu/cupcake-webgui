@@ -17,6 +17,13 @@ Configuration, through environment variables:
                              steps-cupcake/ and steps-vanilla/ for tasks shown step by step, and one
                              folder per browser line-up for the live session panel
   CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
+  CUPCAKE_APPLIANCE     set to 0 when the target is a Cupcake instance on a cluster rather than an appliance, to skip
+                        the screens only an appliance has: storage, backups, Wi-Fi, remote access, plugins and power
+  CUPCAKE_RESOLVE       an IP address the host names of the URLs above resolve to, for an instance whose names this
+                        machine cannot resolve, such as <slug>.local on a k3s cluster reached over Tailscale; WebKit
+                        cannot be pointed at it, so its tests are skipped
+  CUPCAKE_CA_FILE       a certificate authority to trust besides the usual ones, such as a k3s cluster's
+                        cupcake-k3s-ca.crt
 
 The browser tests need the Playwright browsers:  poetry run playwright install chromium firefox webkit
 (WebKit also needs its system libraries, once:  sudo <venv>/bin/playwright install-deps webkit)
@@ -27,25 +34,59 @@ Run with:  CUPCAKE_HOST=... CUPCAKE_PASSWORD=... poetry run pytest
 import json
 import os
 import secrets
+import socket
+import tempfile
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
+import certifi
 import pytest
 import requests
 
+import browser_support
+
 TIMINGS = []
+
+
+def pytest_configure(config):
+    """Send the instance's host names to CUPCAKE_RESOLVE and trust CUPCAKE_CA_FILE, when they are set."""
+    ca_file = os.environ.get("CUPCAKE_CA_FILE")
+    if ca_file:
+        bundle = Path(tempfile.gettempdir(), f"cupcake-client-tests-ca-{os.getpid()}.pem")
+        bundle.write_text(Path(certifi.where()).read_text() + "\n" + Path(ca_file).read_text())
+        os.environ["REQUESTS_CA_BUNDLE"] = str(bundle)
+        os.environ["SSL_CERT_FILE"] = str(bundle)
+    address = browser_support.PINNED_ADDRESS
+    if not address:
+        return
+    host = os.environ.get("CUPCAKE_HOST", "")
+    hosts = {host}
+    for name in ("CUPCAKE_VANILLA_URL", "CUPCAKE_URL"):
+        if os.environ.get(name):
+            hosts.add(urlparse(os.environ[name]).hostname)
+    browser_support.PINNED_HOSTS.extend(sorted(h for h in hosts if h))
+    original = socket.getaddrinfo
+
+    def pinned(name, *args, **kwargs):
+        return original(address if name in browser_support.PINNED_HOSTS else name, *args, **kwargs)
+
+    socket.getaddrinfo = pinned
 
 
 def pytest_collection_modifyitems(config, items):
     """Skip tests whose requirements are not configured instead of failing them."""
     skip_login = pytest.mark.skip(reason="set CUPCAKE_PASSWORD to run tests that need a login")
     skip_writes = pytest.mark.skip(reason="set CUPCAKE_ALLOW_WRITES=1 to run tests that create test data")
+    skip_appliance = pytest.mark.skip(reason="only an appliance has this screen, and CUPCAKE_APPLIANCE=0")
     for item in items:
         if "login" in item.keywords and not os.environ.get("CUPCAKE_PASSWORD"):
             item.add_marker(skip_login)
         if "writes" in item.keywords and os.environ.get("CUPCAKE_ALLOW_WRITES") != "1":
             item.add_marker(skip_writes)
+        if "appliance" in item.keywords and os.environ.get("CUPCAKE_APPLIANCE") == "0":
+            item.add_marker(skip_appliance)
 
 
 def pytest_terminal_summary(terminalreporter):

@@ -16,6 +16,7 @@ playwright = "^1.65.1"
 markers = [
     "login: needs CUPCAKE_PASSWORD",
     "writes: creates and deletes test data on the appliance; needs CUPCAKE_ALLOW_WRITES=1",
+    "appliance: a screen only an appliance has; skipped with CUPCAKE_APPLIANCE=0",
 ]
 
 [build-system]
