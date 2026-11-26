@@ -52,6 +52,15 @@ if [ ! -f "$CONFIG" ]; then
   log "no $CONFIG; k3s stays off until one is added and the Pi restarted"
   exit 0
 fi
+if [ -f "$BOOT_DIR/cupcake-storage.txt" ] && ! mountpoint -q /var/lib/rancher; then
+  log "the USB drive in cupcake-storage.txt is not in use, so k3s is not set up"
+  {
+    echo
+    echo "k3s was not set up because the USB drive in cupcake-storage.txt is not in use; its data would otherwise go on"
+    echo "the SD card for good. Fix the problem above, or remove cupcake-storage.txt to use the SD card, then restart the Pi."
+  } >> "$ERROR_FILE" || true
+  exit 1
+fi
 
 ROLE=$(value ROLE)
 TOKEN=$(value TOKEN)

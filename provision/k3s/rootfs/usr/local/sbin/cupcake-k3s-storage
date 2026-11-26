@@ -1,11 +1,13 @@
 #!/bin/bash
 # Puts /var/lib/rancher (k3s, its images and the volumes it provides) on the USB drive named in cupcake-storage.txt.
+# With FORMAT=yes, a USB drive that is not ext4, xfs or btrfs is formatted as ext4 first, erasing it.
 set -euo pipefail
 
 CONFIG="${CUPCAKE_K3S_STORAGE_CONFIG:-/boot/firmware/cupcake-storage.txt}"
 ERROR_FILE="$(dirname "$CONFIG")/cupcake-k3s-error.txt"
 DATA=/srv/cupcake-data
 RANCHER=/var/lib/rancher
+WARNING_FILE=/var/lib/cupcake-k3s/storage-warning
 
 log() { echo "cupcake-k3s: $*"; }
 fail() {
@@ -48,9 +50,33 @@ done
 FSTYPE=$(blkid -o value -s TYPE "$DEVICE")
 case "$FSTYPE" in
   ext4|xfs|btrfs) ;;
-  *) fail "The drive labelled $LABEL is $FSTYPE; k3s needs ext4, for example: sudo mkfs.ext4 -L $LABEL $DEVICE" ;;
+  *)
+    if [ "$(value FORMAT | tr '[:upper:]' '[:lower:]')" != yes ]; then
+      fail "The drive labelled $LABEL is $FSTYPE; k3s needs ext4. Add FORMAT=yes to cupcake-storage.txt to have it formatted, erasing it, or run: sudo mkfs.ext4 -L $LABEL $DEVICE"
+    fi
+    DISK=$(lsblk -no PKNAME "$DEVICE" 2>/dev/null | head -1)
+    [ "$(lsblk -dno TRAN "/dev/${DISK:-none}" 2>/dev/null)" = usb ] \
+      || fail "The drive labelled $LABEL is not on USB, so it is not formatted"
+    ROOT_DISK=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null | head -1)
+    [ "$DISK" != "$ROOT_DISK" ] || fail "The drive labelled $LABEL holds the running system, so it is not formatted"
+    ! findmnt -rno TARGET -S "$DEVICE" >/dev/null || fail "The drive labelled $LABEL is in use, so it is not formatted"
+    log "formatting $DEVICE ($LABEL, $FSTYPE) as ext4"
+    wipefs -a "$DEVICE" >/dev/null
+    mkfs.ext4 -q -F -L "$LABEL" "$DEVICE" || fail "Formatting the drive labelled $LABEL failed"
+    udevadm settle 2>/dev/null || true
+    FSTYPE=ext4
+    ;;
 esac
-UUID=$(blkid -o value -s UUID "$DEVICE")
+UUID=$(blkid -p -o value -s UUID "$DEVICE")
+
+DISK=$(lsblk -no PKNAME "$DEVICE" 2>/dev/null | head -1)
+install -d -m 755 "$(dirname "$WARNING_FILE")"
+if [ "$(cat "/sys/block/${DISK:-none}/removable" 2>/dev/null)" = 1 ]; then
+  log "the drive labelled $LABEL looks like a USB flash stick"
+  echo "The drive labelled $LABEL looks like a USB flash stick, which writes k3s's and the instances' databases slowly; use a USB SSD instead" > "$WARNING_FILE"
+else
+  rm -f "$WARNING_FILE"
+fi
 
 install -d -m 755 "$DATA"
 grep -q " $DATA " /etc/fstab 2>/dev/null || \

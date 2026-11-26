@@ -26,6 +26,7 @@ PAGE = Path(os.environ.get("CUPCAKE_K3S_PROGRESS_PAGE", "/usr/share/cupcake-k3s/
 K3S_CONFIG = Path("/etc/rancher/k3s/config.yaml")
 AGENT_CONF = STATE / "agent.conf"
 PRELOAD = STATE / "preload"
+STORAGE_WARNING = STATE / "storage-warning"
 K3S_IMAGES = Path("/var/lib/rancher/k3s/agent/images")
 MASTER_MANIFEST = Path("/var/lib/rancher/k3s/server/manifests/cupcake-master.yaml")
 KUBECONFIG = "/etc/rancher/k3s/k3s.yaml"
@@ -84,8 +85,10 @@ def storage_step():
     fstab = Path("/etc/fstab").read_text(errors="replace") if Path("/etc/fstab").exists() else ""
     if " /var/lib/rancher " in fstab:
         mounted = run("mountpoint", "-q", "/var/lib/rancher") is not None
-        return step("storage", "USB drive", DONE if mounted else FAILED,
-                    "k3s keeps its data on the USB drive" if mounted else "The USB drive is not mounted")
+        if not mounted:
+            return step("storage", "USB drive", FAILED, "The USB drive is not mounted")
+        warning = STORAGE_WARNING.read_text(errors="replace").strip() if STORAGE_WARNING.exists() else ""
+        return step("storage", "USB drive", DONE, warning or "k3s keeps its data on the USB drive")
     if (BOOT / "cupcake-storage.txt").exists():
         if unit_failed("cupcake-k3s-storage.service"):
             return step("storage", "USB drive", FAILED, "See cupcake-k3s-error.txt")

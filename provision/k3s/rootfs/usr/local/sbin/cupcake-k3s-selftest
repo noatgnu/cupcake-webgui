@@ -125,6 +125,7 @@ storage_checks() {
   check "the USB drive is mounted at /srv/cupcake-data" mountpoint -q /srv/cupcake-data
   check "k3s keeps its data on the USB drive" mountpoint -q /var/lib/rancher
   metric usb_free_gb "$(df -BG --output=avail /srv/cupcake-data 2>/dev/null | tail -1 | tr -dc 0-9)"
+  [ ! -s /var/lib/cupcake-k3s/storage-warning ] || note "$(cat /var/lib/cupcake-k3s/storage-warning)"
 }
 
 master_checks() {
