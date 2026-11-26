@@ -47,6 +47,17 @@ for _ in $(seq 1 30); do
 done
 [ -n "$DEVICE" ] || fail "No drive labelled $LABEL is plugged in"
 
+DISK=$(lsblk -no PKNAME "$DEVICE" 2>/dev/null | head -1)
+install -d -m 755 "$(dirname "$WARNING_FILE")"
+rm -f "$WARNING_FILE"
+if [ "$(cat "/sys/block/${DISK:-none}/removable" 2>/dev/null)" = 1 ]; then
+  if [ "$(value ALLOW_FLASH | tr '[:upper:]' '[:lower:]')" != yes ]; then
+    fail "The drive labelled $LABEL looks like a USB flash stick, which writes k3s's and the instances' databases too slowly. Use a USB SSD, or remove cupcake-storage.txt to use the SD card, or add ALLOW_FLASH=yes to cupcake-storage.txt to use the stick anyway"
+  fi
+  log "using the drive labelled $LABEL although it looks like a USB flash stick"
+  echo "The drive labelled $LABEL looks like a USB flash stick, which writes k3s's and the instances' databases slowly; use a USB SSD instead" > "$WARNING_FILE"
+fi
+
 FSTYPE=$(blkid -o value -s TYPE "$DEVICE")
 case "$FSTYPE" in
   ext4|xfs|btrfs) ;;
@@ -54,7 +65,6 @@ case "$FSTYPE" in
     if [ "$(value FORMAT | tr '[:upper:]' '[:lower:]')" != yes ]; then
       fail "The drive labelled $LABEL is $FSTYPE; k3s needs ext4. Add FORMAT=yes to cupcake-storage.txt to have it formatted, erasing it, or run: sudo mkfs.ext4 -L $LABEL $DEVICE"
     fi
-    DISK=$(lsblk -no PKNAME "$DEVICE" 2>/dev/null | head -1)
     [ "$(lsblk -dno TRAN "/dev/${DISK:-none}" 2>/dev/null)" = usb ] \
       || fail "The drive labelled $LABEL is not on USB, so it is not formatted"
     ROOT_DISK=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null | head -1)
@@ -68,15 +78,6 @@ case "$FSTYPE" in
     ;;
 esac
 UUID=$(blkid -p -o value -s UUID "$DEVICE")
-
-DISK=$(lsblk -no PKNAME "$DEVICE" 2>/dev/null | head -1)
-install -d -m 755 "$(dirname "$WARNING_FILE")"
-if [ "$(cat "/sys/block/${DISK:-none}/removable" 2>/dev/null)" = 1 ]; then
-  log "the drive labelled $LABEL looks like a USB flash stick"
-  echo "The drive labelled $LABEL looks like a USB flash stick, which writes k3s's and the instances' databases slowly; use a USB SSD instead" > "$WARNING_FILE"
-else
-  rm -f "$WARNING_FILE"
-fi
 
 install -d -m 755 "$DATA"
 grep -q " $DATA " /etc/fstab 2>/dev/null || \

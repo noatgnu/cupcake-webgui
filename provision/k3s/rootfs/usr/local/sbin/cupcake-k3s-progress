@@ -123,7 +123,7 @@ def images_step():
     waiting = len(list(K3S_IMAGES.glob("*.tar.zst")))
     if waiting == 0:
         return step("images", "Preloaded images", DONE, f"{total} of {total} imported")
-    return step("images", "Preloaded images", RUNNING, f"{total - waiting} of {total} imported; this takes a while on an SD card")
+    return step("images", "Preloaded images", RUNNING, f"{total - waiting} of {total} imported; this takes a while")
 
 
 def node_ready_step():
