@@ -144,6 +144,9 @@
         </div>
       }
     }
+    <ccc-help-link
+      [linkClass]="'btn btn-outline-secondary w-100 mb-2 d-flex align-items-center gap-2' + (isCollapsed() ? ' justify-content-center' : '')"
+      [showLabel]="!isCollapsed()" />
     <button
       class="btn btn-outline-secondary w-100 mb-2 d-flex align-items-center gap-2"
       [class.justify-content-center]="isCollapsed()"

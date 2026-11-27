@@ -111,6 +111,26 @@ jobs:
           cp -r dist/cupcake-vanilla-ng/browser/* "$GITHUB_WORKSPACE/frontend/vanilla/"
           git rev-parse --short HEAD > "$GITHUB_WORKSPACE/frontend/vanilla/build-commit.txt"
 
+      - name: Add the manuals
+        env:
+          BACKEND_REF: ${{ inputs.backend_ref || 'master' }}
+        run: |
+          base=https://github.com/noatgnu/cupcake-manual/releases/download
+          for pair in cupcake:webgui cupcake-vanilla:vanilla; do
+            app="${pair%%:*}"
+            folder="$GITHUB_WORKSPACE/frontend/${pair##*:}/help"
+            url="$base/$app-$BACKEND_REF/$app-manual.tar.gz"
+            curl -fsIL --max-time 30 -o /dev/null "$url" || url="$base/manual/$app-manual.tar.gz"
+            if curl -fsIL --max-time 30 -o /dev/null "$url"; then
+              mkdir -p "$folder"
+              curl -fsSL "$url" | tar -xz -C "$folder"
+              test -f "$folder/index.html" && test -f "$folder/screens.json"
+              echo "$app manual: $url" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "$app manual: not published; the app is built without it" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
       - name: Upload webgui
         uses: actions/upload-artifact@v4
         with:

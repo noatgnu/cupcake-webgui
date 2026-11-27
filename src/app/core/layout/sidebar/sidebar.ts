@@ -3,7 +3,7 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { NgbOffcanvas } from '@ng-bootstrap/ng-bootstrap';
-import { ThemeService, AuthService, SiteConfigService, DemoModeService, PluginService, Plugin } from '@noatgnu/cupcake-core';
+import { ThemeService, AuthService, SiteConfigService, DemoModeService, PluginService, Plugin, HelpLink } from '@noatgnu/cupcake-core';
 import { NotificationDropdown } from '../../../shared/components/notification-dropdown/notification-dropdown';
 import { MessagingDropdown } from '../../../shared/components/messaging-dropdown/messaging-dropdown';
 import { AsyncTaskDropdown } from '../../../shared/components/async-task-dropdown/async-task-dropdown';
@@ -12,7 +12,7 @@ import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterLink, RouterLinkActive, CommonModule, NotificationDropdown, MessagingDropdown, AsyncTaskDropdown],
+  imports: [RouterLink, RouterLinkActive, CommonModule, NotificationDropdown, MessagingDropdown, AsyncTaskDropdown, HelpLink],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
