@@ -34,12 +34,12 @@ export class JobDetail implements OnInit {
     if (!jobValue || !user) return false;
 
     const isOwnerInDraft = jobValue.user === user.id && jobValue.status === Status.DRAFT;
-    const canEditAsStaffAfterSubmission = jobValue.canEditStaffOnlyColumns &&
+    const canEditAfterSubmission = !!jobValue.canEdit &&
       (jobValue.status === Status.SUBMITTED ||
        jobValue.status === Status.PENDING ||
        jobValue.status === Status.IN_PROGRESS);
 
-    return isOwnerInDraft || canEditAsStaffAfterSubmission;
+    return isOwnerInDraft || canEditAfterSubmission;
   });
 
   isDraft = computed(() => {

@@ -113,7 +113,7 @@
               <thead class="table-light">
                 <tr>
                   <th>Name</th>
-                  <th>Content Type</th>
+                  <th>Billed as</th>
                   <th>Billing Unit</th>
                   <th>Approval</th>
                   <th>Status</th>
@@ -133,10 +133,10 @@
                       }
                     </td>
                     <td>
-                      @if (itemType.contentTypeDisplay) {
-                        <span class="badge bg-info">{{ itemType.contentTypeDisplay }}</span>
+                      @if (itemType.kindDisplay) {
+                        <span class="badge bg-info">{{ itemType.kindDisplay }}</span>
                       } @else {
-                        <span class="text-muted">ID: {{ itemType.contentType }}</span>
+                        <span class="text-muted">Not billed automatically</span>
                       }
                     </td>
                     <td>

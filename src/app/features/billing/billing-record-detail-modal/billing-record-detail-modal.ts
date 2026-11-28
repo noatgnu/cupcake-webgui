@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
 import type { BillingRecord } from '@noatgnu/cupcake-salted-caramel';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-billing-record-detail-modal',
@@ -14,6 +14,7 @@ import { ToastService, AuthService } from '@noatgnu/cupcake-core';
 })
 export class BillingRecordDetailModal {
   activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private billingRecordService = inject(BillingRecordService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
@@ -51,11 +52,11 @@ export class BillingRecordDetailModal {
     return this.isAdmin() && rec?.status === BillingStatus.PENDING;
   }
 
-  approveRecord(): void {
+  async approveRecord(): Promise<void> {
     const rec = this.record();
     if (!rec) return;
 
-    if (!confirm(`Are you sure you want to approve this billing record for ${rec.totalAmount} ${rec.currency}?`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Approve billing record', message: `Are you sure you want to approve this billing record for ${rec.totalAmount} ${rec.currency}?`, confirmLabel: 'Approve', confirmClass: 'btn-primary' }))) {
       return;
     }
 

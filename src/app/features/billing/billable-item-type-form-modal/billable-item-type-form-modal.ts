@@ -6,6 +6,8 @@ import { ToastService } from '@noatgnu/cupcake-core';
 import {
   BillableItemTypeService,
   BillableItemType,
+  BillableKind,
+  BillableKindLabels,
   BillingUnit
 } from '@noatgnu/cupcake-salted-caramel';
 
@@ -29,6 +31,13 @@ export class BillableItemTypeFormModal implements OnInit {
   isEditMode = signal(false);
 
   readonly billingUnits = Object.values(BillingUnit);
+  readonly kinds = Object.values(BillableKind);
+  readonly kindLabels = BillableKindLabels;
+  private readonly kindUnits: Record<BillableKind, BillingUnit> = {
+    [BillableKind.STAFF_TIME]: BillingUnit.HOURLY,
+    [BillableKind.INSTRUMENT_TIME]: BillingUnit.HOURLY,
+    [BillableKind.REAGENT_COST]: BillingUnit.UNIT
+  };
 
   ngOnInit(): void {
     this.isEditMode.set(!!this.billableItemType);
@@ -39,14 +48,16 @@ export class BillableItemTypeFormModal implements OnInit {
     this.form = this.fb.group({
       name: [this.billableItemType?.name || '', [Validators.required, Validators.maxLength(200)]],
       description: [this.billableItemType?.description || ''],
-      contentType: [this.billableItemType?.contentType || null, Validators.required],
+      kind: [this.billableItemType?.kind || BillableKind.INSTRUMENT_TIME, Validators.required],
       defaultBillingUnit: [this.billableItemType?.defaultBillingUnit || BillingUnit.HOURLY, Validators.required],
       requiresApproval: [this.billableItemType?.requiresApproval ?? false],
       isActive: [this.billableItemType?.isActive ?? true]
     });
 
-    if (this.isEditMode()) {
-      this.form.get('contentType')?.disable();
+    if (!this.isEditMode()) {
+      this.form.get('kind')?.valueChanges.subscribe((kind: BillableKind) => {
+        this.form.get('defaultBillingUnit')?.setValue(this.kindUnits[kind]);
+      });
     }
   }
 
@@ -57,6 +68,7 @@ export class BillableItemTypeFormModal implements OnInit {
       [BillingUnit.USAGE]: 'Usage',
       [BillingUnit.SAMPLE]: 'Sample',
       [BillingUnit.FLAT]: 'Flat Rate',
+      [BillingUnit.UNIT]: 'Per unit',
       [BillingUnit.CUSTOM]: 'Custom'
     };
     return displays[unit] || unit;
@@ -76,6 +88,7 @@ export class BillableItemTypeFormModal implements OnInit {
       const updateData = {
         name: formValue.name,
         description: formValue.description || undefined,
+        kind: formValue.kind,
         defaultBillingUnit: formValue.defaultBillingUnit,
         requiresApproval: formValue.requiresApproval,
         isActive: formValue.isActive
@@ -95,7 +108,7 @@ export class BillableItemTypeFormModal implements OnInit {
       const createData = {
         name: formValue.name,
         description: formValue.description || undefined,
-        contentType: formValue.contentType,
+        kind: formValue.kind,
         defaultBillingUnit: formValue.defaultBillingUnit,
         requiresApproval: formValue.requiresApproval,
         isActive: formValue.isActive

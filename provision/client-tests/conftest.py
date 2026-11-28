@@ -19,9 +19,9 @@ Configuration, through environment variables:
   CUPCAKE_SCREENSHOTS_LABEL  version label recorded in the manifest, for example 0.0.24
   CUPCAKE_APPLIANCE     set to 0 when the target is a Cupcake instance on a cluster rather than an appliance, to skip
                         the screens only an appliance has: storage, backups, Wi-Fi, remote access, plugins and power
-  CUPCAKE_RESOLVE       an IP address the host names of the URLs above resolve to, for an instance whose names this
-                        machine cannot resolve, such as <slug>.local on a k3s cluster reached over Tailscale; WebKit
-                        cannot be pointed at it, so its tests are skipped
+  CUPCAKE_RESOLVE       an IP address the host names of the URLs above resolve to, except localhost, for an instance
+                        whose names this machine cannot resolve, such as <slug>.local on a k3s cluster reached over
+                        Tailscale; WebKit cannot be pointed at it, so its tests are skipped
   CUPCAKE_CA_FILE       a certificate authority to trust besides the usual ones, such as a k3s cluster's
                         cupcake-k3s-ca.crt
 
@@ -48,6 +48,7 @@ import requests
 import browser_support
 
 TIMINGS = []
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def pytest_configure(config):
@@ -66,7 +67,7 @@ def pytest_configure(config):
     for name in ("CUPCAKE_VANILLA_URL", "CUPCAKE_URL"):
         if os.environ.get(name):
             hosts.add(urlparse(os.environ[name]).hostname)
-    browser_support.PINNED_HOSTS.extend(sorted(h for h in hosts if h))
+    browser_support.PINNED_HOSTS.extend(sorted(h for h in hosts if h and h not in LOOPBACK_HOSTS))
     original = socket.getaddrinfo
 
     def pinned(name, *args, **kwargs):
@@ -249,6 +250,7 @@ def make_user(api, api_url, cleanup):
         client = requests.Session()
         client.headers["Authorization"] = f"Bearer {login.json()['access']}"
         client.user = user
+        client.password = password
         client.access_token = login.json()["access"]
         client.refresh_token = login.json()["refresh"]
         return client

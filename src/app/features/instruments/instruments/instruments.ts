@@ -7,7 +7,7 @@ import { forkJoin, of } from 'rxjs';
 import { InstrumentsNavbar } from '../instruments-navbar/instruments-navbar';
 import { InstrumentService, InstrumentPermissionService, InstrumentUsageService, MaintenanceService, MaintenanceType, Status } from '@noatgnu/cupcake-macaron';
 import type { Instrument, InstrumentDetail, SupportInformation, ExternalContact, InstrumentPermission, MaintenanceLog, InstrumentUsage } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { type MetadataColumn } from '@noatgnu/cupcake-vanilla';
 import { SupportInformationModal } from '../support-information-modal/support-information-modal';
 import { InstrumentEditModal } from '../instrument-edit-modal/instrument-edit-modal';
@@ -28,6 +28,7 @@ import { InstrumentUsageModal } from '../instrument-usage-modal/instrument-usage
 })
 export class Instruments implements OnInit {
   private instrumentService = inject(InstrumentService);
+  private confirmDialog = inject(ConfirmDialogService);
   private instrumentPermissionService = inject(InstrumentPermissionService);
   private instrumentUsageService = inject(InstrumentUsageService);
   private maintenanceService = inject(MaintenanceService);
@@ -299,13 +300,13 @@ export class Instruments implements OnInit {
     });
   }
 
-  deleteInstrument(id: number): void {
+  async deleteInstrument(id: number): Promise<void> {
     if (!this.isStaff()) {
       this.toastService.error('Only staff members can delete instruments');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this instrument?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete instrument', message: 'Are you sure you want to delete this instrument?', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -640,13 +641,13 @@ export class Instruments implements OnInit {
     });
   }
 
-  deleteMaintenanceLog(maintenanceLog: MaintenanceLog): void {
+  async deleteMaintenanceLog(maintenanceLog: MaintenanceLog): Promise<void> {
     if (!this.canManageInstrument()) {
       this.toastService.error('You do not have permission to delete maintenance logs');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this maintenance log?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete maintenance log', message: 'Are you sure you want to delete this maintenance log?', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -758,8 +759,8 @@ export class Instruments implements OnInit {
     });
   }
 
-  deleteBooking(booking: InstrumentUsage): void {
-    if (!confirm('Are you sure you want to delete this booking?')) {
+  async deleteBooking(booking: InstrumentUsage): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete booking', message: 'Are you sure you want to delete this booking?', confirmLabel: 'Delete' }))) {
       return;
     }
 

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, ChangeDetectionStrategy, afterEveryRender } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, ChangeDetectionStrategy, afterEveryRender, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
@@ -20,7 +20,7 @@ import {
   WebRTCPermissionOverrides,
   WebRTCPermissionChange
 } from '@noatgnu/cupcake-mint-chocolate';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { SessionService } from '@noatgnu/cupcake-red-velvet';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -63,6 +63,7 @@ interface DisplayChatMessage {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SessionWebrtcPanel implements OnInit, OnDestroy {
+  private confirmDialog = inject(ConfirmDialogService);
   @Input() ccrvSessionId!: number;
   @Input() role: PeerRole = PeerRole.PARTICIPANT;
   @Output() closePanel = new EventEmitter<void>();
@@ -264,7 +265,7 @@ export class SessionWebrtcPanel implements OnInit, OnDestroy {
       ? `Are you sure you want to delete session "${sessionName}"?`
       : 'Are you sure you want to delete this session?';
 
-    if (!confirm(confirmMessage)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete live session', message: confirmMessage, confirmLabel: 'Delete' }))) {
       return;
     }
 

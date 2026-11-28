@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } 
 
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import {
   BillableItemTypeService,
   BillableItemType,
@@ -22,6 +22,7 @@ import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 })
 export class BillableItemTypes implements OnInit {
   private billableItemTypeService = inject(BillableItemTypeService);
+  private confirmDialog = inject(ConfirmDialogService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
@@ -151,8 +152,8 @@ export class BillableItemTypes implements OnInit {
     });
   }
 
-  deleteItemType(id: number): void {
-    if (!confirm('Are you sure you want to delete this billable item type? This action cannot be undone.')) {
+  async deleteItemType(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete billable item type', message: 'Are you sure you want to delete this billable item type? This action cannot be undone.', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -174,6 +175,7 @@ export class BillableItemTypes implements OnInit {
       [BillingUnit.USAGE]: 'Usage',
       [BillingUnit.SAMPLE]: 'Sample',
       [BillingUnit.FLAT]: 'Flat Rate',
+      [BillingUnit.UNIT]: 'Per unit',
       [BillingUnit.CUSTOM]: 'Custom'
     };
     return displays[unit] || unit;

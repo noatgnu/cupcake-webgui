@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbPaginationModule, NgbTooltipModule, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ServiceTierService } from '@noatgnu/cupcake-salted-caramel';
 import type { ServiceTier, PaginatedResponse, ServiceTierQueryParams } from '@noatgnu/cupcake-salted-caramel';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { BillingNavbar } from '../billing-navbar/billing-navbar';
 import { ServiceTierFormModal } from '../service-tier-form-modal/service-tier-form-modal';
 
@@ -17,6 +17,7 @@ import { ServiceTierFormModal } from '../service-tier-form-modal/service-tier-fo
 })
 export class ServiceTiers implements OnInit {
   private serviceTierService = inject(ServiceTierService);
+  private confirmDialog = inject(ConfirmDialogService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
@@ -128,8 +129,8 @@ export class ServiceTiers implements OnInit {
     );
   }
 
-  deleteTier(tier: ServiceTier): void {
-    if (!confirm(`Are you sure you want to delete the service tier "${tier.tierName}"? This action cannot be undone.`)) {
+  async deleteTier(tier: ServiceTier): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete service tier', message: `Are you sure you want to delete the service tier "${tier.tierName}"? This action cannot be undone.`, confirmLabel: 'Delete' }))) {
       return;
     }
 

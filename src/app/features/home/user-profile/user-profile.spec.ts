@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { UserBlockService } from '@noatgnu/cupcake-mint-chocolate';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
@@ -22,7 +23,12 @@ describe('UserProfile', () => {
     isSuperuser: false
   };
 
+  let mockUserBlockService: jasmine.SpyObj<UserBlockService>;
+
   beforeEach(async () => {
+    mockUserBlockService = jasmine.createSpyObj('UserBlockService', ['getBlocks', 'unblock']);
+    mockUserBlockService.getBlocks.and.returnValue(of({ count: 1, results: [{ id: 3, blocked: 4, blockedUsername: 'ada', createdAt: '' }] }));
+    mockUserBlockService.unblock.and.returnValue(of(undefined));
     mockAuthService = jasmine.createSpyObj('AuthService', ['logout'], {
       currentUser: signal(mockUser as any)
     });
@@ -45,7 +51,8 @@ describe('UserProfile', () => {
         { provide: CUPCAKE_CORE_CONFIG, useValue: { apiUrl: 'http://localhost:8000' } },
         { provide: AuthService, useValue: mockAuthService },
         { provide: UserManagementService, useValue: mockUserManagementService },
-        { provide: ToastService, useValue: mockToastService }
+        { provide: ToastService, useValue: mockToastService },
+        { provide: UserBlockService, useValue: mockUserBlockService }
       ]
     }).compileComponents();
 
@@ -126,5 +133,15 @@ describe('UserProfile', () => {
     component.changePassword();
     expect(mockUserManagementService.changePassword).toHaveBeenCalled();
     expect(mockToastService.success).toHaveBeenCalledWith('Password changed successfully');
+  });
+
+  it('lists the users you have blocked', () => {
+    expect(fixture.nativeElement.textContent).toContain('ada');
+  });
+
+  it('unblocks a user and reloads the list', () => {
+    component.unblock({ id: 3, blocked: 4, blockedUsername: 'ada', createdAt: '' });
+    expect(mockUserBlockService.unblock).toHaveBeenCalledWith(3);
+    expect(mockUserBlockService.getBlocks).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,4 +1,5 @@
-import { Component, Input, Output, EventEmitter, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, signal, computed, ChangeDetectionStrategy, inject } from '@angular/core';
+import { ConfirmDialogService } from '@noatgnu/cupcake-core';
 
 import { FormsModule } from '@angular/forms';
 
@@ -17,6 +18,7 @@ export interface WebVTTCue {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WebvttEditor {
+  private confirmDialog = inject(ConfirmDialogService);
   @Input() set vttContent(content: string | undefined) {
     if (content) {
       this.parseVTT(content);
@@ -162,8 +164,8 @@ export class WebvttEditor {
     this.cues.set(updatedCues);
   }
 
-  deleteCue(cueId: string): void {
-    if (confirm('Are you sure you want to delete this cue?')) {
+  async deleteCue(cueId: string): Promise<void> {
+    if ((await this.confirmDialog.confirm({ title: 'Delete caption', message: 'Are you sure you want to delete this cue?', confirmLabel: 'Delete' }))) {
       const updatedCues = this.cues().filter(cue => cue.id !== cueId);
       this.cues.set(updatedCues);
       this.emitChanges();

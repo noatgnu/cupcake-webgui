@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, comp
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, ApiService, Annotation, AnnotationType, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ToastService, ApiService, Annotation, AnnotationType, SiteConfigService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { MaintenanceService, type MaintenanceLog, type MaintenanceLogAnnotation } from '@noatgnu/cupcake-macaron';
 
 @Component({
@@ -14,6 +14,7 @@ import { MaintenanceService, type MaintenanceLog, type MaintenanceLogAnnotation 
 })
 export class MaintenanceLogAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private maintenanceService = inject(MaintenanceService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
@@ -112,13 +113,13 @@ export class MaintenanceLogAnnotationsModal implements OnInit {
     }
   }
 
-  deleteAnnotation(maintenanceLogAnnotation: MaintenanceLogAnnotation): void {
+  async deleteAnnotation(maintenanceLogAnnotation: MaintenanceLogAnnotation): Promise<void> {
     if (!this.canManage) {
       this.toastService.error('You do not have permission to delete annotations');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this annotation?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete annotation', message: 'Are you sure you want to delete this annotation?', confirmLabel: 'Delete' }))) {
       return;
     }
 

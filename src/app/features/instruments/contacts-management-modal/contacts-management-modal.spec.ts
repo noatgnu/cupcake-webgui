@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { ContactService, ContactType } from '@noatgnu/cupcake-macaron';
 import { ContactsManagementModal } from './contacts-management-modal';
 
@@ -84,11 +84,11 @@ describe('ContactsManagementModal', () => {
     expect(mockContactService.getExternalContacts).toHaveBeenCalledWith({ search: 'test' });
   });
 
-  it('should delete contact', () => {
+  it('should delete contact', async () => {
     const contact = component.contacts()[0];
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
     mockContactService.deleteExternalContact.and.returnValue(of(undefined));
-    component.deleteContact(contact);
+    await component.deleteContact(contact);
     expect(mockContactService.deleteExternalContact).toHaveBeenCalledWith(1);
     expect(mockToastService.success).toHaveBeenCalled();
   });

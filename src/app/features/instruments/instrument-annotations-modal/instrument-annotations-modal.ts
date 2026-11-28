@@ -2,17 +2,13 @@ import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, comp
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, ApiService, AnnotationFolder, Annotation, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ToastService, AnnotationFolder, SiteConfigService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { InstrumentService, type InstrumentDetail, type InstrumentAnnotation } from '@noatgnu/cupcake-macaron';
 
 interface AnnotationsByFolder {
   folderId: number;
   folderName: string;
-  annotations: Array<{
-    junctionId: number;
-    annotation: Annotation;
-    instrumentAnnotation: InstrumentAnnotation;
-  }>;
+  annotations: InstrumentAnnotation[];
 }
 
 @Component({
@@ -24,8 +20,8 @@ interface AnnotationsByFolder {
 })
 export class InstrumentAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private instrumentService = inject(InstrumentService);
-  private apiService = inject(ApiService);
   private toastService = inject(ToastService);
   private siteConfigService = inject(SiteConfigService);
 
@@ -41,7 +37,6 @@ export class InstrumentAnnotationsModal implements OnInit {
   loadingAnnotations = signal(true);
   availableFolders = signal<AnnotationFolder[]>([]);
   instrumentAnnotations = signal<InstrumentAnnotation[]>([]);
-  annotationDetails = signal<Map<number, Annotation>>(new Map());
   showUploadForm = signal(false);
   activeTabId = signal<number | null>(null);
 
@@ -59,56 +54,16 @@ export class InstrumentAnnotationsModal implements OnInit {
   currentTabAnnotations = computed(() => {
     const activeFolder = this.activeFolder();
     if (!activeFolder) return [];
-
-    const annotations = this.instrumentAnnotations();
-    const details = this.annotationDetails();
-
-    const items: Array<{
-      junctionId: number;
-      annotation: Annotation;
-      instrumentAnnotation: InstrumentAnnotation;
-    }> = [];
-
-    annotations.forEach(ia => {
-      if (ia.folder === activeFolder.id) {
-        const annotation = details.get(ia.annotation);
-        if (annotation) {
-          items.push({
-            junctionId: ia.id,
-            annotation: annotation,
-            instrumentAnnotation: ia
-          });
-        }
-      }
-    });
-
-    return items;
+    return this.instrumentAnnotations().filter(ia => ia.folder === activeFolder.id);
   });
 
-  annotationsByFolder = computed(() => {
-    const folders = this.availableFolders();
+  annotationsByFolder = computed<AnnotationsByFolder[]>(() => {
     const annotations = this.instrumentAnnotations();
-    const details = this.annotationDetails();
-
-    const grouped: AnnotationsByFolder[] = folders.map(folder => ({
+    return this.availableFolders().map(folder => ({
       folderId: folder.id,
       folderName: folder.folderName,
-      annotations: []
+      annotations: annotations.filter(ia => ia.folder === folder.id)
     }));
-
-    annotations.forEach(ia => {
-      const folderGroup = grouped.find(g => g.folderId === ia.folder);
-      const annotation = details.get(ia.annotation);
-      if (folderGroup && annotation) {
-        folderGroup.annotations.push({
-          junctionId: ia.id,
-          annotation: annotation,
-          instrumentAnnotation: ia
-        });
-      }
-    });
-
-    return grouped;
   });
 
   ngOnInit(): void {
@@ -138,26 +93,11 @@ export class InstrumentAnnotationsModal implements OnInit {
     this.instrumentService.getAnnotationsForInstrument(this.instrument.id).subscribe({
       next: (response) => {
         this.instrumentAnnotations.set(response.results);
-        response.results.forEach(ia => {
-          this.loadAnnotationDetails(ia.annotation);
-        });
         this.loadingAnnotations.set(false);
       },
       error: (err) => {
         this.toastService.error('Failed to load annotations');
         this.loadingAnnotations.set(false);
-      }
-    });
-  }
-
-  loadAnnotationDetails(annotationId: number): void {
-    this.apiService.getAnnotation(annotationId).subscribe({
-      next: (annotation) => {
-        const details = new Map(this.annotationDetails());
-        details.set(annotationId, annotation);
-        this.annotationDetails.set(details);
-      },
-      error: () => {
       }
     });
   }
@@ -236,8 +176,8 @@ export class InstrumentAnnotationsModal implements OnInit {
     });
   }
 
-  deleteAnnotation(junctionId: number, annotationName: string): void {
-    if (!confirm(`Are you sure you want to delete "${annotationName}"?`)) {
+  async deleteAnnotation(junctionId: number, annotationName: string): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete annotation', message: `Are you sure you want to delete "${annotationName}"?`, confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -278,11 +218,4 @@ export class InstrumentAnnotationsModal implements OnInit {
     return icons[type.toLowerCase()] || 'bi-paperclip';
   }
 
-  formatFileSize(bytes: number | undefined): string {
-    if (!bytes) return 'Unknown size';
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(2)} KB`;
-    const mb = kb / 1024;
-    return `${mb.toFixed(2)} MB`;
-  }
 }

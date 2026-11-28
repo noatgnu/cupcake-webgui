@@ -27,8 +27,9 @@ describe('LabGroupInviteModal', () => {
   beforeEach(async () => {
     currentUserSignal = signal<any>(null);
 
-    mockLabGroupService = jasmine.createSpyObj('LabGroupService', ['inviteUserToLabGroup']);
+    mockLabGroupService = jasmine.createSpyObj('LabGroupService', ['inviteUserToLabGroup', 'addMemberToLabGroup']);
     mockLabGroupService.inviteUserToLabGroup.and.returnValue(of({} as any));
+    mockLabGroupService.addMemberToLabGroup.and.returnValue(of({ message: 'added' }));
 
     mockToastService = jasmine.createSpyObj('ToastService', ['success', 'error', 'info', 'show']);
 
@@ -70,5 +71,27 @@ describe('LabGroupInviteModal', () => {
 
   it('users() starts empty', () => {
     expect(component.users()).toEqual([]);
+  });
+
+  it('adds the user straight away when staff choose them', () => {
+    component.isStaff = true;
+    component.labGroup = { id: 3, name: 'Proteomics core' } as any;
+    component.selectedUser = { id: 9, email: 'grace@example.org' } as any;
+
+    component.inviteOrAddUser();
+
+    expect(mockLabGroupService.addMemberToLabGroup).toHaveBeenCalledWith(3, 9);
+    expect(mockLabGroupService.inviteUserToLabGroup).not.toHaveBeenCalled();
+  });
+
+  it('sends an invitation when a member chooses someone', () => {
+    component.isStaff = false;
+    component.labGroup = { id: 3, name: 'Proteomics core' } as any;
+    component.selectedUser = { id: 9, email: 'grace@example.org' } as any;
+
+    component.inviteOrAddUser();
+
+    expect(mockLabGroupService.inviteUserToLabGroup).toHaveBeenCalledWith(3, { labGroup: 3, invitedEmail: 'grace@example.org' });
+    expect(mockLabGroupService.addMemberToLabGroup).not.toHaveBeenCalled();
   });
 });

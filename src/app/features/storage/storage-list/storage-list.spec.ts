@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { StorageService, ReagentService } from '@noatgnu/cupcake-macaron';
 import { StorageList } from './storage-list';
 
@@ -57,5 +57,31 @@ describe('StorageList', () => {
 
   it('loadChildStorageObjects calls StorageService.getStorageObjects', () => {
     expect(mockStorageService.getStorageObjects).toHaveBeenCalled();
+  });
+
+  it('moves to the parent location after deleting the location it shows', async () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.resolveTo(true);
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
+    mockStorageService.deleteStorageObject.and.returnValue(of(undefined as any));
+    component.currentStorage.set({ id: 9, objectName: 'Freezer', storedAt: 4 } as any);
+    component.selectedStorage.set({ id: 9, objectName: 'Freezer', storedAt: 4 } as any);
+
+    await component.deleteStorage(9);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/storage', 4]);
+    expect(component.selectedStorage()).toBeNull();
+  });
+
+  it('moves to the top level after deleting a top-level location it shows', async () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.resolveTo(true);
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
+    mockStorageService.deleteStorageObject.and.returnValue(of(undefined as any));
+    component.currentStorage.set({ id: 4, objectName: 'Cold room' } as any);
+
+    await component.deleteStorage(4);
+
+    expect(router.navigate).toHaveBeenCalledWith(['/storage']);
   });
 });

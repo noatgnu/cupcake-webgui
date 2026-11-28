@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { SessionService, ProtocolService, StepAnnotationService, SessionAnnotationService } from '@noatgnu/cupcake-red-velvet';
 import { SessionList } from './session-list';
 
@@ -64,19 +64,21 @@ describe('SessionList', () => {
     expect(component.sessions()).toEqual([]);
   });
 
-  it('warns how many annotations and files go with the session before deleting it', () => {
-    const ask = spyOn(window, 'confirm').and.returnValue(true);
+  it('warns how many annotations and files go with the session before deleting it', async () => {
+    const ask = spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
 
     component.deleteSession(4, new Event('click'));
+    await new Promise(resolve => setTimeout(resolve));
 
-    expect(ask.calls.mostRecent().args[0]).toContain('up to 3 annotations and their uploaded files');
+    expect(ask.calls.mostRecent().args[0].message).toContain('up to 3 annotations and their uploaded files');
     expect(mockSessionService.deleteSession).toHaveBeenCalledWith(4);
   });
 
-  it('keeps the session when the warning is cancelled', () => {
-    spyOn(window, 'confirm').and.returnValue(false);
+  it('keeps the session when the warning is cancelled', async () => {
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(false);
 
     component.deleteSession(4, new Event('click'));
+    await new Promise(resolve => setTimeout(resolve));
 
     expect(mockSessionService.deleteSession).not.toHaveBeenCalled();
   });

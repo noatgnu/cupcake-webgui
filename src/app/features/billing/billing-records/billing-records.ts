@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbPaginationModule, NgbTooltipModule, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
 import type { BillingRecord, PaginatedResponse, BillingRecordQueryParams } from '@noatgnu/cupcake-salted-caramel';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { BillingNavbar } from '../billing-navbar/billing-navbar';
 import { BillingRecordDetailModal } from '../billing-record-detail-modal/billing-record-detail-modal';
 
@@ -17,6 +17,7 @@ import { BillingRecordDetailModal } from '../billing-record-detail-modal/billing
 })
 export class BillingRecords implements OnInit {
   private billingRecordService = inject(BillingRecordService);
+  private confirmDialog = inject(ConfirmDialogService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
@@ -158,7 +159,7 @@ export class BillingRecords implements OnInit {
     this.selectedRecords.set(new Set());
   }
 
-  bulkApprove(): void {
+  async bulkApprove(): Promise<void> {
     const selected = Array.from(this.selectedRecords());
     if (selected.length === 0) {
       this.toastService.warning('Please select at least one record to approve');
@@ -174,7 +175,7 @@ export class BillingRecords implements OnInit {
       return;
     }
 
-    if (!confirm(`Are you sure you want to approve ${pendingRecords.length} billing record(s)?`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Approve billing records', message: `Are you sure you want to approve ${pendingRecords.length} billing record(s)?`, confirmLabel: 'Approve', confirmClass: 'btn-primary' }))) {
       return;
     }
 

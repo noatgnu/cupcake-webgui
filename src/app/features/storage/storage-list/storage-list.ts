@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } fro
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { NgbModal, NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { StorageService, ReagentService, StoredReagent, ActionType } from '@noatgnu/cupcake-macaron';
 import { StorageObject, StorageObjectType, StorageObjectTypeLabels, StoragePathItem } from '@noatgnu/cupcake-macaron';
 import { type MetadataColumn } from '@noatgnu/cupcake-vanilla';
@@ -30,6 +30,7 @@ import { filter, forkJoin } from 'rxjs';
 })
 export class StorageList implements OnInit {
   private storageService = inject(StorageService);
+  private confirmDialog = inject(ConfirmDialogService);
   private reagentService = inject(ReagentService);
   private modal = inject(NgbModal);
   private toastService = inject(ToastService);
@@ -369,17 +370,22 @@ export class StorageList implements OnInit {
     return icons[type] || 'bi-archive';
   }
 
-  deleteStorage(id: number): void {
-    if (!confirm('Are you sure you want to delete this storage object?')) {
+  async deleteStorage(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete storage location', message: 'Are you sure you want to delete this storage object?', confirmLabel: 'Delete' }))) {
       return;
     }
 
     this.storageService.deleteStorageObject(id).subscribe({
       next: () => {
         this.toastService.success('Storage object deleted');
+        const current = this.currentStorage();
         if (this.selectedStorage()?.id === id) {
           this.selectedStorage.set(null);
           this.storedReagents.set([]);
+        }
+        if (current?.id === id) {
+          this.router.navigate(current.storedAt ? ['/storage', current.storedAt] : ['/storage']);
+          return;
         }
         this.loadChildStorageObjects();
       },

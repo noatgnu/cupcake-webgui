@@ -58,4 +58,16 @@ describe('JobDetail', () => {
   it('isDraft returns false when job is null', () => {
     expect(component.isDraft()).toBeFalse();
   });
+
+  it('offers editing a submitted job to whoever the backend lets edit it, its submitter included', () => {
+    currentUserSignal.set({ id: 3, username: 'submitter' });
+    component.job.set({ id: 8, user: 3, status: 'submitted', canEdit: true, canEditStaffOnlyColumns: true } as any);
+    expect(component.canEdit()).toBeTrue();
+  });
+
+  it('hides editing a submitted job from those the backend does not let edit it', () => {
+    currentUserSignal.set({ id: 4, username: 'outsider' });
+    component.job.set({ id: 8, user: 3, status: 'submitted', canEdit: false, canEditStaffOnlyColumns: true } as any);
+    expect(component.canEdit()).toBeFalse();
+  });
 });

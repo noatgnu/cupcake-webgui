@@ -201,7 +201,7 @@ export class StepEditModal implements OnInit {
 
   insertTemplate(template: string): void {
     if (this.quillEditor) {
-      const range = this.quillEditor.getSelection();
+      const range = this.quillEditor.getSelection(true);
       if (range) {
         this.quillEditor.insertText(range.index, template);
         this.quillEditor.setSelection(range.index + template.length);

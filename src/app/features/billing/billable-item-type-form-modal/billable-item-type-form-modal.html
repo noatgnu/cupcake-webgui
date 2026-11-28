@@ -48,27 +48,17 @@
     </div>
 
     <div class="mb-3">
-      <label for="contentType" class="form-label">
-        Content Type <span class="text-danger">*</span>
+      <label for="kind" class="form-label">
+        What is billed <span class="text-danger">*</span>
       </label>
-      <input
-        type="number"
-        class="form-control"
-        [class.is-invalid]="isFieldInvalid('contentType')"
-        id="contentType"
-        formControlName="contentType"
-        placeholder="Enter content type ID">
-      @if (isFieldInvalid('contentType')) {
-        <div class="invalid-feedback">
-          {{ getFieldError('contentType') }}
-        </div>
-      }
-      <small class="form-text text-muted">
-        @if (isEditMode()) {
-          Content type cannot be changed after creation
-        } @else {
-          The Django content type ID this item type is associated with
+      <select class="form-select" id="kind" formControlName="kind">
+        @for (kind of kinds; track kind) {
+          <option [value]="kind">{{ kindLabels[kind] }}</option>
         }
+      </select>
+      <small class="form-text text-muted">
+        Staff time and instrument time are billed by the hour from completed jobs and finished bookings; reagent cost
+        by the unit reserved from storage.
       </small>
     </div>
 

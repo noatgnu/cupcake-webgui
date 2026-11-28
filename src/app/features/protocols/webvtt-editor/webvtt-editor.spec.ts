@@ -1,3 +1,4 @@
+import { ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { WebvttEditor } from './webvtt-editor';
@@ -112,7 +113,7 @@ First caption`;
     expect(component.cues()[0].text).toBe('Updated caption');
   });
 
-  it('should delete cue', () => {
+  it('should delete cue', async () => {
     const vttContent = `WEBVTT
 
 00:00.000 --> 00:02.000
@@ -124,8 +125,8 @@ Second caption`;
     component.vttContent = vttContent;
     const cueId = component.cues()[0].id;
 
-    spyOn(window, 'confirm').and.returnValue(true);
-    component.deleteCue(cueId);
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
+    await component.deleteCue(cueId);
 
     expect(component.cues().length).toBe(1);
     expect(component.cues()[0].text).toBe('Second caption');

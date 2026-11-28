@@ -2,17 +2,13 @@ import { ChangeDetectionStrategy, Component, inject, Input, signal, OnInit, comp
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, ApiService, AnnotationFolder, Annotation, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ToastService, AnnotationFolder, SiteConfigService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { ReagentService, StoredReagent, StoredReagentAnnotation } from '@noatgnu/cupcake-macaron';
 
 interface AnnotationsByFolder {
   folderId: number;
   folderName: string;
-  annotations: Array<{
-    junctionId: number;
-    annotation: Annotation;
-    storedReagentAnnotation: StoredReagentAnnotation;
-  }>;
+  annotations: StoredReagentAnnotation[];
 }
 
 @Component({
@@ -24,8 +20,8 @@ interface AnnotationsByFolder {
 })
 export class StoredReagentAnnotationsModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private reagentService = inject(ReagentService);
-  private apiService = inject(ApiService);
   private toastService = inject(ToastService);
   private siteConfigService = inject(SiteConfigService);
 
@@ -41,7 +37,6 @@ export class StoredReagentAnnotationsModal implements OnInit {
   loadingAnnotations = signal(true);
   availableFolders = signal<AnnotationFolder[]>([]);
   storedReagentAnnotations = signal<StoredReagentAnnotation[]>([]);
-  annotationDetails = signal<Map<number, Annotation>>(new Map());
   showUploadForm = signal(false);
   activeTabId = signal<number | null>(null);
 
@@ -59,56 +54,16 @@ export class StoredReagentAnnotationsModal implements OnInit {
   currentTabAnnotations = computed(() => {
     const activeFolder = this.activeFolder();
     if (!activeFolder) return [];
-
-    const annotations = this.storedReagentAnnotations();
-    const details = this.annotationDetails();
-
-    const items: Array<{
-      junctionId: number;
-      annotation: Annotation;
-      storedReagentAnnotation: StoredReagentAnnotation;
-    }> = [];
-
-    annotations.forEach(sra => {
-      if (sra.folder === activeFolder.id) {
-        const annotation = details.get(sra.annotation);
-        if (annotation) {
-          items.push({
-            junctionId: sra.id,
-            annotation: annotation,
-            storedReagentAnnotation: sra
-          });
-        }
-      }
-    });
-
-    return items;
+    return this.storedReagentAnnotations().filter(sra => sra.folder === activeFolder.id);
   });
 
-  annotationsByFolder = computed(() => {
-    const folders = this.availableFolders();
+  annotationsByFolder = computed<AnnotationsByFolder[]>(() => {
     const annotations = this.storedReagentAnnotations();
-    const details = this.annotationDetails();
-
-    const grouped: AnnotationsByFolder[] = folders.map(folder => ({
+    return this.availableFolders().map(folder => ({
       folderId: folder.id,
       folderName: folder.folderName,
-      annotations: []
+      annotations: annotations.filter(sra => sra.folder === folder.id)
     }));
-
-    annotations.forEach(sra => {
-      const folderGroup = grouped.find(g => g.folderId === sra.folder);
-      const annotation = details.get(sra.annotation);
-      if (folderGroup && annotation) {
-        folderGroup.annotations.push({
-          junctionId: sra.id,
-          annotation: annotation,
-          storedReagentAnnotation: sra
-        });
-      }
-    });
-
-    return grouped;
   });
 
   ngOnInit(): void {
@@ -138,26 +93,11 @@ export class StoredReagentAnnotationsModal implements OnInit {
     this.reagentService.getAnnotationsForStoredReagent(this.storedReagent.id).subscribe({
       next: (response) => {
         this.storedReagentAnnotations.set(response.results);
-        response.results.forEach(sra => {
-          this.loadAnnotationDetails(sra.annotation);
-        });
         this.loadingAnnotations.set(false);
       },
       error: (err) => {
         this.toastService.error('Failed to load annotations');
         this.loadingAnnotations.set(false);
-      }
-    });
-  }
-
-  loadAnnotationDetails(annotationId: number): void {
-    this.apiService.getAnnotation(annotationId).subscribe({
-      next: (annotation) => {
-        const details = new Map(this.annotationDetails());
-        details.set(annotationId, annotation);
-        this.annotationDetails.set(details);
-      },
-      error: () => {
       }
     });
   }
@@ -236,8 +176,8 @@ export class StoredReagentAnnotationsModal implements OnInit {
     });
   }
 
-  deleteAnnotation(junctionId: number, annotationName: string): void {
-    if (!confirm(`Are you sure you want to delete "${annotationName}"?`)) {
+  async deleteAnnotation(junctionId: number, annotationName: string): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete annotation', message: `Are you sure you want to delete "${annotationName}"?`, confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -278,11 +218,4 @@ export class StoredReagentAnnotationsModal implements OnInit {
     return icons[type.toLowerCase()] || 'bi-paperclip';
   }
 
-  formatFileSize(bytes: number | undefined): string {
-    if (!bytes) return 'Unknown size';
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(2)} KB`;
-    const mb = kb / 1024;
-    return `${mb.toFixed(2)} MB`;
-  }
 }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
+import { Observable } from 'rxjs';
 
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
@@ -71,21 +72,20 @@ export class LabGroupInviteModal implements OnInit {
 
     this.saving.set(true);
 
-    this.labGroupService.inviteUserToLabGroup(this.labGroup.id, {
-      labGroup: this.labGroup.id,
-      invitedEmail: this.selectedUser.email
-    }).subscribe({
+    const request: Observable<unknown> = this.isStaff
+      ? this.labGroupService.addMemberToLabGroup(this.labGroup.id, this.selectedUser.id)
+      : this.labGroupService.inviteUserToLabGroup(this.labGroup.id, {
+          labGroup: this.labGroup.id,
+          invitedEmail: this.selectedUser.email
+        });
+    request.subscribe({
       next: () => {
-        if (this.isStaff) {
-          this.toastService.success('User added to lab group successfully');
-        } else {
-          this.toastService.success('Invitation sent successfully');
-        }
+        this.toastService.success(this.isStaff ? 'User added to lab group' : 'Invitation sent');
         this.saving.set(false);
         this.activeModal.close(true);
       },
-      error: (err) => {
-        this.toastService.error('Failed to send invitation');
+      error: () => {
+        this.toastService.error(this.isStaff ? 'Failed to add the user' : 'Failed to send invitation');
         this.saving.set(false);
       }
     });

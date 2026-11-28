@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { CUPCAKE_CORE_CONFIG, ToastService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ConfirmDialogService, ToastService } from '@noatgnu/cupcake-core';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import { ProtocolList } from './protocol-list';
 
@@ -48,5 +48,16 @@ describe('ProtocolList', () => {
 
   it('should start with empty protocols signal', () => {
     expect(component.protocols()).toEqual([]);
+  });
+
+  it('stops showing a protocol once it is deleted', async () => {
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
+    mockProtocolService.deleteProtocol.and.returnValue(of(undefined as any));
+    component.selectedProtocol.set({ id: 5, protocolTitle: 'Enrichment' } as any);
+
+    await component.deleteProtocol(5, new Event('click'));
+
+    expect(mockProtocolService.deleteProtocol).toHaveBeenCalledWith(5);
+    expect(component.selectedProtocol()).toBeNull();
   });
 });

@@ -15,7 +15,7 @@ import {
   CCMNotificationWebSocketService,
   InstrumentService
 } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { AddAnnotationModal } from './add-annotation-modal/add-annotation-modal';
 import { WebvttEditor } from '../../protocols/webvtt-editor/webvtt-editor';
@@ -30,6 +30,7 @@ import { Subscription } from 'rxjs';
 })
 export class JobAnnotations implements OnInit, OnDestroy {
   private annotationService = inject(InstrumentJobAnnotationService);
+  private confirmDialog = inject(ConfirmDialogService);
   private chunkedUploadService = inject(AnnotationChunkedUploadService);
   private instrumentUsageService = inject(InstrumentUsageService);
   private usageAnnotationLinkService = inject(InstrumentUsageJobAnnotationService);
@@ -586,13 +587,13 @@ export class JobAnnotations implements OnInit, OnDestroy {
     });
   }
 
-  deleteAnnotation(annotation: InstrumentJobAnnotation): void {
+  async deleteAnnotation(annotation: InstrumentJobAnnotation): Promise<void> {
     if (!annotation.canDelete) {
       this.toastService.error('You do not have permission to delete this annotation');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this annotation?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete annotation', message: 'Are you sure you want to delete this annotation?', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -651,7 +652,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
     }
   }
 
-  retriggerTranscription(annotation: InstrumentJobAnnotation): void {
+  async retriggerTranscription(annotation: InstrumentJobAnnotation): Promise<void> {
     if (!annotation.id) {
       this.toastService.error('Invalid annotation');
       return;
@@ -668,7 +669,7 @@ export class JobAnnotations implements OnInit, OnDestroy {
       return;
     }
 
-    if (confirm('Are you sure you want to retrigger transcription for this annotation? This will clear existing transcription data and queue a new task.')) {
+    if ((await this.confirmDialog.confirm({ title: 'Transcribe again', message: 'Are you sure you want to retrigger transcription for this annotation? This will clear existing transcription data and queue a new task.', confirmLabel: 'Transcribe', confirmClass: 'btn-primary' }))) {
       this.annotationService.retriggerTranscription(annotation.id).subscribe({
         next: (response) => {
           this.toastService.success(response.message || 'Transcription task queued successfully');

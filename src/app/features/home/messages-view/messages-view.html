@@ -164,6 +164,11 @@
                       @if (message.isEdited) {
                         <small class="text-muted">(edited)</small>
                       }
+                      @if (message.sender !== currentUser()?.id) {
+                        <button type="button" class="btn btn-link btn-sm p-0 ms-auto text-muted" (click)="blockSender(message)" [title]="'Block ' + (message.senderUsername || 'this user')">
+                          <i class="bi bi-slash-circle"></i>
+                        </button>
+                      }
                     </div>
                     @if (message.replyToContent) {
                       <div class="reply-context p-2 mb-2 border-start border-3 border-secondary bg-light small">
@@ -196,7 +201,7 @@
               [(ngModel)]="newMessageContent"
               name="messageContent"
               [disabled]="sendingMessage()"
-              (keydown.enter)="($any($event).ctrlKey) && sendMessage()"></textarea>
+              (keydown.control.enter)="$event.preventDefault(); sendMessage()"></textarea>
             <button
               type="submit"
               class="btn btn-primary"

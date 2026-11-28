@@ -67,6 +67,11 @@ def settle(page, busy_ok=False):
     page.evaluate(PAINTED_SCRIPT)
 
 
+SECRETS_BLANKED = """document.querySelectorAll("[data-secret], ngb-modal-window .alert code").forEach(function (element) {
+    element.textContent = "\u2022".repeat(element.textContent.length);
+})"""
+
+
 class Screen:
     """A logged-in browser tab on one of the apps, recording API requests that failed."""
 
@@ -106,6 +111,7 @@ class Screen:
                 close.click()
         expect(notifications).to_have_count(0)
         settle(self.page, busy_ok)
+        self.page.evaluate(SECRETS_BLANKED)
         self.screenshots(self.page, self.folder, name, caption)
 
     def close(self):
@@ -116,6 +122,7 @@ class Screen:
         if keep_notifications:
             expect(self.page.locator(".toast-container ngb-toast.showing")).to_have_count(0)
             settle(self.page, busy_ok)
+            self.page.evaluate(SECRETS_BLANKED)
             self.screenshots(self.page, self.folder, name, caption)
         else:
             self.screenshot(name, caption, busy_ok)

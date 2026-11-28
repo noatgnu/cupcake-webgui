@@ -107,6 +107,7 @@ export class ServicePriceFormModal implements OnInit {
       [BillingUnit.USAGE]: 'Usage',
       [BillingUnit.SAMPLE]: 'Sample',
       [BillingUnit.FLAT]: 'Flat Rate',
+      [BillingUnit.UNIT]: 'Per unit',
       [BillingUnit.CUSTOM]: 'Custom'
     };
     return displays[unit] || unit;

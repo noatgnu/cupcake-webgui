@@ -7,7 +7,7 @@ import { HttpClient } from '@angular/common/http';
 import { SessionService, ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService, StepAnnotationService, TimeKeeperService, AnnotationChunkedUploadService, CCRVNotificationWebSocketService, InstrumentUsageStepAnnotationService, TimeKeeperWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel, ProtocolSection, ProtocolStep, StepReagent, StepAnnotation, TimeKeeper, TimeKeeperStartedEvent, TimeKeeperStoppedEvent, TimeKeeperUpdatedEvent, TranscriptionStartedEvent, TranscriptionCompletedEvent, TranscriptionFailedEvent } from '@noatgnu/cupcake-red-velvet';
 import { InstrumentUsageService, InstrumentUsageCreateRequest, InstrumentUsage, ReagentActionService, ReagentAction, InstrumentService, ReagentService } from '@noatgnu/cupcake-macaron';
-import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, AnnotationType, AsyncTaskStatus, TaskType, SiteConfigService, ThemeService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { MetadataTable, MetadataColumn, Websocket as CCVWebSocketService } from '@noatgnu/cupcake-vanilla';
 import { DurationFormatPipe } from '../../../shared/pipes/duration-format-pipe';
 import { StepTemplatePipe } from '../../../shared/pipes/step-template-pipe';
@@ -41,6 +41,7 @@ interface MolarityHistoryData {
 export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
   @ViewChildren('sketchCanvas') sketchCanvases!: QueryList<ElementRef<HTMLCanvasElement>>;
   private route = inject(ActivatedRoute);
+  private confirmDialog = inject(ConfirmDialogService);
   private router = inject(Router);
   private modalService = inject(NgbModal);
   private http = inject(HttpClient);
@@ -669,13 +670,13 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
-  deleteReagentAction(action: ReagentAction): void {
+  async deleteReagentAction(action: ReagentAction): Promise<void> {
     if (!action.isDeletable) {
       this.toastService.error('This reagent booking can no longer be deleted (outside deletion window)');
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this reagent booking?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete reagent booking', message: 'Are you sure you want to delete this reagent booking?', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -1693,14 +1694,14 @@ export class SessionDetail implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  deleteAnnotation(annotation: StepAnnotation): void {
+  async deleteAnnotation(annotation: StepAnnotation): Promise<void> {
     if (!this.canEditSession()) {
       this.toastService.error(this.denied);
       return;
     }
 
     const confirmMessage = `Are you sure you want to delete this annotation? This action cannot be undone.`;
-    if (!confirm(confirmMessage)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete annotation', message: confirmMessage, confirmLabel: 'Delete' }))) {
       return;
     }
 

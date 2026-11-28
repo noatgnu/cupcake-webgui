@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { of } from 'rxjs';
-import { CUPCAKE_CORE_CONFIG, ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { CUPCAKE_CORE_CONFIG, ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { BillingRecordService, BillingStatus } from '@noatgnu/cupcake-salted-caramel';
 import type { BillingRecord } from '@noatgnu/cupcake-salted-caramel';
 import { BillingRecordDetailModal } from './billing-record-detail-modal';
@@ -112,14 +112,14 @@ describe('BillingRecordDetailModal', () => {
     expect(component.canApprove()).toBeFalse();
   });
 
-  it('approveRecord() calls service when confirmed', () => {
-    spyOn(window, 'confirm').and.returnValue(true);
+  it('approveRecord() calls service when confirmed', async () => {
+    spyOn(TestBed.inject(ConfirmDialogService), 'confirm').and.resolveTo(true);
     const updated = { ...mockRecord, status: BillingStatus.APPROVED } as BillingRecord;
     mockBillingRecordService.approveBillingRecord.and.returnValue(
       of({ message: 'Billing record approved successfully', billingRecord: updated })
     );
     component.record.set(mockRecord);
-    component.approveRecord();
+    await component.approveRecord();
     expect(mockBillingRecordService.approveBillingRecord).toHaveBeenCalledWith('rec-1', {});
     expect(mockToastService.success).toHaveBeenCalledWith('Billing record approved successfully');
     expect(component.record()).toEqual(updated);

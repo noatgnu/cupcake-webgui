@@ -6,7 +6,7 @@ import { forkJoin } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SessionService, ProtocolService, StepAnnotationService, SessionAnnotationService } from '@noatgnu/cupcake-red-velvet';
 import type { Session, ProtocolModel } from '@noatgnu/cupcake-red-velvet';
-import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { AccessUtils } from '../../../shared/utils/access.utils';
 import { SessionEditModal } from '../session-edit-modal/session-edit-modal';
 
@@ -19,6 +19,7 @@ import { SessionEditModal } from '../session-edit-modal/session-edit-modal';
 })
 export class SessionList implements OnInit {
   private sessionService = inject(SessionService);
+  private confirmDialog = inject(ConfirmDialogService);
   private protocolService = inject(ProtocolService);
   private stepAnnotationService = inject(StepAnnotationService);
   private sessionAnnotationService = inject(SessionAnnotationService);
@@ -153,13 +154,13 @@ export class SessionList implements OnInit {
   /**
    * Warn that the session's annotations and their files go with it, then delete it.
    */
-  confirmAndDeleteSession(id: number, annotationCount: number): void {
+  async confirmAndDeleteSession(id: number, annotationCount: number): Promise<void> {
     const warning = annotationCount > 0
       ? `Delete this session? This also permanently deletes up to ${annotationCount} annotation${annotationCount === 1 ? '' : 's'} `
         + 'and their uploaded files (recordings, images, documents). Annotations filed in a folder or used elsewhere, '
         + 'and linked instrument bookings, are kept. This cannot be undone.'
       : 'Delete this session? This cannot be undone.';
-    if (!confirm(warning)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete session', message: warning, confirmLabel: 'Delete' }))) {
       return;
     }
 

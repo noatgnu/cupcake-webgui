@@ -3,6 +3,8 @@ import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService, ToastService, User, UserManagementService, ThemeService } from '@noatgnu/cupcake-core';
+import { UserBlockService } from '@noatgnu/cupcake-mint-chocolate';
+import type { UserBlock } from '@noatgnu/cupcake-mint-chocolate';
 
 @Component({
   selector: 'app-user-profile',
@@ -16,6 +18,9 @@ export class UserProfile implements OnInit {
   private userManagementService = inject(UserManagementService);
   private toastService = inject(ToastService);
   protected themeService = inject(ThemeService);
+  private userBlockService = inject(UserBlockService);
+
+  blocks = signal<UserBlock[]>([]);
 
   currentUser = signal<User | null>(this.authService.currentUser());
   editMode = signal(false);
@@ -32,7 +37,25 @@ export class UserProfile implements OnInit {
   saving = signal(false);
   changingPassword = signal(false);
 
+
+  loadBlocks(): void {
+    this.userBlockService.getBlocks({ limit: 10 }).subscribe({
+      next: (page) => this.blocks.set(page.results)
+    });
+  }
+
+  unblock(block: UserBlock): void {
+    this.userBlockService.unblock(block.id).subscribe({
+      next: () => {
+        this.toastService.success(`Unblocked ${block.blockedUsername}`);
+        this.loadBlocks();
+      },
+      error: () => this.toastService.error(`Failed to unblock ${block.blockedUsername}`)
+    });
+  }
+
   ngOnInit(): void {
+    this.loadBlocks();
     const user = this.authService.currentUser();
     if (user) {
       this.firstName = user.firstName || '';

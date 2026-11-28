@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, signal, computed, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, signal, computed, ViewChild, ElementRef, ChangeDetectionStrategy, inject } from '@angular/core';
 
 import { NgbModal, NgbDropdown, NgbDropdownToggle, NgbDropdownMenu } from '@ng-bootstrap/ng-bootstrap';
 import { Subject } from 'rxjs';
@@ -29,7 +29,7 @@ import {
   MetadataColumnHistoryModal,
   ColumnHistoryModalConfig
 } from '@noatgnu/cupcake-vanilla';
-import { ToastService, MetadataExportRequest, MetadataValidationConfig, SiteConfigService } from '@noatgnu/cupcake-core';
+import { ToastService, MetadataExportRequest, MetadataValidationConfig, SiteConfigService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 
 @Component({
   selector: 'app-metadata-table-editor',
@@ -40,6 +40,7 @@ import { ToastService, MetadataExportRequest, MetadataValidationConfig, SiteConf
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MetadataTableEditor implements OnInit, OnDestroy {
+  private confirmDialog = inject(ConfirmDialogService);
   private destroy$ = new Subject<void>();
 
   @Input() tableId!: number;
@@ -486,7 +487,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     });
   }
 
-  bulkDeleteColumns(): void {
+  async bulkDeleteColumns(): Promise<void> {
     const selected = this.selectedColumnIds();
     if (selected.size === 0) {
       this.toastService.error('Please select columns first');
@@ -499,7 +500,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       .map(col => col.name)
       .join(', ');
 
-    if (!confirm(`Are you sure you want to delete ${columnIds.length} column(s)?\n\n${columnNames}`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete columns', message: `Are you sure you want to delete ${columnIds.length} column(s)?\n\n${columnNames}`, confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -520,10 +521,10 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     });
   }
 
-  removeColumn(column: MetadataColumn): void {
+  async removeColumn(column: MetadataColumn): Promise<void> {
     if (!column.id) return;
 
-    if (!confirm(`Are you sure you want to remove the column "${column.name}"?`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Remove column', message: `Are you sure you want to remove the column "${column.name}"?`, confirmLabel: 'Remove' }))) {
       return;
     }
 
@@ -596,7 +597,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     this.excelFileInput.nativeElement.click();
   }
 
-  importSdrf(event: Event): void {
+  async importSdrf(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
 
@@ -611,7 +612,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       return;
     }
 
-    if (confirm(`Import SDRF data into table "${table.name}"?\n\nThis will add new columns and may modify existing data.`)) {
+    if ((await this.confirmDialog.confirm({ title: 'Import SDRF file', message: `Import SDRF data into table "${table.name}"?\n\nThis will add new columns and may modify existing data.`, confirmLabel: 'Import', confirmClass: 'btn-primary' }))) {
       input.value = '';
       this.isLoading.set(true);
 
@@ -647,7 +648,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     }
   }
 
-  importExcel(event: Event): void {
+  async importExcel(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
 
@@ -662,7 +663,7 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
       return;
     }
 
-    if (confirm(`Import Excel data into table "${table.name}"?\n\nThis will add new columns and may modify existing data.`)) {
+    if ((await this.confirmDialog.confirm({ title: 'Import Excel file', message: `Import Excel data into table "${table.name}"?\n\nThis will add new columns and may modify existing data.`, confirmLabel: 'Import', confirmClass: 'btn-primary' }))) {
       input.value = '';
       this.isLoading.set(true);
 
@@ -962,13 +963,13 @@ export class MetadataTableEditor implements OnInit, OnDestroy {
     modalRef.componentInstance.pool = pool;
   }
 
-  deletePool(pool: SamplePool): void {
+  async deletePool(pool: SamplePool): Promise<void> {
     const table = this.table();
     if (!table || !pool.id) return;
 
     const confirmMessage = `Are you sure you want to delete the pool "${pool.poolName}"?\n\nThis action cannot be undone.`;
 
-    if (confirm(confirmMessage)) {
+    if ((await this.confirmDialog.confirm({ title: 'Delete sample pool', message: confirmMessage, confirmLabel: 'Delete' }))) {
       this.samplePoolService.deleteSamplePool(pool.id).subscribe({
         next: () => {
           this.loadTable(this.tableId);

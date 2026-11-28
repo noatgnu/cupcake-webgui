@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } 
 
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import {
   ServicePriceService,
   ServicePrice,
@@ -24,6 +24,7 @@ import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 })
 export class ServicePrices implements OnInit {
   private servicePriceService = inject(ServicePriceService);
+  private confirmDialog = inject(ConfirmDialogService);
   private serviceTierService = inject(ServiceTierService);
   private billableItemTypeService = inject(BillableItemTypeService);
   private toastService = inject(ToastService);
@@ -190,8 +191,8 @@ export class ServicePrices implements OnInit {
     });
   }
 
-  deletePrice(id: number): void {
-    if (!confirm('Are you sure you want to delete this service price? This action cannot be undone.')) {
+  async deletePrice(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete service price', message: 'Are you sure you want to delete this service price? This action cannot be undone.', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -213,6 +214,7 @@ export class ServicePrices implements OnInit {
       [BillingUnit.USAGE]: 'Usage',
       [BillingUnit.SAMPLE]: 'Sample',
       [BillingUnit.FLAT]: 'Flat Rate',
+      [BillingUnit.UNIT]: 'Per unit',
       [BillingUnit.CUSTOM]: 'Custom'
     };
     return displays[unit] || unit;

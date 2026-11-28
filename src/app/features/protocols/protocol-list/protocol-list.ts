@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProtocolService } from '@noatgnu/cupcake-red-velvet';
 import type { ProtocolModel } from '@noatgnu/cupcake-red-velvet';
-import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { AccessUtils } from '../../../shared/utils/access.utils';
 import { ProtocolCreateModal } from '../protocol-create-modal/protocol-create-modal';
 import { SessionCreateModal } from '../session-create-modal/session-create-modal';
@@ -20,6 +20,7 @@ import { ProtocolRating } from '../protocol-rating/protocol-rating';
 })
 export class ProtocolList implements OnInit {
   private protocolService = inject(ProtocolService);
+  private confirmDialog = inject(ConfirmDialogService);
   private router = inject(Router);
   private toastService = inject(ToastService);
   private modalService = inject(NgbModal);
@@ -153,16 +154,19 @@ export class ProtocolList implements OnInit {
     );
   }
 
-  deleteProtocol(id: number, event: Event): void {
+  async deleteProtocol(id: number, event: Event): Promise<void> {
     event.stopPropagation();
 
-    if (!confirm('Are you sure you want to delete this protocol?')) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete protocol', message: 'Are you sure you want to delete this protocol?', confirmLabel: 'Delete' }))) {
       return;
     }
 
     this.protocolService.deleteProtocol(id).subscribe({
       next: () => {
         this.toastService.success('Protocol deleted successfully');
+        if (this.selectedProtocol()?.id === id) {
+          this.selectedProtocol.set(null);
+        }
         this.loadProtocols();
       },
       error: (err) => {

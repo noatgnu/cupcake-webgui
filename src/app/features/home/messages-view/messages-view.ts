@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { MessageThreadService, MessageService } from '@noatgnu/cupcake-mint-chocolate';
+import { MessageThreadService, MessageService, UserBlockService } from '@noatgnu/cupcake-mint-chocolate';
+import { AuthService, ConfirmDialogService, ToastService } from '@noatgnu/cupcake-core';
 import type { MessageThread, Message } from '@noatgnu/cupcake-mint-chocolate';
 
 @Component({
@@ -20,6 +21,11 @@ export class MessagesView implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private modal = inject(NgbModal);
+  private userBlockService = inject(UserBlockService);
+  private confirmDialog = inject(ConfirmDialogService);
+  private toastService = inject(ToastService);
+  private authService = inject(AuthService);
+  readonly currentUser = this.authService.currentUser;
 
   threads = signal<MessageThread[]>([]);
   selectedThread = signal<MessageThread | null>(null);
@@ -123,6 +129,29 @@ export class MessagesView implements OnInit {
       error: () => {
         this.loadingMessages.set(false);
       }
+    });
+  }
+
+  async blockSender(message: Message): Promise<void> {
+    const name = message.senderUsername || 'this user';
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Block user',
+      message: `Block ${name}? You will not see their messages or notifications, and neither of you can start a thread with or notify the other. You can unblock them from your profile.`,
+      confirmLabel: 'Block'
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.userBlockService.block(message.sender).subscribe({
+      next: () => {
+        this.toastService.success(`Blocked ${name}`);
+        this.loadThreads();
+        const thread = this.selectedThread();
+        if (thread) {
+          this.loadMessages(thread.id);
+        }
+      },
+      error: () => this.toastService.error(`Failed to block ${name}`)
     });
   }
 

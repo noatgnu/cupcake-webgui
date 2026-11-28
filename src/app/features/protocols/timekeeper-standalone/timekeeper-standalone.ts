@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TimeKeeperService, SessionService, ProtocolStepService, TimeKeeperWebSocketService } from '@noatgnu/cupcake-red-velvet';
 import type { TimeKeeper, Session, ProtocolStep, TimeKeeperEvent } from '@noatgnu/cupcake-red-velvet';
-import { ToastService, AuthService } from '@noatgnu/cupcake-core';
+import { ToastService, AuthService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { TimerService } from '../../../shared/services/timer';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
@@ -17,6 +17,7 @@ import { Subscription } from 'rxjs';
 })
 export class TimekeeperStandalone implements OnInit, OnDestroy {
   private timeKeeperService = inject(TimeKeeperService);
+  private confirmDialog = inject(ConfirmDialogService);
   private sessionService = inject(SessionService);
   private protocolStepService = inject(ProtocolStepService);
   private timeKeeperWsService = inject(TimeKeeperWebSocketService);
@@ -213,8 +214,8 @@ export class TimekeeperStandalone implements OnInit, OnDestroy {
     });
   }
 
-  deleteTimer(id: number): void {
-    if (!confirm('Are you sure you want to delete this timer?')) {
+  async deleteTimer(id: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete timer', message: 'Are you sure you want to delete this timer?', confirmLabel: 'Delete' }))) {
       return;
     }
 

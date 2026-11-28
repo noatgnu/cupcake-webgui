@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgbModal, NgbDropdown, NgbDropdownToggle, NgbDropdownMenu } from '@ng-bootstrap/ng-bootstrap';
-import { AuthService, ToastService } from '@noatgnu/cupcake-core';
+import { AuthService, ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { AccessUtils } from '../../../shared/utils/access.utils';
 import { ProtocolService, ProtocolSectionService, ProtocolStepService, StepReagentService } from '@noatgnu/cupcake-red-velvet';
 import type { ProtocolModel, ProtocolSection, ProtocolStep, StepReagent } from '@noatgnu/cupcake-red-velvet';
@@ -33,6 +33,7 @@ import { SessionCreateModal } from '../session-create-modal/session-create-modal
 })
 export class ProtocolEditor implements OnInit {
   private fb = inject(FormBuilder);
+  private confirmDialog = inject(ConfirmDialogService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private protocolService = inject(ProtocolService);
@@ -242,11 +243,11 @@ export class ProtocolEditor implements OnInit {
     });
   }
 
-  deleteSection(): void {
+  async deleteSection(): Promise<void> {
     const section = this.selectedSection();
     if (!section) return;
 
-    if (!confirm(`Are you sure you want to delete section "${section.sectionDescription}"?`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete section', message: `Are you sure you want to delete section "${section.sectionDescription}"?`, confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -369,8 +370,8 @@ export class ProtocolEditor implements OnInit {
     });
   }
 
-  deleteStep(stepId: number): void {
-    if (!confirm('Are you sure you want to delete this step?')) {
+  async deleteStep(stepId: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete step', message: 'Are you sure you want to delete this step?', confirmLabel: 'Delete' }))) {
       return;
     }
 
@@ -447,8 +448,8 @@ export class ProtocolEditor implements OnInit {
     );
   }
 
-  deleteStepReagent(stepId: number, reagentId: number): void {
-    if (!confirm('Are you sure you want to remove this reagent from the step?')) {
+  async deleteStepReagent(stepId: number, reagentId: number): Promise<void> {
+    if (!(await this.confirmDialog.confirm({ title: 'Remove reagent', message: 'Are you sure you want to remove this reagent from the step?', confirmLabel: 'Remove' }))) {
       return;
     }
 

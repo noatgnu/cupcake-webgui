@@ -19,7 +19,7 @@ import {
   OntologyType as OntologyTypeEnum,
   MSTermType
 } from '@noatgnu/cupcake-vanilla';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { InstrumentService } from '@noatgnu/cupcake-macaron';
 
 @Component({
@@ -31,6 +31,7 @@ import { InstrumentService } from '@noatgnu/cupcake-macaron';
 })
 export class InstrumentMetadataModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private instrumentService = inject(InstrumentService);
   private metadataColumnTemplateService = inject(MetadataColumnTemplateService);
   private ontologySearchService = inject(OntologySearchService);
@@ -439,10 +440,10 @@ export class InstrumentMetadataModal implements OnInit {
     });
   }
 
-  deleteField(field: MetadataColumn): void {
+  async deleteField(field: MetadataColumn): Promise<void> {
     if (!field.id || !this.instrumentId) return;
 
-    if (!confirm(`Are you sure you want to delete "${field.name}"?`)) {
+    if (!(await this.confirmDialog.confirm({ title: 'Delete metadata field', message: `Are you sure you want to delete "${field.name}"?`, confirmLabel: 'Delete' }))) {
       return;
     }
 

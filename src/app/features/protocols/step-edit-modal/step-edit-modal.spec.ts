@@ -57,4 +57,16 @@ describe('StepEditModal', () => {
     component.cancel();
     expect(mockActiveModal.dismiss).toHaveBeenCalled();
   });
+
+  it('inserts a template at the cursor the editor had before the insert button was clicked', () => {
+    const editor = jasmine.createSpyObj('Quill', ['getSelection', 'insertText', 'setSelection', 'focus', 'getLength']);
+    editor.getSelection.and.callFake((focus?: boolean) => (focus ? { index: 4, length: 0 } : null));
+    editor.root = { innerHTML: '<p>Add %1.quantity% of trypsin</p>' };
+    component.quillEditor = editor;
+
+    component.insertTemplate('%1.quantity%');
+
+    expect(editor.insertText).toHaveBeenCalledWith(4, '%1.quantity%');
+    expect(editor.setSelection).toHaveBeenCalledWith(16);
+  });
 });

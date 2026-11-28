@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ContactService, ExternalContact } from '@noatgnu/cupcake-macaron';
-import { ToastService } from '@noatgnu/cupcake-core';
+import { ToastService, ConfirmDialogService } from '@noatgnu/cupcake-core';
 import { ExternalContactModal } from '../external-contact-modal/external-contact-modal';
 
 @Component({
@@ -15,6 +15,7 @@ import { ExternalContactModal } from '../external-contact-modal/external-contact
 })
 export class ContactsManagementModal implements OnInit {
   private activeModal = inject(NgbActiveModal);
+  private confirmDialog = inject(ConfirmDialogService);
   private contactService = inject(ContactService);
   private toastService = inject(ToastService);
   private modalService = inject(NgbModal);
@@ -60,8 +61,8 @@ export class ContactsManagementModal implements OnInit {
     );
   }
 
-  deleteContact(contact: ExternalContact): void {
-    if (confirm(`Are you sure you want to delete contact "${contact.contactName}"?`)) {
+  async deleteContact(contact: ExternalContact): Promise<void> {
+    if ((await this.confirmDialog.confirm({ title: 'Delete contact', message: `Are you sure you want to delete contact "${contact.contactName}"?`, confirmLabel: 'Delete' }))) {
       this.contactService.deleteExternalContact(contact.id).subscribe({
         next: () => {
           this.toastService.success('Contact deleted successfully');

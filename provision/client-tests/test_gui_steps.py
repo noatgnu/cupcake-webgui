@@ -12,8 +12,9 @@ import re
 from pathlib import Path
 
 import pytest
-from browser_support import Screen, launch_options
-from playwright.sync_api import expect, sync_playwright
+from example_sdrf import ENZYMES, INSTRUMENT, LABEL, PRECURSOR_TOLERANCE
+from playwright.sync_api import expect
+from steps_support import admin_cupcake, admin_vanilla, browser, fill, modal, owner_cupcake, owner_vanilla, retype  # noqa: F401
 from support import created, lab, results, unique  # noqa: F401
 
 pytestmark = [pytest.mark.login, pytest.mark.writes]
@@ -26,51 +27,6 @@ SDRF = (
     "kidney-1\thomo sapiens\tkidney\tnormal\trun 3\tproteomic profiling by mass spectrometry\tkidney-1.raw\n"
 )
 STRAINS = "id,name,synonyms\nLAB:0001,K-12 MG1655,MG1655\nLAB:0002,BL21(DE3),BL21\nLAB:0003,DH5 alpha,DH5a\n"
-
-
-@pytest.fixture(scope="module")
-def browser():
-    with sync_playwright() as playwright:
-        chromium = playwright.chromium.launch(**launch_options("chromium"))
-        yield chromium
-        chromium.close()
-
-
-@pytest.fixture
-def owner_vanilla(browser, lab, vanilla_url, screenshots):
-    tab = Screen(browser, vanilla_url, "steps-vanilla", screenshots, lab["owner"].access_token, lab["owner"].refresh_token)
-    yield tab
-    tab.close()
-
-
-@pytest.fixture
-def admin_vanilla(browser, tokens, vanilla_url, screenshots):
-    tab = Screen(browser, vanilla_url, "steps-vanilla", screenshots, tokens["access"], tokens["refresh"])
-    yield tab
-    tab.close()
-
-
-@pytest.fixture
-def owner_cupcake(browser, lab, cupcake_url, screenshots):
-    tab = Screen(browser, cupcake_url, "steps-cupcake", screenshots, lab["owner"].access_token, lab["owner"].refresh_token)
-    yield tab
-    tab.close()
-
-
-def fill(field, value):
-    """Type value into field once Angular has attached it to its form, so the form's first value cannot replace it."""
-    expect(field).to_be_visible()
-    if field.get_attribute("formcontrolname") is not None:
-        expect(field).to_have_class(re.compile(r"\bng-(pristine|dirty)\b"))
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def modal(tab):
-    """The dialog that is open."""
-    dialog = tab.page.locator("ngb-modal-window").last
-    expect(dialog).to_be_visible()
-    return dialog
 
 
 def test_creating_a_metadata_table_and_filling_it_from_an_sdrf_file(owner_vanilla, lab, api_url):
@@ -245,6 +201,93 @@ def test_writing_a_protocol_and_running_it_as_a_session(owner_cupcake, lab, api_
                 owner.delete(api_url + f"protocols/{protocol['id']}/", timeout=60)
 
 
+def test_naming_a_step_reagent_in_the_step_with_templates(owner_cupcake, lab, api_url):
+    tab, owner = owner_cupcake, lab["owner"]
+    title = unique("templated digestion")
+    reagent_name = unique("Trypsin")
+    session_name = unique("templated run")
+    try:
+        tab.open("protocols", "app-protocol-list")
+        tab.page.get_by_role("button", name="Create Protocol").first.click()
+        dialog = modal(tab)
+        fill(dialog.locator("#protocolTitle"), title)
+        dialog.get_by_role("button", name=re.compile("Create Protocol")).click()
+        expect(tab.page.locator("app-protocol-editor")).to_be_visible()
+        tab.page.locator(".card-header", has_text="Sections").locator("button.btn-primary").click()
+        section_title = tab.page.locator("#sectionDescription")
+        section_title.fill("Digestion")
+        tab.page.locator("form", has=section_title).locator("button.btn-success").click()
+        tab.page.get_by_role("button", name=re.compile("Add Step")).first.click()
+        dialog = modal(tab)
+        dialog.locator(".ql-editor").fill("Digest the lysate")
+        dialog.get_by_role("button", name=re.compile("Create Step")).click()
+        expect(tab.page.locator("ngb-modal-window")).to_have_count(0)
+
+        tab.page.locator("button[title='Add Reagent']").first.click()
+        dialog = modal(tab)
+        fill(dialog.locator("#reagentName"), reagent_name)
+        dialog.locator(".modal-title").click()
+        dialog.locator("#reagentUnit").select_option("ug")
+        fill(dialog.locator("#quantity"), "2")
+        dialog.locator("#scalable").check()
+        fill(dialog.locator("#scalableFactor"), "2")
+        tab.step("template-01-reagent", "Adding a reagent to the step: 2 ug of trypsin, scalable by a factor of 2")
+        dialog.locator(".modal-footer .btn-primary").click()
+        expect(tab.page.locator("ngb-modal-window")).to_have_count(0)
+        expect(tab.page.get_by_text(reagent_name).filter(visible=True).first).to_be_visible()
+
+        for close in tab.page.locator(".toast-container ngb-toast .btn-close").all():
+            close.click()
+        expect(tab.page.locator(".toast-container ngb-toast")).to_have_count(0)
+        tab.page.locator("button[title='Insert Template']").first.click()
+        expect(tab.page.locator(".dropdown-header", has_text="Insert Template")).to_be_visible()
+        tab.step("template-02-insert-menu", "Insert Template beside the reagent copies one of its templates",
+                 keep_notifications=True)
+        tab.page.keyboard.press("Escape")
+
+        tab.page.locator("button[title='Edit Step']").first.click()
+        dialog = modal(tab)
+        editor = dialog.locator(".ql-editor")
+        editor.fill("Add ")
+        reagent_row = dialog.locator("tr", has_text=reagent_name)
+        for button, text_after in (("bi-123", " "), ("bi-rulers", " of "), ("bi-tag", " ("), ("bi-calculator", " "),
+                                   ("bi-rulers", " for a double batch) and incubate overnight at 37 °C")):
+            editor.press("Control+End")
+            reagent_row.locator(f"button:has(i.{button})").click()
+            editor.press("Control+End")
+            tab.page.keyboard.type(text_after)
+        expect(editor).to_contain_text(".scaled_quantity%")
+        tab.step("template-03-written", "Writing the step with the insert buttons of Step Reagents")
+        dialog.get_by_role("button", name="Preview").click()
+        expect(dialog.get_by_text(f"Add 2 ug of {reagent_name} (4 ug").first).to_be_visible()
+        tab.step("template-04-preview", "Preview shows the step with its templates filled in")
+        dialog.get_by_role("button", name=re.compile("Save Changes")).click()
+        expect(tab.page.locator("ngb-modal-window")).to_have_count(0)
+        expect(tab.page.get_by_text(f"Add 2 ug of {reagent_name}").filter(visible=True).first).to_be_visible()
+        tab.step("template-05-filled", "The protocol shows the reagent's quantity, unit and name in the step")
+
+        tab.page.get_by_role("button", name=re.compile("Start Session")).first.click()
+        dialog = modal(tab)
+        fill(dialog.locator("#sessionName"), session_name)
+        dialog.get_by_role("button", name=re.compile("Create & Start Session")).click()
+        expect(tab.page.locator("app-session-list")).to_be_visible()
+        tab.page.get_by_text(session_name).filter(visible=True).first.click()
+        tab.page.locator("button[title='Open Session']").first.click()
+        expect(tab.page.locator("app-session-detail")).to_be_visible()
+        expect(tab.page.get_by_text(f"Add 2 ug of {reagent_name}").filter(visible=True).first).to_be_visible()
+        tab.step("template-06-session", "The filled-in step in a session")
+    finally:
+        for session in results(owner.get(api_url + "sessions/", params={"search": session_name, "limit": 10}, timeout=30)):
+            if session.get("name") == session_name:
+                owner.delete(api_url + f"sessions/{session['id']}/", timeout=60)
+        for protocol in results(owner.get(api_url + "protocols/", params={"search": title, "limit": 10}, timeout=30)):
+            if protocol.get("protocol_title") == title:
+                owner.delete(api_url + f"protocols/{protocol['id']}/", timeout=60)
+        for reagent in results(owner.get(api_url + "reagents/", params={"search": reagent_name, "limit": 10}, timeout=30)):
+            if reagent.get("name") == reagent_name:
+                owner.delete(api_url + f"reagents/{reagent['id']}/", timeout=60)
+
+
 EXAMPLE_SDRF = Path(__file__).parent / "examples" / "PXD019185_PXD018883.sdrf.tsv"
 PER_SAMPLE_COLUMNS = {"source name", "assay name", "comment[data file]"}
 STAFF_ONLY_COLUMNS = {"comment[instrument]", "comment[data file]", "comment[fraction identifier]", "comment[technical replicate]"}
@@ -351,6 +394,22 @@ def test_submitting_an_instrument_job_through_the_wizard(owner_cupcake, lab, job
         expect(tab.page.locator("th", has_text="characteristics[organism]").filter(visible=True)).to_have_count(0)
         table_title.evaluate("element => element.scrollIntoView({block: 'start'})")
         tab.step("job-08-staff-columns", "The submitted job's metadata table showing only the columns staff fill in")
+
+        tab.open(f"jobs/{jobs[0]['id']}", "app-job-detail", job_title)
+        tab.page.get_by_role("button", name=re.compile("Edit Job Details")).first.click()
+        dialog = modal(tab)
+        expect(dialog.locator("#jobName")).to_have_value(job_title)
+        retype(dialog.locator("#method"), f"{LABEL}, {ENZYMES[0]} and {ENZYMES[1]}, {PRECURSOR_TOLERANCE} precursor tolerance")
+        retype(dialog.locator("#location"), f"{INSTRUMENT}, room 2.14")
+        tab.step("job-14-staff-edit", "The group's staff change a submitted job's details, such as the method and where "
+                                      "it runs")
+        with tab.page.expect_response(lambda response: "/instrument-jobs/" in response.url
+                                      and response.request.method == "PATCH") as saved_job:
+            dialog.locator(".modal-footer .btn-primary").last.click()
+        assert saved_job.value.ok, f"saving the job failed: {saved_job.value.status} {saved_job.value.text()[:300]}"
+        expect(tab.page.locator("ngb-modal-window")).to_have_count(0)
+        saved = owner.get(api_url + f"instrument-jobs/{jobs[0]['id']}/", timeout=30).json()
+        assert saved.get("location") == f"{INSTRUMENT}, room 2.14", f"the location was not saved: {saved.get('location')}"
     finally:
         for job in results(owner.get(api_url + "instrument-jobs/", params={"search": job_title, "limit": 10}, timeout=30)):
             if job.get("job_name") == job_title:
